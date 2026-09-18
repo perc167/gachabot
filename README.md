@@ -1,0 +1,244 @@
+# Gacha bot
+
+A Mudae-style Discord gacha bot: roll random characters, claim them with a
+button, collect kakera, keep a wishlist, trade with other players. Rates and
+cooldowns are configurable per server.
+
+## Setup
+
+Six steps, about ten minutes. You need a Discord server where you can add bots
+(make a new empty one if you like — click the **+** at the bottom of your server
+list in Discord).
+
+### Step 1 — Create the bot account
+
+A bot is its own Discord account that your code logs into. You make one here:
+
+1. Go to **https://discord.com/developers/applications**, sign in.
+2. Top right: **New Application**. Give it a name (this is the name people will
+   see) and click **Create**.
+3. In the left sidebar, click **Bot**.
+
+Leave this page open — the next two steps happen right here.
+
+### Step 2 — Get the token
+
+The token is the bot's password. Your code needs it to log in.
+
+1. On that **Bot** page, click **Reset Token**, then **Yes, do it**.
+2. Click **Copy**. You can only see it once — if you lose it, just reset again.
+3. Open the file **`.env`** in this folder (Notepad is fine). Find this line:
+
+   ```
+   DISCORD_TOKEN=paste-your-bot-token-here
+   ```
+
+   Replace `paste-your-bot-token-here` with what you copied. No quotes, no
+   spaces around the `=`. It should end up looking like
+   `DISCORD_TOKEN=MTIzNDU2Nzg5...`
+
+4. Save the file.
+
+> Never post this token anywhere. Anyone who has it controls your bot. If it
+> leaks, hit **Reset Token** and it becomes worthless.
+
+### Step 3 — Turn on the two switches
+
+Still on the **Bot** page, scroll down to **Privileged Gateway Intents** and
+turn ON both of these:
+
+- **MESSAGE CONTENT INTENT** — lets the bot read `$w` and friends
+- **SERVER MEMBERS INTENT** — lets it recognise `@mentions` in trades
+
+Click **Save Changes** at the bottom. **The bot will refuse to start without
+these**, and it will tell you so if you forget.
+
+### Step 4 — Invite it to your server
+
+1. Left sidebar: **OAuth2**, then find **OAuth2 URL Generator**.
+2. Under **SCOPES**, tick **`bot`**.
+3. A **BOT PERMISSIONS** box appears below. Tick:
+   **Send Messages**, **Embed Links**, **Attach Files**, **Read Message History**.
+4. Copy the long URL at the bottom, paste it into your browser, pick your
+   server, and click **Authorize**.
+
+The bot appears in your member list, offline. That's expected — it comes online
+in step 5.
+
+### Step 5 — Tell it who you are, then start it
+
+`BOT_OWNERS` is who is allowed to add characters. That should be you.
+
+1. In Discord: **Settings** (gear, bottom left) → **Advanced** → turn on
+   **Developer Mode**.
+2. Right-click your own name anywhere → **Copy User ID**.
+3. In **`.env`**, replace `paste-your-user-id-here` with that number. Save.
+4. Now start it: **double-click `start-bot.bat`** in this folder.
+
+That's it. The launcher finds Python for you, installs what's needed the first
+time, and starts the bot.
+
+When it works you'll see `logged in as YourBotName`. The bot goes green in
+Discord. Leave that black window open — closing it turns the bot off.
+
+<details>
+<summary>Prefer to type the commands yourself?</summary>
+
+```bash
+pip install -r requirements.txt
+```
+
+```bash
+python bot.py
+```
+
+If cmd says `'python' is not recognized`, Python was installed without being
+added to your PATH. Either use `start-bot.bat`, which works around it, or fix
+it permanently: re-run the Python installer, choose **Modify**, click Next, and
+tick **Add Python to environment variables**. Then close and reopen cmd.
+</details>
+
+### Step 6 — Load the characters and play
+
+In any channel in your server, type:
+
+```
+$import
+```
+
+That loads the starter characters. Then:
+
+```
+$w
+```
+
+You'll get a character with a **Claim** button. Press it. You're playing.
+
+`$help` lists everything else.
+
+## If something goes wrong
+
+| What you see | What it means |
+|---|---|
+| `SETUP NEEDED: the bot does not have a token yet` | Step 2 — the token is still the placeholder text in `.env` |
+| `Discord rejected that token` | The token is mistyped, cut short, or was reset after you copied it. Reset it and paste again |
+| `SETUP NEEDED: two switches are still off` | Step 3 — the two intents |
+| `'python' is not recognized` | Python isn't on your PATH. Use `start-bot.bat` instead — it finds Python on its own |
+| `.env` is missing | Copy `.env.example` to `.env` and fill it in. It is never copied automatically, because it holds your token |
+| Bot is online but ignores `$w` | It can't see messages: the Message Content intent (step 3), or it lacks Send Messages in that channel |
+| `BOT_OWNERS is empty` warning | Step 5 — your user ID. Everything works except `$import` and `$addchar` |
+| Nothing happens on `$w` | Run `$import` first — an empty pool has nothing to roll |
+
+## Commands
+
+| | |
+|---|---|
+| `$w` | Roll a character (aliases: `$wa`, `$m`, `$roll`) |
+| `$rolls` | Rolls left and every cooldown |
+| `$mm [@user] [likes\|name\|recent\|kakera]` | Browse a harem |
+| `$im <name>` | Character card |
+| `$search <text>` | Search by character or series |
+| `$divorce <name>` | Release a character, refunds half its kakera |
+| `$note <name> \| <text>` | Annotate one of your characters |
+| `$top` | Biggest harems in the server |
+| `$k [@user]` | Kakera balance and harem worth |
+| `$daily` | Free kakera every 20h |
+| `$pay @user <amount>` | Send kakera |
+| `$richest` | Kakera leaderboard |
+| `$wish <name>` | Get pinged and a head start when it rolls |
+| `$unwish <name>` / `$wishlist [@user]` / `$wishedby <name>` | Wishlist management |
+| `$gift @user <name>` | Give a character away (they confirm) |
+| `$trade @user <yours> \| <theirs>` | Swap two characters (both confirm) |
+| `$settings` / `$set <key> <value>` / `$resetsettings` | Per-server tuning (Manage Server) |
+| `$pool` | Pool size and most-liked characters |
+| `$addchar` / `$editchar` / `$delchar` / `$import` / `$export` | Owner-only pool management |
+
+## How the game works
+
+**Rolling.** Each player gets `roll_limit` rolls per `roll_reset_minutes`
+window. The counter refills in blocks — when the window expires, you are back
+to full.
+
+**Claiming.** A roll of an unclaimed character shows a Claim button for
+`claim_window_seconds`. Clicking it marries the character to you and starts
+your `claim_interval_minutes` cooldown. A character can only be married by one
+person *per server* — each server has its own independent game state over a
+shared character pool.
+
+**Kakera.** Rolling a character someone already owns drops a Kakera button
+instead. Grabbing pays out based on the character's `base_kakera`, their rarity
+tier, and the server's `kakera_rate`, with a ±20% jitter — 60% payout if the
+character is not yours. Gated by `kakera_interval_minutes`.
+
+**Rarity.** Derived from a character's `likes`, not stored separately. The tiers
+and their kakera multipliers live in `RARITY_TIERS` in `config.py`; edit that
+list to change the curve.
+
+**Wishes.** When a wished character rolls, every wisher gets pinged, and for
+`wish_protect_seconds` only wishers may press Claim. Wishes are consumed once
+the character is claimed.
+
+## Adding your own characters
+
+`data/characters.json` is a list of objects:
+
+```json
+[
+  {
+    "name": "Ren Ashgrove",
+    "series": "Lanternfall",
+    "image_url": "https://example.com/ren.png",
+    "likes": 1820,
+    "base_kakera": 95
+  }
+]
+```
+
+`likes` and `base_kakera` are optional (default 0 and 50). Imports match on
+`name` + `series`, so re-importing updates rather than duplicates.
+
+The shipped seed file is 14 placeholder characters with randomly generated
+images, there so the bot works the moment you start it. **Replace them.** Do not
+scrape anime art off the internet for a public bot — use art you own, art you
+have permission for, or public-domain images.
+
+## Layout
+
+```
+start-bot.bat       double-click launcher, finds Python and starts the bot
+bot.py              entry point, cog loading, error handling
+config.py           settings table, rarity tiers, env vars
+db.py               all SQL; every query lives here
+utils.py            cooldown bookkeeping, kakera math, embed building
+views.py            Paginator and Confirm buttons
+cogs/rolling.py     $w, the Claim and Kakera buttons
+cogs/harem.py       browsing, lookup, divorce, leaderboard
+cogs/kakera.py      balance, daily, pay, richest
+cogs/wishlist.py    wishes
+cogs/trading.py     gift and trade
+cogs/admin.py       pool management, import/export
+cogs/settings.py    per-guild config
+cogs/help.py        the help embed
+smoke_test.py       loads every cog, exercises the game logic, no token needed
+```
+
+Before you touch anything, check it still runs:
+
+```bash
+python smoke_test.py
+```
+
+It loads all eight cogs, then drives claims, races, cooldowns, kakera, wishes,
+trades, divorces, settings and embed building against a throwaway database —
+about 70 assertions, a few seconds, no Discord connection.
+
+Adding a setting is one line in `GUILD_SETTINGS` — `$settings` and `$set` pick
+it up automatically.
+
+## Notes
+
+- Storage is SQLite (`gacha.db`), created on first run. Back it up by copying
+  the file.
+- Concurrent claims are safe: the marriage table's primary key means the first
+  writer wins and everyone else gets "Someone beat you to it."
+- Buttons expire but the message stays; expired views disable their buttons.

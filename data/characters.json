@@ -1,0 +1,100 @@
+[
+  {
+    "name": "Ren Ashgrove",
+    "series": "Lanternfall",
+    "image_url": "https://picsum.photos/seed/ren-ashgrove/600/800",
+    "likes": 1820,
+    "base_kakera": 95
+  },
+  {
+    "name": "Vega Calloway",
+    "series": "Lanternfall",
+    "image_url": "https://picsum.photos/seed/vega-calloway/600/800",
+    "likes": 1540,
+    "base_kakera": 90
+  },
+  {
+    "name": "Sable Quint",
+    "series": "Nine Hollow Kings",
+    "image_url": "https://picsum.photos/seed/sable-quint/600/800",
+    "likes": 980,
+    "base_kakera": 80
+  },
+  {
+    "name": "Ilyra Vantt",
+    "series": "Nine Hollow Kings",
+    "image_url": "https://picsum.photos/seed/ilyra-vantt/600/800",
+    "likes": 745,
+    "base_kakera": 75
+  },
+  {
+    "name": "Marek Solheim",
+    "series": "The Glass Meridian",
+    "image_url": "https://picsum.photos/seed/marek-solheim/600/800",
+    "likes": 520,
+    "base_kakera": 70
+  },
+  {
+    "name": "Ophelia Crane",
+    "series": "The Glass Meridian",
+    "image_url": "https://picsum.photos/seed/ophelia-crane/600/800",
+    "likes": 430,
+    "base_kakera": 65
+  },
+  {
+    "name": "Juno Belltower",
+    "series": "Saltwind Academy",
+    "image_url": "https://picsum.photos/seed/juno-belltower/600/800",
+    "likes": 310,
+    "base_kakera": 60
+  },
+  {
+    "name": "Cassius Vale",
+    "series": "Saltwind Academy",
+    "image_url": "https://picsum.photos/seed/cassius-vale/600/800",
+    "likes": 265,
+    "base_kakera": 58
+  },
+  {
+    "name": "Nim Teodor",
+    "series": "Saltwind Academy",
+    "image_url": "https://picsum.photos/seed/nim-teodor/600/800",
+    "likes": 180,
+    "base_kakera": 55
+  },
+  {
+    "name": "Perrin Hale",
+    "series": "Duskfare",
+    "image_url": "https://picsum.photos/seed/perrin-hale/600/800",
+    "likes": 120,
+    "base_kakera": 52
+  },
+  {
+    "name": "Wren Odalis",
+    "series": "Duskfare",
+    "image_url": "https://picsum.photos/seed/wren-odalis/600/800",
+    "likes": 64,
+    "base_kakera": 48
+  },
+  {
+    "name": "Tobias Fenn",
+    "series": "Duskfare",
+    "image_url": "https://picsum.photos/seed/tobias-fenn/600/800",
+    "likes": 41,
+    "base_kakera": 45
+  },
+  {
+    "name": "Liora Nast",
+    "series": "Coldwater Orbit",
+    "image_url": "https://picsum.photos/seed/liora-nast/600/800",
+    "likes": 22,
+    "base_kakera": 40
+  },
+  {
+    "name": "Hadrian Vosk",
+    "series": "Coldwater Orbit",
+    "image_url": "https://picsum.photos/seed/hadrian-vosk/600/800",
+    "likes": 9,
+    "base_kakera": 38
+  }
+]
