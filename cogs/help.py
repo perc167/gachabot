@@ -41,7 +41,7 @@ CATEGORIES = [
         ("wishremoveall", "Empty your wishlist"),
     ]),
     ("\U0001f48e", "Karuda", "The currency", [
-        ("dk", "Two shards appear, keep one · every 20h"),
+        ("dk", "Two shards: keep one, others may snipe the rest"),
         ("shards", "What each shard pays, and the odds"),
         ("", ""),
         ("k [@user]", "Balance and shard collection"),

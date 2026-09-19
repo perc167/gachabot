@@ -15,20 +15,28 @@ DAILY_MIN, DAILY_MAX = 100, 240
 
 
 class ShardDrops(discord.ui.View):
-    """Two shards, one choice.
+    """Two shards. You keep one — the other is up for grabs.
 
-    Both are rolled and both are shown with their icon and payout, so the
-    decision is made with full information - the interesting case is an
-    Aurum next to an Azure, not a mystery box. Taking one forfeits the other.
+    Both are rolled and shown with their icon and payout, so the choice is
+    made with full information. You get first refusal for a short window;
+    after that, or the moment you take yours, anyone else in the channel can
+    snipe what is left. Snipers take a reduced cut, so a busy server does not
+    quietly double everyone's daily income.
     """
 
-    def __init__(self, bot, guild_id: int, author, drops, timeout: float = 600):
+    def __init__(self, bot, guild_id: int, author, drops, protect: int,
+                 snipe: bool, snipe_percent: int, timeout: float = 600):
         super().__init__(timeout=timeout)
         self.bot = bot
         self.guild_id = guild_id
         self.author = author
         self.drops = drops
-        self.taken = None  # index of the one they chose
+        self.protect = protect
+        self.snipe = snipe
+        self.snipe_percent = snipe_percent
+        self.opened_at = utils.now()
+        self.claimed = [None] * len(drops)  # user id per shard
+        self.takers = set()  # nobody takes two from one drop
         self.message = None
 
         for index, (key, name, _mult, _colour, amount) in enumerate(drops):
@@ -40,23 +48,49 @@ class ShardDrops(discord.ui.View):
             button.callback = self._collector(index)
             self.add_item(button)
 
+    # ---- who may press what, and when -------------------------------
+
+    @property
+    def owner_took_one(self) -> bool:
+        return self.author.id in self.takers
+
+    def protection_left(self) -> int:
+        if self.owner_took_one:
+            return 0  # they have had their pick; the rest is fair game
+        return max(0, self.protect - (utils.now() - self.opened_at))
+
+    def snipe_amount(self, amount: int) -> int:
+        return max(1, amount * self.snipe_percent // 100)
+
     def render(self) -> discord.Embed:
         lines = []
         for index, (key, name, mult, _colour, amount) in enumerate(self.drops):
             icon = utils.shard_icon(key)
-            if self.taken is None:
+            holder = self.claimed[index]
+            if holder is None:
                 lines.append(f"{icon} **{name}** ×{mult:g} — **{amount:,}**")
-            elif index == self.taken:
-                lines.append(f"{icon} **{name}** ×{mult:g} — taken, **{amount:,}**")
+            elif holder == self.author.id:
+                lines.append(f"{icon} **{name}** ×{mult:g} — kept, **{amount:,}**")
             else:
-                lines.append(f"~~{icon} {name} ×{mult:g} — {amount:,}~~")
+                lines.append(
+                    f"{icon} ~~{name} ×{mult:g}~~ — sniped by <@{holder}>"
+                )
 
-        if self.taken is None:
-            colour = max(self.drops, key=lambda d: d[2])[3]
-            footer = "Pick one — the other is lost"
+        left = [i for i, holder in enumerate(self.claimed) if holder is None]
+        if not left:
+            colour = config.CARD_COLOUR
+            footer = "All gone · next in 20h"
         else:
-            colour = self.drops[self.taken][3]
-            footer = "Chosen · next in 20h"
+            colour = max((self.drops[i] for i in left), key=lambda d: d[2])[3]
+            if not self.snipe:
+                footer = "Pick one — the other is lost"
+            elif self.protection_left():
+                footer = (
+                    f"Yours alone for {self.protection_left()}s,"
+                    f" then anyone may take what is left"
+                )
+            else:
+                footer = f"Open to anyone · snipers take {self.snipe_percent}%"
 
         embed = discord.Embed(
             title=f"{self.author.display_name}'s daily karuda",
@@ -68,41 +102,61 @@ class ShardDrops(discord.ui.View):
 
     def _collector(self, index: int):
         async def callback(interaction: discord.Interaction):
-            if self.taken is not None:
+            user = interaction.user
+            if self.claimed[index] is not None:
                 await interaction.response.send_message(
-                    "You already chose.", ephemeral=True
+                    "That one is gone.", ephemeral=True
                 )
                 return
-            key, _name, _mult, _colour, amount = self.drops[index]
-            self.taken = index
-            total = self.bot.db.add_karuda(self.guild_id, self.author.id, amount)
-            self.bot.db.record_shard(self.guild_id, self.author.id, key)
-
-            # Both close: one because it is spent, the other because it is gone.
-            for position, child in enumerate(self.children):
-                child.disabled = True
-                child.style = (
-                    discord.ButtonStyle.success
-                    if position == index
-                    else discord.ButtonStyle.secondary
+            if user.id in self.takers:
+                await interaction.response.send_message(
+                    "One each from a drop.", ephemeral=True
                 )
+                return
+
+            is_owner = user.id == self.author.id
+            if not is_owner:
+                if not self.snipe:
+                    await interaction.response.send_message(
+                        "Sniping is off on this server.", ephemeral=True
+                    )
+                    return
+                waiting = self.protection_left()
+                if waiting:
+                    await interaction.response.send_message(
+                        f"{self.author.display_name} has first refusal for"
+                        f" another {waiting}s.",
+                        ephemeral=True,
+                    )
+                    return
+
+            key, name, _mult, _colour, amount = self.drops[index]
+            payout = amount if is_owner else self.snipe_amount(amount)
+            self.claimed[index] = user.id
+            self.takers.add(user.id)
+            total = self.bot.db.add_karuda(self.guild_id, user.id, payout)
+            self.bot.db.record_shard(self.guild_id, user.id, key)
+
+            self.children[index].disabled = True
+            self.children[index].style = discord.ButtonStyle.success
+            # The owner taking one opens the rest immediately.
+            if all(holder is not None for holder in self.claimed):
+                for child in self.children:
+                    child.disabled = True
+                self.stop()
+
             embed = self.render()
-            embed.add_field(name="Balance", value=f"{total:,}", inline=True)
+            embed.add_field(
+                name="Kept" if is_owner else "Sniped",
+                value=f"{user.mention} +{payout:,} → {total:,}",
+                inline=False,
+            )
             await interaction.response.edit_message(embed=embed, view=self)
-            self.stop()
 
         return callback
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author.id:
-            await interaction.response.send_message(
-                "Not your drop. Run `$dk` for your own.", ephemeral=True
-            )
-            return False
-        return True
-
     async def on_timeout(self):
-        if self.message and self.taken is None:
+        if self.message and any(holder is None for holder in self.claimed):
             for child in self.children:
                 child.disabled = True
             try:
@@ -157,7 +211,7 @@ class Karuda(commands.Cog):
     @commands.command(name="dk", aliases=["daily", "dailykaruda"])
     @commands.guild_only()
     async def dk(self, ctx):
-        """Two shards appear, you keep one. Once every 20 hours."""
+        """Two shards appear: you keep one, the other can be sniped."""
         db = self.bot.db
         gid = ctx.guild.id
         player = db.get_player(gid, ctx.author.id)
@@ -188,7 +242,15 @@ class Karuda(commands.Cog):
             gid, ctx.author.id, daily_ready_at=utils.now() + DAILY_COOLDOWN
         )
 
-        view = ShardDrops(self.bot, gid, ctx.author, drops)
+        view = ShardDrops(
+            self.bot,
+            gid,
+            ctx.author,
+            drops,
+            protect=db.get_setting(gid, "dk_protect_seconds"),
+            snipe=bool(db.get_setting(gid, "dk_snipe")),
+            snipe_percent=db.get_setting(gid, "dk_snipe_percent"),
+        )
         view.message = await ctx.send(
             content=ctx.author.mention, embed=view.render(), view=view
         )

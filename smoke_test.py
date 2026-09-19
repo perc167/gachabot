@@ -534,6 +534,69 @@ async def main():
           "<:dust:42>" in str(card.fields[0].value), str(card.fields[0].value))
     utils.use_emoji_from(None)
 
+    # 20d. $dk: two shards, you keep one, others may snipe the rest.
+    from cogs.karuda import DAILY_OFFERS, ShardDrops
+
+    class _Author:
+        id = ALICE
+        display_name = "tester"
+
+    rolled = [config.roll_shard(_random) for _ in range(DAILY_OFFERS)]
+    drops = [
+        (k, n, m, c, 100 * (i + 1))
+        for i, (k, n, _i, m, _w, c) in enumerate(rolled)
+    ]
+
+    def fresh(protect=20, snipe=True, percent=50):
+        return ShardDrops(
+            b, GUILD, _Author(), drops,
+            protect=protect, snipe=snipe, snipe_percent=percent,
+        )
+
+    view = fresh()
+    check("dk offers a button per shard", len(view.children) == DAILY_OFFERS,
+          f"{len(view.children)} for {DAILY_OFFERS} offers")
+    check("dk starts with nothing claimed",
+          view.claimed == [None] * DAILY_OFFERS)
+    body = view.render().description
+    check("dk shows both shards up front",
+          all(d[1] in body for d in drops), body[:120])
+    check("dk shows each amount before choosing",
+          all(f"{d[4]:,}" in body for d in drops), body[:120])
+    check("dk labels buttons with the payout",
+          all(str(d[4]) in c.label.replace(",", "")
+              for d, c in zip(drops, view.children)),
+          " | ".join(c.label for c in view.children))
+
+    # The owner gets first refusal, then it opens up.
+    check("a fresh drop is protected", fresh().protection_left() > 0)
+    check("a zero window is open at once",
+          fresh(protect=0).protection_left() == 0)
+    taken = fresh()
+    taken.takers.add(ALICE)
+    check("the owner taking one opens the rest immediately",
+          taken.protection_left() == 0)
+    check("footer announces the wait",
+          "yours alone" in fresh().render().footer.text.lower(),
+          fresh().render().footer.text)
+    check("footer announces when it is open",
+          "anyone" in fresh(protect=0).render().footer.text.lower(),
+          fresh(protect=0).render().footer.text)
+    check("footer says the spare is lost when sniping is off",
+          "lost" in fresh(snipe=False).render().footer.text.lower(),
+          fresh(snipe=False).render().footer.text)
+
+    # A sniper takes a share, never the lot and never nothing.
+    check("snipers take the configured share",
+          fresh(percent=50).snipe_amount(200) == 100)
+    check("a snipe never rounds down to zero",
+          fresh(percent=1).snipe_amount(1) >= 1)
+    check("a hundred percent hands over the whole shard",
+          fresh(percent=100).snipe_amount(200) == 200)
+    check("snipe settings are real settings",
+          {"dk_snipe", "dk_protect_seconds", "dk_snipe_percent"}
+          <= set(config.GUILD_SETTINGS))
+
     # 20c. Name lookups can offer every match, not just an arbitrary one.
     dupe_names = {}
     for row in all_rows:
@@ -554,32 +617,6 @@ async def main():
     check("single match needs no prompt", single["id"] == by_rank[0]["id"])
     check("no matches yields nothing",
           await views.choose_character(None, [], "pick") is None)
-
-    # 20d. $dk drops two shards as buttons.
-    from cogs.karuda import ShardDrops
-
-    class _Author:
-        id = ALICE
-        display_name = "tester"
-
-    from cogs.karuda import DAILY_OFFERS
-
-    rolled = [config.roll_shard(_random) for _ in range(DAILY_OFFERS)]
-    drops = [(k, n, m, c, 100 * (i + 1)) for i, (k, n, _i, m, _w, c) in enumerate(rolled)]
-    view = ShardDrops(b, GUILD, _Author(), drops)
-    check("dk offers a button per shard", len(view.children) == DAILY_OFFERS,
-          f"{len(view.children)} for {DAILY_OFFERS} offers")
-    check("dk starts with nothing chosen", view.taken is None)
-    body = view.render().description
-    check("dk shows both shards up front",
-          all(d[1] in body for d in drops), body[:120])
-    check("dk shows each amount before choosing",
-          all(f"{d[4]:,}" in body for d in drops), body[:120])
-    check("dk says only one may be taken",
-          "one" in view.render().footer.text.lower(), view.render().footer.text)
-    check("dk labels buttons with the payout",
-          all(str(d[4]) in c.label.replace(",", "") for d, c in zip(drops, view.children)),
-          " | ".join(c.label for c in view.children))
 
     # 20e. Likes: a vote you can take back, counted per server.
     liked = by_rank[5]

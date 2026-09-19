@@ -154,7 +154,7 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$duel @user [bet]` | Your best character against theirs |
 | `$alea [low] [high]` / `$jankenpon` | Dice and rock-paper-scissors |
 | `$k [@user]` | Karuda balance and shard collection |
-| `$dk` | A karuda shard to collect, every 20h |
+| `$dk` | Two shards: keep one, others may snipe the rest |
 | `$shards` | What each shard pays, and its odds |
 | `$pay @user <amount>` | Send karuda |
 | `$richest` | Karuda leaderboard |
@@ -222,6 +222,12 @@ eight types, and which one you get decides the payout:
 | Obsidian | ×9 | 1.5% |
 | Prism | ×14 | 0.8% |
 | Lumen | ×25 | 0.2% |
+
+**Sniping.** You get first refusal on your own drop for
+`dk_protect_seconds` (20 by default). After that — or the moment you take
+yours — anyone in the channel can take the shard you left. Snipers receive
+`dk_snipe_percent` of it (50% by default), so a busy server does not quietly
+double everyone's daily income, and `dk_snipe 0` turns it off entirely.
 
 One balance, so shards are about the moment of the pull rather than six
 separate wallets. Every type you have pulled is tracked and shown on `$k`.

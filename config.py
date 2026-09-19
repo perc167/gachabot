@@ -37,6 +37,15 @@ GUILD_SETTINGS = {
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
     "wish_limit": (20, 1, 200, "How many characters a user may wish for"),
     "custom_limit": (50, 0, 2000, "Custom characters a server may add"),
+    "dk_snipe": (1, 0, 1, "Let others take the shard you leave behind (0/1)"),
+    "dk_protect_seconds": (
+        20, 0, 600,
+        "How long a daily drop is yours alone before others may snipe it",
+    ),
+    "dk_snipe_percent": (
+        50, 1, 100,
+        "Percent of a shard a sniper receives",
+    ),
     # --- economy ---
     "karuda_grab_percent": (
         8, 1, 100,
