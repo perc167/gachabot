@@ -75,7 +75,10 @@ class Games(commands.Cog):
         gid = ctx.guild.id
         character = None
         for _ in range(40):
-            candidate = db.random_character(gid, include_claimed=True)
+            candidate = db.random_character(
+                gid, include_claimed=True,
+                bias=db.get_setting(gid, "roll_bias"),
+            )
             if (
                 candidate
                 and candidate["image_url"]

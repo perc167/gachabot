@@ -1,4 +1,5 @@
 """Shared helpers: cooldown bookkeeping, karuda math, embed building."""
+import json
 import time
 
 import discord
@@ -234,3 +235,42 @@ def character_embed(
 def paginate(lines, per_page: int = 10) -> list:
     """Chop a list of strings into pages."""
     return [lines[i : i + per_page] for i in range(0, len(lines), per_page)] or [[]]
+
+
+def iter_roster(path: str):
+    """Yield character records from a roster file without holding all of it.
+
+    data/characters.json is written one record per line inside a JSON array,
+    so it can be read a line at a time. That shape is worth using: a hundred
+    thousand characters parsed in one go is around 140MB of Python objects,
+    which is real money on a small container and happens on every deploy.
+
+    Anything not in that shape - a hand-written file, a prettified one - is
+    loaded whole instead, so nothing stops working for the sake of the
+    optimisation.
+    """
+    with open(path, "r", encoding="utf-8") as handle:
+        first = handle.readline().strip()
+        second = handle.readline()
+        record = None
+        streamable = first == "["
+        if streamable:
+            try:
+                record = json.loads(second.strip().rstrip(","))
+            except json.JSONDecodeError:
+                streamable = False
+
+        if not streamable:
+            handle.seek(0)
+            payload = json.load(handle)
+            if not isinstance(payload, list):
+                raise ValueError("expected a JSON list of character objects")
+            yield from payload
+            return
+
+        yield record
+        for line in handle:
+            line = line.strip().rstrip(",")
+            if not line or line == "]":
+                continue
+            yield json.loads(line)

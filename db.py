@@ -1,4 +1,5 @@
 """SQLite storage layer. One connection, shared across cogs."""
+import random
 import sqlite3
 import time
 from typing import Optional
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS character_images (
 );
 CREATE INDEX IF NOT EXISTS idx_images_character
     ON character_images (character_id);
+
 
 CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id INTEGER NOT NULL,
@@ -170,12 +172,26 @@ class DuplicateCharacter(Exception):
     """A write would collide with an existing name + series pair."""
 
 
+# Built after the migrations rather than alongside the tables: an older
+# database reaches __init__ without a like_rank column at all, and indexing a
+# column that is about to be added fails the whole script.
+INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_characters_rank
+    ON characters (like_rank);
+CREATE INDEX IF NOT EXISTS idx_characters_series
+    ON characters (series);
+CREATE INDEX IF NOT EXISTS idx_characters_name
+    ON characters (name COLLATE NOCASE);
+"""
+
+
 class Database:
     def __init__(self, path: str = config.DB_PATH):
         self.conn = sqlite3.connect(path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self._migrate()
+        self.conn.executescript(INDEXES)
         self.conn.commit()
 
     def _migrate(self):
@@ -475,25 +491,88 @@ class Database:
             (f"{name}%", *extra, limit),
         ).fetchall()
 
-    def random_character(
-        self, guild_id: int, include_claimed: bool
-    ) -> Optional[sqlite3.Row]:
+    def _roll_scope(self, guild_id: int, include_claimed: bool) -> tuple:
+        """The FROM and WHERE every roll shares: this guild's view of the pool,
+        optionally minus everyone already claimed here."""
         if include_claimed:
-            return self.conn.execute(
-                "SELECT * FROM characters"
-                " WHERE guild_id = 0 OR guild_id = ?"
-                " ORDER BY RANDOM() LIMIT 1",
+            return (
+                "FROM characters c",
+                "WHERE (c.guild_id = 0 OR c.guild_id = ?)",
                 (guild_id,),
-            ).fetchone()
-        return self.conn.execute(
-            "SELECT c.* FROM characters c"
+            )
+        return (
+            "FROM characters c"
             " LEFT JOIN marriages m"
-            "   ON m.character_id = c.id AND m.guild_id = ?"
-            " WHERE m.character_id IS NULL"
-            "   AND (c.guild_id = 0 OR c.guild_id = ?)"
-            " ORDER BY RANDOM() LIMIT 1",
+            "   ON m.character_id = c.id AND m.guild_id = ?",
+            "WHERE m.character_id IS NULL"
+            "  AND (c.guild_id = 0 OR c.guild_id = ?)",
             (guild_id, guild_id),
+        )
+
+    def random_character(
+        self, guild_id: int, include_claimed: bool, bias: int = 0
+    ) -> Optional[sqlite3.Row]:
+        """One character to roll.
+
+        At bias 0 the pool is flat, and a flat pool punishes size: against a
+        hundred thousand characters a famous face turns up once in a thousand
+        rolls, which is a lottery rather than a game. Above 0 the pick is
+        pulled towards the top of the popularity ranking. Nobody is excluded -
+        the whole roster still rolls, just not with equal weight.
+
+        The dial is a percent rather than a curve so it means something to
+        whoever sets it: 35 over a hundred thousand characters feels like a
+        flat pool of thirty thousand did.
+        """
+        source, where, args = self._roll_scope(guild_id, include_claimed)
+
+        if bias <= 0:
+            return self.conn.execute(
+                f"SELECT c.* {source} {where} ORDER BY RANDOM() LIMIT 1", args
+            ).fetchone()
+
+        # Deliberately not counted through the join: at a hundred thousand
+        # rows that is a full scan on every single roll. The depth of the
+        # ranking is the same for everyone, and an index knows it instantly.
+        deepest = self.conn.execute(
+            "SELECT MAX(like_rank) AS deepest FROM characters"
+        ).fetchone()["deepest"] or 0
+        if not deepest:
+            return self.conn.execute(
+                f"SELECT c.* {source} {where} ORDER BY RANDOM() LIMIT 1", args
+            ).fetchone()
+        # Counted over exactly the same set the branch below picks from.
+        # Anything unranked - a server's own character, or one an owner added
+        # by hand - would otherwise be unrollable the moment bias is on.
+        unranked = self.conn.execute(
+            f"SELECT COUNT(*) AS c {source} {where} AND c.like_rank <= 0", args
+        ).fetchone()["c"]
+        total = deepest + unranked
+
+        # No popularity rank means a rank window would shut them out
+        # completely, so give them exactly their share of the rolls instead.
+        if unranked and random.random() < unranked / total:
+            return self.conn.execute(
+                f"SELECT c.* {source} {where} AND c.like_rank <= 0"
+                f" ORDER BY RANDOM() LIMIT 1",
+                args,
+            ).fetchone()
+
+        exponent = 1.0 + min(100, max(0, bias)) / 100.0
+        target = max(1, int(deepest * (random.random() ** exponent)))
+        row = self.conn.execute(
+            f"SELECT c.* {source} {where} AND c.like_rank >= ?"
+            f" ORDER BY c.like_rank LIMIT 1",
+            (*args, target),
         ).fetchone()
+        if row is None:
+            # Everyone past the target is claimed; fall back up the ranking.
+            row = self.conn.execute(
+                f"SELECT c.* {source} {where} AND c.like_rank > 0"
+                f" ORDER BY c.like_rank DESC LIMIT 1",
+                args,
+            ).fetchone()
+        return row
 
     # ---------- character images ----------
 

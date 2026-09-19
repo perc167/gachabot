@@ -260,39 +260,101 @@ the character is claimed.
 
 ## The character pool
 
-`$import` loads `data/characters.json` — currently **30,012 characters across
-2,200-odd series**, every one with artwork, built by `tools/fetch_roster.py` from
-AniList.
+`$import` loads `data/characters.json` — **100,000 characters across
+13,257 series**, every one with artwork, built by `tools/fetch_roster.py`
+from AniList.
 
-### How karuda values were decided
+### How the sweep reaches six figures
 
-Values are not hand-typed. `tools/build_roster.py` computes each one from two
-things:
+AniList will not paginate past **5,000 entries of any sorted list**. Ask it
+for "the most popular anime" and you get 5,000 shows and a closed door, which
+is nowhere near enough casts for a roster this size. The same cap is why the
+global character list cannot simply be read off in favourites order.
 
-```
-base_karuda = how famous the series is + how central the character is
-```
-
-Series sit in fame tiers (`S` = household name, down to `C` = niche), and each
-character is a `lead`, `main` or `support` within their own series. So Naruto
-Uzumaki lands at 115 and Ein from Cowboy Bebop at 56. Disagree with a ranking?
-Edit the tables at the top of that file and re-run:
+The way through is that the cap is per *query*, not per database. A query
+narrowed to one release year is its own 5,000-entry budget, so the fetcher
+walks the calendar instead of one long list:
 
 ```bash
-python tools/build_roster.py
+python tools/fetch_roster.py --count 100000 --manga-years
 ```
 
-Then `$import` again — matching is on `name` + `series`, so it updates in place
-rather than duplicating, and nobody loses a character they already claimed.
+Newest year backwards, anime first and then manga, cutting a year into months
+whenever one year is itself too big to read. The windows tile the whole
+calendar with no gaps, so every title AniList knows about is reachable.
+
+Three details that matter more than they look:
+
+- **The reported total is a lie.** AniList clamps `pageInfo.total` at the same
+  5,000, so a year holding twenty thousand titles reports exactly five
+  thousand — indistinguishable from one that really has five thousand. The
+  split therefore fires on *reaching* the cap, never on exceeding it, because
+  nothing ever exceeds it.
+- **Fuzzy dates.** AniList files plenty of older titles with a year and no
+  month at all, which reads as `YYYY0000`. A month split starts its first
+  window there rather than at `YYYY0100` — starting at January would step
+  straight over every one of them.
+- **Which series someone is filed under.** A character in six shows is kept
+  under the most popular one, tracked as the sweep runs rather than taken from
+  whichever window happened to come first.
+
+It is paced to AniList's live limit of 30 requests a minute, so a full sweep
+takes about two hours. That is long enough to be worth protecting: it
+checkpoints as it goes, Ctrl-C still writes out what it has, and a phase that
+fails is reported rather than throwing the rest away. `--resume <file>` picks
+up from an earlier run instead of repeating it.
+
+### How karuda values are decided
+
+Nothing is hand-typed. Every character carries their real AniList favourites
+count, the whole set is sorted by it, and value is mapped from **rank on a log
+scale**:
+
+```
+rank 1 → 1300 karuda        rank 300 → 300        rank 100,000 → 20
+```
+
+The curve is pinned so it crosses 300 karuda at rank 300 exactly. That pin is
+computed from the pool size rather than fixed, which is why growing the roster
+from 30,000 to 100,000 left **295 characters** above 300 karuda
+instead of tripling them. Being worth something means being genuinely
+well-known, whatever the roster's size. Satoru Gojou tops it.
+
+Re-running the fetcher and `$import`-ing again updates in place — matching is
+on `name` + `series`, so nobody loses a character they already claimed.
+
+### Rolling out of a pool this big
+
+A flat roll punishes size: over 100,000 characters, a uniform draw shows
+someone from the top thousand about **once in a hundred rolls**. That is a
+lottery, not a game.
+
+So `roll_bias` (0–100) pulls the draw towards the well-known end of the
+ranking. It is a percent rather than a curve so that it means something:
+
+| `roll_bias` | chance a roll is top-1,000 |
+|---|---|
+| 0 (flat) | 1.0% |
+| 35 (default) | 3.4% |
+| 100 | 11.1% |
+
+The default of **35** is chosen so a 100,000-character pool rolls exactly
+the way a flat 30,000-character one did — the roster tripled, the feel did
+not. Nobody is ever excluded: the whole tail still rolls, just not with equal
+weight, and characters your own server invented keep precisely their share.
+
+```
+$set roll_bias 0     # a pure lottery across every character
+$set roll_bias 100   # mostly faces people recognise
+```
 
 ### Adding a niche series
 
-The bulk fetch walks anime by popularity and stops once it has enough
-characters, around 2,200 shows in. Anything below that line never arrives —
-MILGRAM sits at popularity 6,870, so it was missing despite AniList having
-all twelve of its cast with art.
+Sweeping the calendar rather than a popularity list means niche titles now
+arrive on their own — MILGRAM sits at popularity 6,870 and used to be missed
+entirely; all twelve of its cast are in the roster without being asked for.
 
-Either of these pulls one in:
+Anything still missing can be pulled in one series at a time:
 
 ```
 $addseries MILGRAM
@@ -302,11 +364,9 @@ $addseries MILGRAM
 python tools/add_series.py "MILGRAM" --dry-run
 ```
 
-Every character stores their AniList favourites count, so a newcomer is
-placed by counting how many existing characters have more — exact, and
-without renumbering thirty thousand rows. MILGRAM's cast landed between
-#5,017 and #11,000, worth 40–66 karuda, which is what their global
-popularity earns them.
+Every character stores their favourites count, so a newcomer is placed by
+counting how many existing characters have more — exact, and without
+renumbering 100,000 rows.
 
 ### Artwork
 

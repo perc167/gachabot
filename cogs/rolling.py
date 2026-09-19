@@ -194,7 +194,9 @@ class Rolling(commands.Cog):
             return
 
         include_claimed = bool(db.get_setting(gid, "show_claimed"))
-        character = db.random_character(gid, include_claimed)
+        character = db.random_character(
+            gid, include_claimed, db.get_setting(gid, "roll_bias")
+        )
         if character is None:
             await ctx.send(
                 "Every character in the pool is already claimed here."

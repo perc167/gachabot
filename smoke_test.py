@@ -196,6 +196,11 @@ async def main():
           db.get_setting(GUILD, "roll_limit") == config.GUILD_SETTINGS["roll_limit"][0])
     check("all_settings covers table",
           set(db.all_settings(GUILD)) == set(config.GUILD_SETTINGS))
+    # $settings renders one embed field per setting, and Discord refuses an
+    # embed with more than 25. Nothing else would catch that until it threw.
+    check("settings still fit in one embed",
+          len(config.GUILD_SETTINGS) <= 25,
+          str(len(config.GUILD_SETTINGS)) + " settings")
 
     # 12. Random roll respects the claimed filter.
     db.claim(GUILD, top["id"], ALICE)
@@ -334,8 +339,10 @@ async def main():
           and not fetch_art.series_matches("Naruto", ["Bleach"]))
 
     # Every character in the shipped roster should be usable by the bot.
-    with open(os.path.join(PROJECT, "data", "characters.json"), encoding="utf-8") as fh:
-        roster = json.load(fh)
+    # Read through iter_roster rather than json.load, so the file that ships
+    # is exercised by the exact path $import uses on it.
+    roster = list(utils.iter_roster(
+        os.path.join(PROJECT, "data", "characters.json")))
     check("roster entries all have name and series",
           all(r.get("name") and r.get("series") for r in roster))
     bad_urls = [r["name"] for r in roster
@@ -346,12 +353,21 @@ async def main():
 
     # Two characters sharing one AniList id means the matcher mapped someone
     # onto the wrong person - how Levi ended up with Mikasa's portrait.
-    ids = [r["anilist_id"] for r in roster if r.get("anilist_id")]
-    shared = {i for i in ids if ids.count(i) > 1}
-    clashes = [
-        f"{i}: {[r['name'] for r in roster if r.get('anilist_id') == i]}"
-        for i in shared
-    ]
+    # Counted rather than searched: list.count inside a comprehension is
+    # quadratic, which is fine over a thousand characters and hangs the suite
+    # outright over a hundred thousand.
+    import collections
+
+    ids = collections.Counter(
+        r["anilist_id"] for r in roster if r.get("anilist_id")
+    )
+    shared = {i for i, seen in ids.items() if seen > 1}
+    by_id = collections.defaultdict(list)
+    if shared:
+        for r in roster:
+            if r.get("anilist_id") in shared:
+                by_id[r["anilist_id"]].append(r["name"])
+    clashes = [f"{i}: {by_id[i]}" for i in shared]
     check("no two characters share an AniList id", not clashes, "; ".join(clashes))
 
     # 18. Regressions from the code review.
@@ -993,7 +1009,227 @@ async def main():
           str(migrated.get_setting(1, "karuda_rate")))
     check("legacy image seeded an album",
           migrated.image_count(migrated.find_character_by_name("Legacy Hero")["id"]) == 1)
+    check("indexes built on a migrated database",
+          {r["name"] for r in migrated.conn.execute(
+              "SELECT name FROM sqlite_master WHERE type = 'index'")}
+          >= {"idx_characters_rank", "idx_characters_name",
+              "idx_characters_series"})
     migrated.close()
+
+    # ---- the roster sweep -------------------------------------------------
+    # Both of these went wrong for real. They are pure functions, so there is
+    # no excuse for not pinning them down.
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "fetch_roster", os.path.join(PROJECT, "tools", "fetch_roster.py"))
+    fetcher = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fetcher)
+
+    windows = fetcher.months(2019)
+    check("a split year makes twelve windows", len(windows) == 12)
+    check("split windows leave no gap",
+          all(windows[i][1] == windows[i + 1][0]
+              for i in range(len(windows) - 1)))
+    # AniList dates are fuzzy: a title filed under a year with no month at all
+    # reads as YYYY0000, which is below January.
+    check("a year-only date still falls in a window",
+          windows[0][0] <= 20190000 < windows[0][1],
+          "first window is " + str(windows[0]))
+    check("split windows cover the whole year",
+          windows[0][0] == 20190000 and windows[-1][1] == 20200000)
+
+    # AniList clamps pageInfo.total at the page-depth limit, so a window that
+    # is over the line reports exactly the line. Testing for "past it" means
+    # the split never fires and a year is silently truncated.
+    cap = fetcher.PAGE_DEPTH_LIMIT
+    check("a window at the cap is split",
+          fetcher.should_split(cap, 20240000, 20250000))
+    check("a window under the cap is left alone",
+          not fetcher.should_split(cap - 1, 20240000, 20250000))
+    check("a window from a split is never split again",
+          not any(fetcher.should_split(cap, a, b, False)
+                  for a, b in fetcher.months(2023)))
+
+    # The property that actually matters, stated as itself rather than
+    # inferred: splitting has to bottom out. It did not, once - the first
+    # month window is wider than the others, so judging "is this a month?" by
+    # its width let January split into itself forever.
+    def splitting_terminates(after, before, splittable=True, depth=0):
+        if depth > 3:
+            return False
+        if not fetcher.should_split(cap, after, before, splittable):
+            return True
+        return all(
+            splitting_terminates(a, b, False, depth + 1)
+            for a, b in fetcher.months(after // 10000)
+        )
+
+    check("splitting a full year terminates",
+          splitting_terminates(20230000, 20240000))
+    check("an open-ended window is never split",
+          not fetcher.should_split(cap, None, None))
+
+    # An unset bound must be omitted, not sent as null - AniList refuses the
+    # null outright and the sweep dies on its first request.
+    check("an open-ended window sends no date filter",
+          fetcher.window_variables(None, None) == {})
+    check("a bounded window sends both ends",
+          fetcher.window_variables(20190000, 20200000)
+          == {"after": 20189999, "before": 20200000})
+    check("no window argument is ever null",
+          all(v is not None
+              for pair in ((None, None), (20190000, None), (None, 20200000),
+                           (20190000, 20200000))
+              for v in fetcher.window_variables(*pair).values()))
+
+    # The value curve is pinned to rank, not to pool size: growing the roster
+    # must not inflate how many characters are worth real money.
+    for size in (30000, 100000, 250000):
+        rich = sum(1 for rank in range(1, 400)
+                   if fetcher.karuda_for_rank(rank, size) > 300)
+        check("only the top 300 clear 300 karuda at " + str(size),
+              295 <= rich <= 305, str(rich) + " above 300")
+
+    # ---- reading a roster file -------------------------------------------
+    # The seed file is read a line at a time now, so the shapes it can arrive
+    # in are worth pinning down.
+    eol = chr(10)
+    roster_dir = tempfile.mkdtemp()
+    sample = [
+        {"name": "Reader One", "series": "Streamed",
+         "image_url": "https://e.invalid/1.png", "likes": 0, "favourites": 900,
+         "like_rank": 1, "claim_rank": 1, "base_karuda": 500},
+        {"name": "Reader Two", "series": "Streamed",
+         "image_url": "https://e.invalid/2.png", "likes": 0, "favourites": 400,
+         "like_rank": 2, "claim_rank": 2, "base_karuda": 200},
+    ]
+    compact = os.path.join(roster_dir, "compact.json")
+    with open(compact, "w", encoding="utf-8") as fh:
+        fh.write("[" + eol
+                 + ("," + eol).join(json.dumps(r) for r in sample)
+                 + eol + "]" + eol)
+    check("roster streams one record per line",
+          list(utils.iter_roster(compact)) == sample)
+
+    pretty = os.path.join(roster_dir, "pretty.json")
+    with open(pretty, "w", encoding="utf-8") as fh:
+        json.dump(sample, fh, indent=2)
+    check("a prettified roster still reads",
+          list(utils.iter_roster(pretty)) == sample)
+
+    single = os.path.join(roster_dir, "single.json")
+    with open(single, "w", encoding="utf-8") as fh:
+        fh.write("[" + eol + json.dumps(sample[0]) + eol + "]" + eol)
+    check("a one-record roster reads",
+          list(utils.iter_roster(single)) == sample[:1])
+
+    notalist = os.path.join(roster_dir, "object.json")
+    with open(notalist, "w", encoding="utf-8") as fh:
+        fh.write('{"name": "nope"}')
+    try:
+        list(utils.iter_roster(notalist))
+        check("a JSON object is rejected", False)
+    except ValueError:
+        check("a JSON object is rejected", True)
+
+    # favourites is what places a series added later at the right rank, so it
+    # has to survive the trip through a file.
+    favdb = dbmod.Database(os.path.join(roster_dir, "fav.db"))
+    favdb.import_characters(list(utils.iter_roster(compact)))
+    check("favourites survive an import",
+          favdb.find_character_by_name("Reader One")["favourites"] == 900)
+    rank, pool = favdb.rank_for_favourites(600)
+    check("a newcomer ranks against imported favourites",
+          (rank, pool) == (2, 2), str(rank) + " of " + str(pool))
+    favdb.close()
+
+    # ---- weighted rolling -------------------------------------------------
+    # A big roster only works if rolls can be pulled towards the famous end of
+    # it. These check the dial does what it claims without ever walling
+    # anybody off.
+    weighted_path = os.path.join(tempfile.mkdtemp(), "weighted.db")
+    wdb = dbmod.Database(weighted_path)
+    POOL = 20000
+    wdb.import_characters([
+        {"name": f"W{i}", "series": "Weighted", "image_url": "https://e.invalid/x.png",
+         "likes": 0, "like_rank": i, "claim_rank": i,
+         "base_karuda": utils.value_for_rank(i, POOL)}
+        for i in range(1, POOL + 1)
+    ])
+    check("roll_bias is a real setting", "roll_bias" in config.GUILD_SETTINGS)
+    check("roll_bias defaults to leaning towards the known",
+          config.GUILD_SETTINGS["roll_bias"][0] > 0)
+
+    SAMPLE = 4000
+    flat = [wdb.random_character(GUILD, True, 0)["like_rank"] for _ in range(SAMPLE)]
+    leaning = [wdb.random_character(GUILD, True, 35)["like_rank"] for _ in range(SAMPLE)]
+    hardest = [wdb.random_character(GUILD, True, 100)["like_rank"] for _ in range(SAMPLE)]
+
+    def share(sample, edge):
+        return sum(1 for r in sample if r <= edge) / len(sample)
+
+    check("a flat pool is actually flat",
+          0.7 <= share(flat, POOL // 10) / 0.1 <= 1.3,
+          f"{share(flat, POOL // 10):.3f} in the top tenth")
+    check("bias favours the well known",
+          share(leaning, POOL // 10) > share(flat, POOL // 10) * 1.5,
+          f"flat {share(flat, POOL // 10):.3f} vs biased "
+          f"{share(leaning, POOL // 10):.3f}")
+    check("more bias means more of a lean",
+          share(hardest, POOL // 10) > share(leaning, POOL // 10),
+          f"{share(leaning, POOL // 10):.3f} vs {share(hardest, POOL // 10):.3f}")
+    check("bias never walls off the long tail",
+          max(hardest) > POOL // 2,
+          f"deepest roll at full bias was #{max(hardest)}")
+    check("every biased roll is a real character",
+          all(1 <= r <= POOL for r in leaning))
+
+    # Characters with no popularity rank - one a server invented, one an
+    # owner added by hand - must still reach the table when bias is on. Two
+    # unranked among twenty thousand would surface once in ten thousand rolls,
+    # so this runs against a small pool where their share is large enough to
+    # measure rather than hope for.
+    smalldb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "unranked.db"))
+    RANKED = 200
+    smalldb.import_characters([
+        {"name": "S" + str(i), "series": "Small",
+         "image_url": "https://e.invalid/s.png", "likes": 0,
+         "like_rank": i, "claim_rank": i,
+         "base_karuda": utils.value_for_rank(i, RANKED)}
+        for i in range(1, RANKED + 1)
+    ])
+    mascot = smalldb.add_custom(GUILD, "House Mascot", "Ours",
+                                "https://e.invalid/m.png", 60)
+    handmade = smalldb.add_character("Hand Made", "By An Owner",
+                                     "https://e.invalid/h.png", 0, 75)
+    picks = [smalldb.random_character(GUILD, True, 100)["id"]
+             for _ in range(4000)]
+    check("customs still roll when bias is on", mascot in picks)
+    check("an unranked pool character still rolls", handmade in picks)
+    # Their share should be about 2 in 202, not a rounding error either way.
+    unranked_share = sum(1 for p in picks if p in (mascot, handmade)) / len(picks)
+    check("unranked characters get roughly their fair share",
+          0.004 <= unranked_share <= 0.035,
+          str(round(unranked_share, 4)) + " of rolls")
+
+    leaked = any(
+        smalldb.random_character(OTHER, True, 100)["id"] == mascot
+        for _ in range(4000)
+    )
+    check("bias does not leak customs across servers", not leaked)
+    smalldb.close()
+
+    unclaimed_only = True
+    for _ in range(200):
+        pick = wdb.random_character(GUILD, False, 60)
+        if pick is None:
+            continue
+        wdb.claim(GUILD, pick["id"], ALICE)
+        if wdb.owner_of(GUILD, pick["id"]) != ALICE:
+            unclaimed_only = False
+            break
+    check("biased rolls respect the claimed filter", unclaimed_only)
+    wdb.close()
 
     await b.close()
 

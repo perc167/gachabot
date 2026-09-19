@@ -35,6 +35,10 @@ GUILD_SETTINGS = {
         "Head start a wisher gets before others may claim",
     ),
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
+    "roll_bias": (
+        35, 0, 100,
+        "How strongly rolls favour well-known characters (0 = flat pool)",
+    ),
     "wish_limit": (20, 1, 200, "How many characters a user may wish for"),
     "custom_limit": (50, 0, 2000, "Custom characters a server may add"),
     "dk_snipe": (1, 0, 1, "Let others take the shard you leave behind (0/1)"),

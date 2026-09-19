@@ -279,22 +279,42 @@ class Admin(commands.Cog):
                 raw = await ctx.message.attachments[0].read()
                 payload = json.loads(raw.decode("utf-8"))
                 source = ctx.message.attachments[0].filename
+                if not isinstance(payload, list):
+                    await ctx.send("Expected a JSON list of character objects.")
+                    return
             else:
+                # Read from disk a record at a time. The seed roster is six
+                # figures long, and parsing it whole costs more memory than a
+                # small host has to spare.
                 source = path or SEED_PATH
-                with open(source, "r", encoding="utf-8") as handle:
-                    payload = json.load(handle)
+                # Checked here rather than left to the generator: reading is
+                # lazy now, so the open would not fail until mid-loop.
+                if not os.path.exists(source):
+                    raise FileNotFoundError(source)
+                payload = utils.iter_roster(source)
         except FileNotFoundError:
             await ctx.send(f"No file at `{path or SEED_PATH}`.")
             return
-        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+        except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
             await ctx.send(f"That file is not valid JSON: {error}")
             return
 
-        if not isinstance(payload, list):
-            await ctx.send("Expected a JSON list of character objects.")
-            return
-
+        # Imported in batches so neither the cleaned records nor the parsed
+        # file are ever all in memory at once.
+        BATCH = 10000
+        tally = {"inserted": 0, "updated": 0, "images": 0, "total": 0}
         clean, skipped = [], []
+        started = time.perf_counter()
+        notice = await ctx.send("Importing...")
+
+        async def flush():
+            if not clean:
+                return
+            result = await asyncio.to_thread(self.bot.db.import_characters, clean)
+            for key in tally:
+                tally[key] += result[key]
+            clean.clear()
+
         for index, entry in enumerate(payload):
             try:
                 name = str(entry["name"]).strip()
@@ -318,6 +338,9 @@ class Admin(commands.Cog):
                 "base_karuda": int(entry.get("base_karuda", 50) or 50),
                 "like_rank": int(entry.get("like_rank", 0) or 0),
                 "claim_rank": int(entry.get("claim_rank", 0) or 0),
+                # Carried through deliberately: this is what places a series
+                # added later at the right rank instead of guessing.
+                "favourites": int(entry.get("favourites", 0) or 0),
                 "images": [
                     str(u).strip()
                     for u in (entry.get("images") or [])
@@ -325,20 +348,34 @@ class Admin(commands.Cog):
                 ],
             }
             clean.append(record)
+            # Writes go off the event loop, so the bot keeps answering while
+            # a six-figure roster loads.
+            if len(clean) >= BATCH:
+                try:
+                    await flush()
+                except Exception as error:  # a bad file should not kill the cog
+                    await notice.edit(
+                        content=f"Import stopped after {tally['total']}"
+                                f" characters: {error}"
+                    )
+                    raise
+                await notice.edit(
+                    content=f"Importing... {tally['total']:,} so far"
+                )
 
-        if not clean:
-            await ctx.send("Nothing importable in that file.")
+        try:
+            await flush()
+        except Exception as error:
+            await notice.edit(
+                content=f"Import stopped after {tally['total']} characters: {error}"
+            )
+            raise
+
+        if not tally["total"]:
+            await notice.edit(content="Nothing importable in that file.")
             return
 
-        # A thousand characters is a lot of writes; do them in one transaction
-        # off the event loop so the bot keeps responding meanwhile.
-        notice = await ctx.send(f"Importing {len(clean)} characters...")
-        started = time.perf_counter()
-        try:
-            result = await asyncio.to_thread(self.bot.db.import_characters, clean)
-        except Exception as error:  # a bad file should not kill the cog
-            await notice.edit(content=f"Import failed, nothing changed: {error}")
-            raise
+        result = tally
         elapsed = time.perf_counter() - started
 
         message = (
