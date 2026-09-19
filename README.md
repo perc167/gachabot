@@ -172,18 +172,28 @@ instead. Grabbing pays out the character's `base_kakera` scaled by the server's
 `kakera_rate`, with a ±20% jitter — 60% payout if the character is not yours.
 Gated by `kakera_interval_minutes`.
 
-**Rarity.** Read off `base_kakera`, which is how famous the character is. Likes
-are earned by players over time and deliberately do *not* decide the tier, so a
-brand new pool still shows a full spread of Common through Mythic. Thresholds
-and colours live in `RARITY_TIERS` in `config.py`.
+**Ranks and value.** Every character carries two popularity ranks, 1 being the
+most popular, exactly as Mudae does:
+
+- **Claim rank** — how sought-after they are to actually own
+- **Like rank** — how many people want them
+
+Both appear on the card. `base_kakera` is derived from the average of the two
+on a front-loaded curve, so it runs from **20** for a rank-10000 nobody to
+**1300** for rank 1, and the drop-off near the top is steep. Rarity tier is
+then read off that value, so tier, rank and worth are three views of one
+number rather than three unrelated systems.
 
 Rarity does **not** change your odds of rolling someone. Rolls are a flat,
-uniform pick across the pool, so every character is equally likely and a tier
-is a statement about what they are *worth*, not how hard they are to find. This
-is deliberate, and it is what Mudae does — rarity there expresses itself
-through kakera payouts and through who gets to the Claim button first. If you
-ever want weighted rolls instead, the change is a weight per tier applied in
+uniform pick across the pool, which is what Mudae does — rarity expresses
+itself through kakera payouts and through who reaches the Claim button first.
+If you ever want weighted rolls, the change is a weight per tier applied in
 `Database.random_character`.
+
+**Albums.** A character can hold any number of images. A roll shows one at
+random, so the same character looks different each time they appear. `$album
+<name>` flips through them, `$addimage <id> <url...>` adds, `$delimage <id> <n>`
+removes. The first image added becomes the primary one used on harem pages.
 
 **Wishes.** When a wished character rolls, every wisher gets pinged, and for
 `wish_protect_seconds` only wishers may press Claim. Wishes are consumed once

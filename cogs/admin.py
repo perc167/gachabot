@@ -13,6 +13,7 @@ from discord.ext import commands
 import config
 import utils
 from db import DuplicateCharacter
+from views import Paginator
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "characters.json")
 FIELDS = ("name", "series", "image_url", "likes", "base_kakera")
@@ -125,12 +126,92 @@ class Admin(commands.Cog):
             return
 
         self.bot.db.update_character(character_id, image_url=url)
+        self.bot.db.add_image(character_id, url, source="setimage")
         # Usable in a DM, so guild-specific bits fall back to defaults.
         preview_guild = ctx.guild.id if ctx.guild else 0
         embed = utils.character_embed(
             self.bot.db, preview_guild, self.bot.db.get_character(character_id)
         )
         await ctx.send(f"Art set for **{character['name']}**.", embed=embed)
+
+    @commands.command(name="addimage", aliases=["addart", "ai"])
+    @is_bot_owner()
+    async def addimage(self, ctx, character_id: int, *urls: str):
+        """`$addimage <id> <url> [url ...]` — add images to a character's album.
+
+        Rolls pick one at random from the album, so the same character can
+        show up with different art each time. Attachments work too.
+        """
+        character = self.bot.db.get_character(character_id)
+        if not character:
+            await ctx.send(f"No character with ID `{character_id}`.")
+            return
+
+        candidates = list(urls) + [a.url for a in ctx.message.attachments]
+        good = [u for u in candidates if u.startswith(("http://", "https://"))]
+        rejected = len(candidates) - len(good)
+        if not good:
+            await ctx.send(
+                f"Give me one or more http(s) links:"
+                f" `{ctx.prefix}addimage {character_id} https://... https://...`"
+            )
+            return
+
+        added = self.bot.db.add_images(character_id, good)
+        total = self.bot.db.image_count(character_id)
+        note = f" ({len(good) - added} already in the album)" if added < len(good) else ""
+        if rejected:
+            note += f" ({rejected} ignored, not http links)"
+        await ctx.send(
+            f"Added **{added}** image(s) to **{character['name']}**{note}."
+            f" Album is now {total}."
+        )
+
+    @commands.command(name="album", aliases=["images", "mu"])
+    async def album(self, ctx, *, name: str):
+        """Flip through every image a character has."""
+        character = self.bot.db.find_character_by_name(name)
+        if not character:
+            await ctx.send(f"No character matching `{name}`.")
+            return
+        urls = self.bot.db.images_for(character["id"])
+        if not urls:
+            await ctx.send(
+                f"**{character['name']}** has no images yet."
+                f" Add some with `{ctx.prefix}addimage {character['id']} <url>`."
+            )
+            return
+
+        guild_id = ctx.guild.id if ctx.guild else 0
+        embeds = []
+        for index, url in enumerate(urls, 1):
+            embed = utils.character_embed(
+                ctx.bot.db, guild_id, character, image_url=url,
+                footer=f"Image {index} of {len(urls)} • ID {character['id']}",
+            )
+            embeds.append(embed)
+        await Paginator(embeds, ctx.author.id).start(ctx)
+
+    @commands.command(name="delimage", aliases=["rmimage"])
+    @is_bot_owner()
+    async def delimage(self, ctx, character_id: int, number: int):
+        """`$delimage <id> <n>` — drop image n, as numbered by `$album`."""
+        character = self.bot.db.get_character(character_id)
+        if not character:
+            await ctx.send(f"No character with ID `{character_id}`.")
+            return
+        urls = self.bot.db.images_for(character_id)
+        if not 1 <= number <= len(urls):
+            await ctx.send(
+                f"**{character['name']}** has {len(urls)} image(s);"
+                f" pick a number between 1 and {len(urls)}."
+            )
+            return
+        self.bot.db.remove_image(character_id, urls[number - 1])
+        await ctx.send(
+            f"Removed image {number} from **{character['name']}**."
+            f" {self.bot.db.image_count(character_id)} left."
+        )
 
     @commands.command(name="missingart", aliases=["noart"])
     async def missingart(self, ctx, *, series: str = None):
@@ -210,7 +291,7 @@ class Admin(commands.Cog):
             await ctx.send("Expected a JSON list of character objects.")
             return
 
-        added = 0
+        added, images = 0, 0
         skipped = []
         for index, entry in enumerate(payload):
             try:
@@ -226,16 +307,33 @@ class Admin(commands.Cog):
             if image_url and not image_url.startswith(("http://", "https://")):
                 skipped.append(f"#{index} ({name}): image_url is not an http link")
                 continue
-            self.bot.db.upsert_character(
+            char_id = self.bot.db.upsert_character(
                 name,
                 series,
                 image_url,
                 int(entry.get("likes", 0)),
                 int(entry.get("base_kakera", 50)),
             )
+            ranks = {
+                key: int(entry[key])
+                for key in ("like_rank", "claim_rank")
+                if str(entry.get(key, "")).strip().isdigit()
+            }
+            if ranks:
+                self.bot.db.update_character(char_id, **ranks)
+
+            album = [image_url] if image_url else []
+            album += [
+                str(u).strip()
+                for u in (entry.get("images") or [])
+                if str(u).strip().startswith(("http://", "https://"))
+            ]
+            if album:
+                images += self.bot.db.add_images(char_id, album)
             added += 1
 
-        message = f"Imported **{added}** characters from `{source}`."
+        message = f"Imported **{added}** characters and **{images}** new images"
+        message += f" from `{source}`."
         message += f" Pool is now {self.bot.db.character_count()}."
         if skipped:
             message += f"\nSkipped {len(skipped)}:\n" + "\n".join(skipped[:10])
@@ -253,6 +351,9 @@ class Admin(commands.Cog):
                 "image_url": row["image_url"],
                 "likes": row["likes"],
                 "base_kakera": row["base_kakera"],
+                "like_rank": row["like_rank"],
+                "claim_rank": row["claim_rank"],
+                "images": self.bot.db.images_for(row["id"]),
             }
             for row in rows
         ]

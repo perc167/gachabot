@@ -45,10 +45,10 @@ GUILD_SETTINGS = {
 # base_kakera threshold -> (tier name, embed colour).
 # Ordered high to low; the first threshold a character clears wins.
 RARITY_TIERS = [
-    (105, "Mythic", 0xFF4D6D),
-    (90, "Legendary", 0xF4A261),
-    (80, "Epic", 0xB388EB),
-    (65, "Rare", 0x4EA8DE),
+    (1150, "Mythic", 0xFF4D6D),
+    (835, "Legendary", 0xF4A261),
+    (370, "Epic", 0xB388EB),
+    (66, "Rare", 0x4EA8DE),
     (0, "Common", 0x8D99AE),
 ]
 

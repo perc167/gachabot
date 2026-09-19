@@ -19,6 +19,7 @@ existing characters are updated in place and nobody loses a claim.
 
 Art is filled in separately by tools/fetch_art.py.
 """
+import hashlib
 import json
 import os
 
@@ -371,6 +372,45 @@ ROSTER = {
 }
 
 
+# Kakera range. Mudae-ish: a nobody is worth a pittance, a top-rank character
+# is worth a few hundred rolls of grinding.
+KAKERA_MIN, KAKERA_MAX = 20, 1300
+
+# Ranks run 1 (most popular) to RANK_MAX, as in Mudae.
+RANK_MAX = 10000
+
+# How sharply value falls off with rank. Higher = more top-heavy, so the
+# difference between rank 1 and rank 50 is dramatic and the long tail is flat.
+KAKERA_CURVE = 2.4
+
+
+def fame_score(tier: str, role: str) -> int:
+    """Raw popularity, used only to order characters before ranking."""
+    return TIER_BASE[tier] + ROLE_BONUS[role]
+
+
+def spread_rank(position: int, total: int) -> int:
+    """Map position 1..total onto the 1..RANK_MAX rank scale."""
+    if total <= 1:
+        return 1
+    return round(1 + (position - 1) * (RANK_MAX - 1) / (total - 1))
+
+
+def jitter_rank(rank: int, name: str) -> int:
+    """A character's claim rank is close to their like rank but not identical:
+    some are loved and rarely claimed, some the reverse. Derived from the name
+    so it is stable across regenerations rather than random each run."""
+    digest = hashlib.sha1(name.encode("utf-8")).digest()
+    offset = (digest[0] / 255 - 0.5) * 0.30  # +/- 15%
+    return max(1, min(RANK_MAX, round(rank * (1 + offset))))
+
+
+def kakera_for_rank(rank: int) -> int:
+    """Rank -> kakera, front-loaded so the top of the list is genuinely rare."""
+    share = 1 - (rank - 1) / (RANK_MAX - 1)
+    return round(KAKERA_MIN + (KAKERA_MAX - KAKERA_MIN) * share**KAKERA_CURVE)
+
+
 def build():
     characters = []
     for series, (tier, cast) in ROSTER.items():
@@ -380,9 +420,23 @@ def build():
                 "series": series,
                 "image_url": "",  # filled in by tools/fetch_art.py
                 "likes": 0,
-                "base_kakera": TIER_BASE[tier] + ROLE_BONUS[role],
+                "_fame": fame_score(tier, role),
             })
-    characters.sort(key=lambda c: (-c["base_kakera"], c["series"], c["name"]))
+
+    # Most famous first; ties broken deterministically so ranks are stable.
+    characters.sort(key=lambda c: (-c["_fame"], c["series"], c["name"]))
+
+    total = len(characters)
+    for position, character in enumerate(characters, 1):
+        like_rank = spread_rank(position, total)
+        claim_rank = jitter_rank(like_rank, character["name"])
+        character["like_rank"] = like_rank
+        character["claim_rank"] = claim_rank
+        # Value reflects both how liked and how claimed they are.
+        character["base_kakera"] = kakera_for_rank((like_rank + claim_rank) // 2)
+        del character["_fame"]
+
+    characters.sort(key=lambda c: (c["like_rank"], c["name"]))
     return characters
 
 
@@ -397,6 +451,8 @@ def merge_existing(characters, path):
         previous = old.get((character["name"], character["series"]))
         if previous and previous.get("image_url"):
             character["image_url"] = previous["image_url"]
+            if previous.get("images"):
+                character["images"] = previous["images"]
             for field in ("source", "anilist_id"):
                 if previous.get(field):
                     character[field] = previous[field]

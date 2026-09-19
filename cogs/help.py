@@ -16,6 +16,7 @@ SECTIONS = [
             ("mm [@user] [likes|name|recent|kakera]", "Browse a harem"),
             ("im <name>", "Character card"),
             ("search <text>", "Search the pool by name or series"),
+            ("album <name>", "Flip through every image a character has"),
             ("divorce <name>", "Release a character, refunds half its kakera"),
             ("note <name> | <text>", "Annotate one of your characters"),
             ("top", "Biggest harems in the server"),
@@ -60,7 +61,9 @@ SECTIONS = [
         "Bot owner",
         [
             ("addchar Name | Series", "Add a character (art and stats optional)"),
-            ("setimage <id> <url>", "Give a character its art"),
+            ("setimage <id> <url>", "Set a character's main art"),
+            ("addimage <id> <url...>", "Add images to a character's album"),
+            ("delimage <id> <n>", "Remove image n from an album"),
             ("editchar <id> <field> <value>", "Edit a character"),
             ("delchar <id>", "Delete a character"),
             ("import [path]", "Bulk import JSON (or attach a file)"),

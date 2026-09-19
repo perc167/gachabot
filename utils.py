@@ -86,27 +86,55 @@ class Cooldowns:
 
 
 def character_embed(
-    db, guild_id: int, character, *, footer: str = None, show_owner: bool = True
+    db,
+    guild_id: int,
+    character,
+    *,
+    footer: str = None,
+    show_owner: bool = True,
+    random_art: bool = False,
+    image_url: str = None,
 ) -> discord.Embed:
-    """The card shown for a roll, a `$im` lookup, or a harem page."""
+    """The card shown for a roll, a `$im` lookup, or a harem page.
+
+    `random_art` picks one image at random from the character's album, which
+    is what a roll does: the same character can show up wearing a different
+    picture each time.
+    """
     tier, colour = rarity_of(character)
     rate = db.get_setting(guild_id, "kakera_rate")
 
     embed = discord.Embed(title=character["name"], colour=colour)
     embed.description = character["series"]
 
+    if image_url is None:
+        image_url = (
+            db.random_image(character["id"]) if random_art else character["image_url"]
+        )
+
     # Characters can exist before anyone has added art for them.
-    if character["image_url"]:
-        embed.set_image(url=character["image_url"])
+    if image_url:
+        embed.set_image(url=image_url)
     else:
         embed.description += f"\n*no image yet — `$setimage {character['id']} <url>`*"
 
-    lines = [
-        f"{character['likes']} likes",
-        f"{kakera_value(character, rate)} kakera",
-        tier,
-    ]
+    lines = [f"**{kakera_value(character, rate)}** kakera", tier]
+    album = db.image_count(character["id"])
+    if album > 1:
+        lines.append(f"{album} images")
     embed.add_field(name="​", value=" • ".join(lines), inline=False)
+
+    # Popularity ranks, Mudae style: lower is better. Claim rank is how often
+    # people actually take them; like rank is how many want them.
+    ranks = []
+    if character["claim_rank"]:
+        ranks.append(f"Claims **#{character['claim_rank']}**")
+    if character["like_rank"]:
+        ranks.append(f"Likes **#{character['like_rank']}**")
+    if character["likes"]:
+        ranks.append(f"{character['likes']} ♥ here")
+    if ranks:
+        embed.add_field(name="​", value=" • ".join(ranks), inline=False)
 
     if show_owner:
         owner_id = db.owner_of(guild_id, character["id"])

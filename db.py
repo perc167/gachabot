@@ -13,8 +13,24 @@ CREATE TABLE IF NOT EXISTS characters (
     image_url   TEXT NOT NULL,
     likes       INTEGER NOT NULL DEFAULT 0,
     base_kakera INTEGER NOT NULL DEFAULT 50,
+    -- Popularity ranks, 1 = most popular. Lower is better, as in Mudae.
+    like_rank   INTEGER NOT NULL DEFAULT 0,
+    claim_rank  INTEGER NOT NULL DEFAULT 0,
     UNIQUE (name, series)
 );
+
+-- A character can have many images. characters.image_url stays as the primary
+-- one (shown on a harem page, and the fallback), while rolls pick at random
+-- from the whole album.
+CREATE TABLE IF NOT EXISTS character_images (
+    character_id INTEGER NOT NULL,
+    url          TEXT NOT NULL,
+    source       TEXT,
+    added_at     INTEGER NOT NULL,
+    PRIMARY KEY (character_id, url)
+);
+CREATE INDEX IF NOT EXISTS idx_images_character
+    ON character_images (character_id);
 
 CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id INTEGER NOT NULL,
@@ -83,6 +99,31 @@ class Database:
                     " INTEGER NOT NULL DEFAULT 0"
                 )
 
+        character_columns = {
+            row["name"]
+            for row in self.conn.execute("PRAGMA table_info(characters)").fetchall()
+        }
+        for column in ("like_rank", "claim_rank"):
+            if column not in character_columns:
+                self.conn.execute(
+                    f"ALTER TABLE characters ADD COLUMN {column}"
+                    " INTEGER NOT NULL DEFAULT 0"
+                )
+
+        # Albums arrived after characters already had a single image_url.
+        # Seed the album from it so nothing loses its art.
+        empty = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM character_images"
+        ).fetchone()["c"]
+        if not empty:
+            self.conn.execute(
+                "INSERT OR IGNORE INTO character_images"
+                " (character_id, url, source, added_at)"
+                " SELECT id, image_url, 'primary', ? FROM characters"
+                " WHERE image_url != ''",
+                (int(time.time()),),
+            )
+
     def close(self):
         self.conn.close()
 
@@ -120,6 +161,10 @@ class Database:
         row = self.conn.execute(
             "SELECT id FROM characters WHERE name = ? AND series = ?", (name, series)
         ).fetchone()
+        # Any path that sets a primary image should put it in the album too,
+        # otherwise rolls have nothing to pick from.
+        if image_url:
+            self.add_image(row["id"], image_url, source="import")
         return row["id"]
 
     def delete_character(self, character_id: int) -> bool:
@@ -128,11 +173,17 @@ class Database:
             "DELETE FROM marriages WHERE character_id = ?", (character_id,)
         )
         self.conn.execute("DELETE FROM wishes WHERE character_id = ?", (character_id,))
+        self.conn.execute(
+            "DELETE FROM character_images WHERE character_id = ?", (character_id,)
+        )
         self.conn.commit()
         return cur.rowcount > 0
 
     def update_character(self, character_id: int, **fields) -> bool:
-        allowed = {"name", "series", "image_url", "likes", "base_kakera"}
+        allowed = {
+            "name", "series", "image_url", "likes", "base_kakera",
+            "like_rank", "claim_rank",
+        }
         fields = {k: v for k, v in fields.items() if k in allowed and v is not None}
         if not fields:
             return False
@@ -193,6 +244,83 @@ class Database:
             " ORDER BY RANDOM() LIMIT 1",
             (guild_id,),
         ).fetchone()
+
+    # ---------- character images ----------
+
+    def add_image(self, character_id: int, url: str, source: str = None) -> bool:
+        """Add one image to a character's album. False if already there."""
+        try:
+            self.conn.execute(
+                "INSERT INTO character_images (character_id, url, source, added_at)"
+                " VALUES (?, ?, ?, ?)",
+                (character_id, url, source, int(time.time())),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        # The first image added also becomes the primary one.
+        character = self.get_character(character_id)
+        if character and not character["image_url"]:
+            self.conn.execute(
+                "UPDATE characters SET image_url = ? WHERE id = ?",
+                (url, character_id),
+            )
+        self.conn.commit()
+        return True
+
+    def add_images(self, character_id: int, urls) -> int:
+        """Bulk add. Returns how many were new."""
+        return sum(1 for url in urls if url and self.add_image(character_id, url))
+
+    def images_for(self, character_id: int) -> list:
+        rows = self.conn.execute(
+            "SELECT url FROM character_images WHERE character_id = ?"
+            " ORDER BY added_at, url",
+            (character_id,),
+        ).fetchall()
+        return [r["url"] for r in rows]
+
+    def image_count(self, character_id: int) -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) AS c FROM character_images WHERE character_id = ?",
+            (character_id,),
+        ).fetchone()["c"]
+
+    def random_image(self, character_id: int) -> str:
+        """One image at random from the album, falling back to the primary."""
+        row = self.conn.execute(
+            "SELECT url FROM character_images WHERE character_id = ?"
+            " ORDER BY RANDOM() LIMIT 1",
+            (character_id,),
+        ).fetchone()
+        if row:
+            return row["url"]
+        character = self.get_character(character_id)
+        return character["image_url"] if character else ""
+
+    def remove_image(self, character_id: int, url: str) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM character_images WHERE character_id = ? AND url = ?",
+            (character_id, url),
+        )
+        if cur.rowcount:
+            # If the primary went, promote whatever is left.
+            character = self.get_character(character_id)
+            if character and character["image_url"] == url:
+                remaining = self.images_for(character_id)
+                self.conn.execute(
+                    "UPDATE characters SET image_url = ? WHERE id = ?",
+                    (remaining[0] if remaining else "", character_id),
+                )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def album_totals(self) -> tuple:
+        """(characters with any image, total images) across the pool."""
+        row = self.conn.execute(
+            "SELECT COUNT(DISTINCT character_id) AS chars, COUNT(*) AS images"
+            " FROM character_images"
+        ).fetchone()
+        return row["chars"], row["images"]
 
     # ---------- guild settings ----------
 

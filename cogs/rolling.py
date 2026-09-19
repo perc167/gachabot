@@ -202,7 +202,8 @@ class Rolling(commands.Cog):
         owner_id = db.owner_of(gid, character["id"])
         wishers = db.wishers_of(gid, character["id"])
         embed = utils.character_embed(
-            db, gid, character, footer=f"{left} rolls left • rolled by {ctx.author.display_name}"
+            db, gid, character, random_art=True,
+            footer=f"{left} rolls left • rolled by {ctx.author.display_name}",
         )
 
         content = None

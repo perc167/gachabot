@@ -52,10 +52,12 @@ async def main():
     with open(os.path.join(PROJECT, "data", "characters.json"), encoding="utf-8") as fh:
         seed = json.load(fh)
     for entry in seed:
-        db.upsert_character(
+        cid_ = db.upsert_character(
             entry["name"], entry["series"], entry["image_url"],
             entry.get("likes", 0), entry.get("base_kakera", 50),
         )
+        db.update_character(cid_, like_rank=entry.get("like_rank"),
+                            claim_rank=entry.get("claim_rank"))
     check("seed imports", db.character_count() == len(seed), str(db.character_count()))
     # Re-import must update, not duplicate.
     for entry in seed:
@@ -68,8 +70,8 @@ async def main():
     # 3. Rarity tiers and kakera math.
     import config, utils
 
-    check("mythic tier", config.rarity_for(115)[0] == "Mythic")
-    check("common tier", config.rarity_for(56)[0] == "Common")
+    check("mythic tier", config.rarity_for(1300)[0] == "Mythic")
+    check("common tier", config.rarity_for(20)[0] == "Common")
     check("tiers ordered high to low",
           [t[0] for t in config.RARITY_TIERS]
           == sorted((t[0] for t in config.RARITY_TIERS), reverse=True))
@@ -92,6 +94,26 @@ async def main():
     check("famous leads outvalue minor characters",
           leads and minor and min(r["base_kakera"] for r in leads)
           > max(r["base_kakera"] for r in minor))
+
+    # 3b. Ranks: 1 is best, and value tracks them.
+    ranked = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)
+    check("ranks are populated", all(r["like_rank"] for r in all_rows))
+    check("best rank is 1", ranked[0]["like_rank"] == 1, str(ranked[0]["like_rank"]))
+    check("ranks stay inside 1..10000",
+          all(1 <= r["like_rank"] <= 10000 and 1 <= r["claim_rank"] <= 10000
+              for r in all_rows))
+    check("claim rank differs from like rank for most",
+          sum(1 for r in all_rows if r["claim_rank"] != r["like_rank"]) > len(all_rows) // 2)
+    check("kakera spans the intended 20..1300 range",
+          min(r["base_kakera"] for r in all_rows) == 20
+          and max(r["base_kakera"] for r in all_rows) == 1300,
+          f"{min(r['base_kakera'] for r in all_rows)}..{max(r['base_kakera'] for r in all_rows)}")
+    check("better rank is worth more kakera",
+          ranked[0]["base_kakera"] > ranked[-1]["base_kakera"])
+    rank_embed = utils.character_embed(db, GUILD, ranked[0])
+    blob = " ".join(f.value for f in rank_embed.fields)
+    check("card shows claim and like rank",
+          "Claims **#" in blob and "Likes **#" in blob, blob[:80])
 
     # 4. Roll budget.
     limit = db.get_setting(GUILD, "roll_limit")
@@ -353,6 +375,47 @@ async def main():
     check("gitignore covers secrets, database and backups",
           {".env", "*.db", "*.bak"} <= ignored,
           f"missing {sorted({'.env', '*.db', '*.bak'} - ignored)}")
+
+    # 19. Character albums: rolls pick a random image from the album.
+    album_char = db.find_character_by_name("Nami")
+    cid = album_char["id"]
+    seeded = db.image_count(cid)
+    check("import seeds the album", seeded >= 1, f"{seeded}")
+    check("add_image adds", db.add_image(cid, "https://example.com/a.png"))
+    check("add_image dedupes", not db.add_image(cid, "https://example.com/a.png"))
+    db.add_images(cid, ["https://example.com/b.png", "https://example.com/c.png"])
+    check("album counts all images", db.image_count(cid) == seeded + 3,
+          str(db.image_count(cid)))
+    picks = {db.random_image(cid) for _ in range(60)}
+    check("random_image spreads across the album", len(picks) > 1, f"{len(picks)} distinct")
+    check("random_image only returns album members",
+          picks <= set(db.images_for(cid)))
+
+    # A character with no album falls back to its primary image_url.
+    bare = db.add_character("Album Test", "QA", "https://example.com/solo.png", 0, 50)
+    check("primary used when album empty",
+          db.random_image(bare) == "https://example.com/solo.png")
+    # First image added becomes the primary for an art-less character.
+    blank = db.add_character("Blank Test", "QA", "", 0, 50)
+    db.add_image(blank, "https://example.com/first.png")
+    check("first image becomes primary",
+          db.get_character(blank)["image_url"] == "https://example.com/first.png")
+    # Removing the primary promotes another.
+    db.add_image(blank, "https://example.com/second.png")
+    db.remove_image(blank, "https://example.com/first.png")
+    check("removing primary promotes a survivor",
+          db.get_character(blank)["image_url"] == "https://example.com/second.png")
+    db.remove_image(blank, "https://example.com/second.png")
+    check("emptying the album clears the primary",
+          db.get_character(blank)["image_url"] == "")
+    db.delete_character(blank)
+    db.delete_character(bare)
+    check("delete_character cascades to images", db.image_count(bare) == 0)
+
+    roll_embed = utils.character_embed(db, GUILD, db.get_character(cid), random_art=True)
+    check("roll embed uses an album image",
+          roll_embed.image.url in db.images_for(cid))
+    check("embed shows album size", "images" in str(roll_embed.fields[0].value))
 
     await b.close()
 
