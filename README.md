@@ -141,6 +141,15 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$divorce <name>` | Release a character, refunds half its karuda |
 | `$note <name> \| <text>` | Annotate one of your characters |
 | `$top` | Biggest harems in the server |
+| `$series <name>` | A series and everyone in it |
+| `$divorceall` / `$divorceseries` / `$divorceallbut [n]` | Let go in bulk, with confirmation |
+| `$like <name>` / `$unlike` / `$likelist` | Vote for characters |
+| `$mostliked` / `$likepos <name>` | This server's favourites |
+| `$wishseries <name>` / `$wishremoveall` | Wishlist in bulk |
+| `$profile [@user]` | Balance, best claim, cooldowns |
+| `$stats` | Pool size and what this server has claimed |
+| `$myid` / `$invite` / `$ping` / `$uptime` | Utility |
+| `$alea [low] [high]` / `$jankenpon` | Dice and rock-paper-scissors |
 | `$k [@user]` | Karuda balance and shard collection |
 | `$dk` | Two karuda drops to collect, every 20h |
 | `$shards` | What each shard pays, and its odds |

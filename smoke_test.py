@@ -558,6 +558,54 @@ async def main():
     check("dk footer counts what is left",
           "2 left" in view.render().footer.text, view.render().footer.text)
 
+    # 20e. Likes: a vote you can take back, counted per server.
+    liked = by_rank[5]
+    check("like registers", db.add_like(GUILD, ALICE, liked["id"]))
+    check("double like blocked", not db.add_like(GUILD, ALICE, liked["id"]))
+    db.add_like(GUILD, BOB, liked["id"])
+    check("likes tally per server", db.like_count(GUILD, liked["id"]) == 2)
+    check("other server unaffected", db.like_count(2, liked["id"]) == 0)
+    check("likes listed", len(db.likes_of(GUILD, ALICE)) == 1)
+    check("most liked ranks it first",
+          db.most_liked(GUILD)[0]["id"] == liked["id"])
+    check("like position is 1", db.like_position(GUILD, liked["id"]) == 1)
+    check("unliked character has no position",
+          db.like_position(GUILD, by_rank[6]["id"]) == 0)
+    check("card shows the server tally",
+          "2 ♥" in " ".join(str(f.value) for f in
+                                 utils.character_embed(db, GUILD, liked).fields))
+    check("like removed", db.remove_like(GUILD, ALICE, liked["id"]))
+    check("clear_likes returns a count", db.clear_likes(GUILD, BOB) == 1)
+    check("likes gone", db.like_count(GUILD, liked["id"]) == 0)
+
+    # 20f. Bulk operations.
+    # Only count the ones BOB actually got - earlier tests own some already.
+    victims = [
+        row
+        for row in db.search_characters("", limit=12)
+        if db.claim(GUILD, row["id"], BOB)
+    ][:6]
+    before_bulk = db.harem_size(GUILD, BOB)
+    doomed = victims[:3]
+    removed = db.divorce_many(GUILD, BOB, [r["id"] for r in doomed])
+    check("divorce_many removes exactly what it is given",
+          removed == len(doomed), f"{removed} of {len(doomed)}")
+    check("the rest are untouched",
+          db.harem_size(GUILD, BOB) == before_bulk - len(doomed))
+    check("divorce_many on nothing is a no-op",
+          db.divorce_many(GUILD, BOB, []) == 0)
+    series_name = victims[3]["series"]
+    check("harem_by_series finds them",
+          all(series_name.lower() in r["series"].lower()
+              for r in db.harem_by_series(GUILD, BOB, series_name)))
+    found = db.search_series(series_name[:6])
+    check("series search returns counts",
+          found and all(isinstance(c, int) and c > 0 for _t, c in found))
+    check("characters_in_series is ordered by rank",
+          [r["like_rank"] for r in db.characters_in_series(series_name)]
+          == sorted(r["like_rank"] for r in db.characters_in_series(series_name)))
+    db.divorce_many(GUILD, BOB, [r["id"] for r in victims])
+
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)
     check("shard pull increments", db.record_shard(GUILD, ALICE, "prism") == 2)

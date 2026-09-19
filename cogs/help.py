@@ -20,6 +20,10 @@ SECTIONS = [
             ("divorce <name>", "Release a character, refunds half its karuda"),
             ("note <name> | <text>", "Annotate one of your characters"),
             ("top", "Biggest harems in the server"),
+            ("series <name>", "A series and everyone in it"),
+            ("divorceall", "Let go of your whole harem"),
+            ("divorceseries <name>", "Let go of one series"),
+            ("divorceallbut [n]", "Keep your top n by value"),
         ],
     ),
     (
@@ -43,6 +47,32 @@ SECTIONS = [
             ("unwish <name>", "Remove a wish"),
             ("wishlist [@user]", "Show a wishlist"),
             ("wishedby <name>", "Who is waiting on a character"),
+            ("wishseries <name>", "Wish for a whole series"),
+            ("wishremoveall", "Empty your wishlist"),
+        ],
+    ),
+    (
+        "Likes",
+        [
+            ("like <name>", "Vote for a character"),
+            ("unlike <name>", "Take the vote back"),
+            ("likelist [@user]", "Everyone you have liked"),
+            ("mostliked", "The server's favourites"),
+            ("likepos <name>", "Where a character ranks here"),
+            ("likeclear", "Drop all your likes"),
+        ],
+    ),
+    (
+        "You",
+        [
+            ("profile [@user]", "Balance, best claim, cooldowns"),
+            ("stats", "Pool size and what this server has claimed"),
+            ("myid", "Your Discord user id"),
+            ("invite", "Add the bot to another server"),
+            ("ping", "Latency"),
+            ("uptime", "How long the bot has been up"),
+            ("alea [low] [high]", "Random number"),
+            ("jankenpon <rock|paper|scissors>", "Rock paper scissors"),
         ],
     ),
     (

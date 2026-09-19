@@ -1,6 +1,7 @@
 """Entry point. Run with: python bot.py"""
 import logging
 import sys
+import time
 
 import discord
 from discord.ext import commands
@@ -22,6 +23,9 @@ COGS = [
     "cogs.wishlist",
     "cogs.trading",
     "cogs.shop",
+    "cogs.likes",
+    "cogs.bulk",
+    "cogs.profile",
     "cogs.admin",
     "cogs.settings",
     "cogs.help",
@@ -40,6 +44,7 @@ class GachaBot(commands.Bot):
             case_insensitive=True,
         )
         self.db = Database()
+        self.started_at = time.time()
         self.cooldowns = Cooldowns(self.db)
 
     async def setup_hook(self):

@@ -176,8 +176,9 @@ def character_embed(
     album = db.image_count(character["id"])
     if album > 1:
         extras.append(f"{album} images")
-    if character["likes"]:
-        extras.append(f"{character['likes']} ♥ here")
+    liked = db.like_count(guild_id, character["id"])
+    if liked:
+        extras.append(f"{liked} ♥ here")
     if wishers:
         extras.append(f"wished by {len(wishers)}")
     if extras:

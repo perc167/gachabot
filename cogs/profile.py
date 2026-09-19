@@ -1,0 +1,173 @@
+"""Your standing at a glance, plus the small utility commands."""
+import random
+import time
+
+import discord
+from discord.ext import commands
+
+import config
+import utils
+from utils import fmt_duration
+
+RPS = {"rock": "scissors", "paper": "rock", "scissors": "paper"}
+RPS_ICON = {"rock": "\U0001faa8", "paper": "\U0001f4c4", "scissors": "✂️"}
+
+
+class Profile(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command(name="profile", aliases=["me", "pr"])
+    @commands.guild_only()
+    async def profile(self, ctx, member: discord.Member = None):
+        """Everything about someone in one card."""
+        member = member or ctx.author
+        db = self.bot.db
+        gid = ctx.guild.id
+        player = db.get_player(gid, member.id)
+        harem = db.harem(gid, member.id, "karuda")
+        rate = db.get_setting(gid, "karuda_rate")
+        icon = utils.shard_icon(config.SHARD_TYPES[0][0])
+        worth = sum(utils.karuda_value(r, rate) for r in harem)
+
+        embed = discord.Embed(title=member.display_name, colour=config.CARD_COLOUR)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(
+            name="Balance", value=f"{icon} **{player['karuda']:,}**", inline=True
+        )
+        embed.add_field(name="Characters", value=f"{len(harem):,}", inline=True)
+        embed.add_field(name="Harem worth", value=f"{worth:,}", inline=True)
+
+        if harem:
+            best = harem[0]
+            embed.add_field(
+                name="Best claim",
+                value=f"**{best['name']}** · {best['series']}\n"
+                      f"{icon} {utils.karuda_value(best, rate):,}"
+                      f" · #{best['like_rank']:,}",
+                inline=False,
+            )
+            if best["image_url"]:
+                embed.set_image(url=best["image_url"])
+
+        wishes = db.wish_count(gid, member.id)
+        slots = db.get_setting(gid, "wish_limit") + player["extra_wish_slots"]
+        likes = len(db.likes_of(gid, member.id))
+        shards = db.shards_of(gid, member.id)
+        embed.add_field(
+            name="Also",
+            value=f"{wishes}/{slots} wishes · {likes} likes ·"
+                  f" {len(shards)}/{len(config.SHARD_TYPES)} shard types",
+            inline=False,
+        )
+
+        left, reset_in = self.bot.cooldowns.rolls_left(gid, member.id)
+        claim_ready, claim_in = self.bot.cooldowns.claim_ready(gid, member.id)
+        embed.set_footer(
+            text=f"{left} rolls left, resets in {fmt_duration(reset_in)} · "
+                 + ("claim ready" if claim_ready else f"claim in {fmt_duration(claim_in)}")
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(name="myid", aliases=["id"])
+    async def myid(self, ctx, member: discord.Member = None):
+        """Your Discord user id, for BOT_OWNERS and the like."""
+        member = member or ctx.author
+        await ctx.send(f"`{member.id}`")
+
+    @commands.command(name="invite")
+    async def invite(self, ctx):
+        """A link to add this bot to another server."""
+        if not ctx.bot.user:
+            await ctx.send("Not logged in yet.")
+            return
+        permissions = discord.Permissions(
+            send_messages=True,
+            embed_links=True,
+            attach_files=True,
+            read_message_history=True,
+            use_external_emojis=True,
+        )
+        url = discord.utils.oauth_url(
+            ctx.bot.user.id, permissions=permissions, scopes=("bot",)
+        )
+        await ctx.send(f"<{url}>")
+
+    @commands.command(name="ping")
+    async def ping(self, ctx):
+        """Round trip time to Discord."""
+        await ctx.send(f"Pong — {round(ctx.bot.latency * 1000)}ms.")
+
+    @commands.command(name="stats", aliases=["botinfo"])
+    @commands.guild_only()
+    async def stats(self, ctx):
+        """How big the pool is and how much of it this server has claimed."""
+        db = self.bot.db
+        gid = ctx.guild.id
+        total = db.character_count()
+        claimed = db.conn.execute(
+            "SELECT COUNT(*) AS c FROM marriages WHERE guild_id = ?", (gid,)
+        ).fetchone()["c"]
+        players = db.conn.execute(
+            "SELECT COUNT(*) AS c FROM players WHERE guild_id = ?", (gid,)
+        ).fetchone()["c"]
+        series = db.conn.execute(
+            "SELECT COUNT(DISTINCT series) AS c FROM characters"
+        ).fetchone()["c"]
+        with_art, images = db.album_totals()
+
+        embed = discord.Embed(title="Pool", colour=config.CARD_COLOUR)
+        embed.add_field(name="Characters", value=f"{total:,}", inline=True)
+        embed.add_field(name="Series", value=f"{series:,}", inline=True)
+        embed.add_field(name="Images", value=f"{images:,}", inline=True)
+        embed.add_field(
+            name="Claimed here",
+            value=f"{claimed:,} ({100 * claimed / max(1, total):.1f}%)",
+            inline=True,
+        )
+        embed.add_field(name="Players here", value=f"{players:,}", inline=True)
+        embed.add_field(
+            name="With art", value=f"{100 * with_art / max(1, total):.0f}%", inline=True
+        )
+        await ctx.send(embed=embed)
+
+    @commands.command(name="alea", aliases=["roll_dice", "rng"])
+    async def alea(self, ctx, low: int = 1, high: int = 100):
+        """A random number, for settling arguments."""
+        if low > high:
+            low, high = high, low
+        if high - low > 10_000_000:
+            await ctx.send("Keep the range under ten million.")
+            return
+        await ctx.send(f"**{random.randint(low, high):,}**  ({low:,}–{high:,})")
+
+    @commands.command(name="jankenpon", aliases=["rps"])
+    async def jankenpon(self, ctx, throw: str = None):
+        """Rock, paper, scissors."""
+        throw = (throw or "").lower()
+        if throw not in RPS:
+            await ctx.send(f"Pick one: {', '.join(RPS)}.")
+            return
+        mine = random.choice(list(RPS))
+        if mine == throw:
+            verdict = "A draw."
+        elif RPS[throw] == mine:
+            verdict = "You win."
+        else:
+            verdict = "I win."
+        await ctx.send(
+            f"{RPS_ICON[throw]} vs {RPS_ICON[mine]} — {verdict}"
+        )
+
+    @commands.command(name="uptime")
+    async def uptime(self, ctx):
+        """How long the bot has been running."""
+        started = getattr(ctx.bot, "started_at", None)
+        if not started:
+            await ctx.send("Not recorded.")
+            return
+        await ctx.send(f"Up for {fmt_duration(int(time.time() - started))}.")
+
+
+async def setup(bot):
+    await bot.add_cog(Profile(bot))

@@ -76,6 +76,18 @@ CREATE INDEX IF NOT EXISTS idx_wishes_character
 
 -- How many of each shard type a player has pulled. Flavour and bragging
 -- rights; the spendable balance is players.karuda.
+-- Who likes whom. Likes are per server, like everything else, and a like is
+-- a vote you can take back - hence a table rather than a counter.
+CREATE TABLE IF NOT EXISTS character_likes (
+    guild_id     INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    liked_at     INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id, character_id)
+);
+CREATE INDEX IF NOT EXISTS idx_likes_character
+    ON character_likes (guild_id, character_id);
+
 CREATE TABLE IF NOT EXISTS shard_pulls (
     guild_id INTEGER NOT NULL,
     user_id  INTEGER NOT NULL,
@@ -646,6 +658,113 @@ class Database:
             " WHERE m.guild_id = ?"
             " GROUP BY m.user_id ORDER BY owned DESC, likes DESC LIMIT ?",
             (guild_id, limit),
+        ).fetchall()
+
+    # ---------- likes ----------
+
+    def add_like(self, guild_id: int, user_id: int, character_id: int) -> bool:
+        try:
+            self.conn.execute(
+                "INSERT INTO character_likes"
+                " (guild_id, user_id, character_id, liked_at) VALUES (?, ?, ?, ?)",
+                (guild_id, user_id, character_id, int(time.time())),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def remove_like(self, guild_id: int, user_id: int, character_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM character_likes"
+            " WHERE guild_id = ? AND user_id = ? AND character_id = ?",
+            (guild_id, user_id, character_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def clear_likes(self, guild_id: int, user_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM character_likes WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def like_count(self, guild_id: int, character_id: int) -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) AS c FROM character_likes"
+            " WHERE guild_id = ? AND character_id = ?",
+            (guild_id, character_id),
+        ).fetchone()["c"]
+
+    def likes_of(self, guild_id: int, user_id: int) -> list:
+        return self.conn.execute(
+            "SELECT c.* FROM character_likes l"
+            " JOIN characters c ON c.id = l.character_id"
+            " WHERE l.guild_id = ? AND l.user_id = ?"
+            " ORDER BY l.liked_at",
+            (guild_id, user_id),
+        ).fetchall()
+
+    def most_liked(self, guild_id: int, limit: int = 10) -> list:
+        return self.conn.execute(
+            "SELECT c.*, COUNT(*) AS votes FROM character_likes l"
+            " JOIN characters c ON c.id = l.character_id"
+            " WHERE l.guild_id = ?"
+            " GROUP BY l.character_id ORDER BY votes DESC, c.like_rank LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    def like_position(self, guild_id: int, character_id: int) -> int:
+        """Where this character sits on the server's liked list, 0 if unliked."""
+        rows = self.conn.execute(
+            "SELECT character_id, COUNT(*) AS votes FROM character_likes"
+            " WHERE guild_id = ? GROUP BY character_id ORDER BY votes DESC",
+            (guild_id,),
+        ).fetchall()
+        for position, row in enumerate(rows, 1):
+            if row["character_id"] == character_id:
+                return position
+        return 0
+
+    # ---------- harem in bulk ----------
+
+    def harem_by_series(self, guild_id: int, user_id: int, series: str) -> list:
+        return self.conn.execute(
+            "SELECT c.* FROM marriages m JOIN characters c ON c.id = m.character_id"
+            " WHERE m.guild_id = ? AND m.user_id = ? AND c.series LIKE ?"
+            " ORDER BY c.like_rank",
+            (guild_id, user_id, f"%{series}%"),
+        ).fetchall()
+
+    def divorce_many(self, guild_id: int, user_id: int, character_ids) -> int:
+        ids = list(character_ids)
+        if not ids:
+            return 0
+        marks = ",".join("?" for _ in ids)
+        with self.conn:
+            cur = self.conn.execute(
+                f"DELETE FROM marriages WHERE guild_id = ? AND user_id = ?"
+                f" AND character_id IN ({marks})",
+                (guild_id, user_id, *ids),
+            )
+        return cur.rowcount
+
+    def search_series(self, query: str, limit: int = 25) -> list:
+        # Not "AS cast": CAST is a reserved word in SQLite and the query is a
+        # syntax error the moment you order by it.
+        rows = self.conn.execute(
+            "SELECT series, COUNT(*) AS cast_size FROM characters"
+            " WHERE series LIKE ? GROUP BY series ORDER BY cast_size DESC LIMIT ?",
+            (f"%{query}%", limit),
+        ).fetchall()
+        return [(r["series"], r["cast_size"]) for r in rows]
+
+    def characters_in_series(self, series: str, limit: int = 200) -> list:
+        return self.conn.execute(
+            "SELECT * FROM characters WHERE series = ? ORDER BY like_rank LIMIT ?",
+            (series, limit),
         ).fetchall()
 
     # ---------- wishes ----------
