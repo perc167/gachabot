@@ -173,17 +173,19 @@ Karuda button instead of a Claim button; grabbing pays out that character's
 value scaled by the server's `karuda_rate`, with a ±20% jitter, and 60% if the
 character is not yours. Gated by `karuda_interval_minutes`.
 
-**Shards.** `$daily` pulls one of six shard types, and which one you get
+**Shards.** `$daily` pulls one of eight shard types, and which one you get
 decides the payout:
 
 | Shard | Payout | Chance |
 |---|---|---|
-| 🟣 Karuda Dust | ×1 | 50% |
-| 🟢 Verdite | ×1.6 | 22% |
-| 🟡 Aurum | ×2.4 | 14% |
-| 🟠 Ember | ×3.6 | 8% |
-| 🔵 Azure | ×5.5 | 5% |
-| 🌈 Prism | ×12 | 1% |
+| Karuda Dust | ×1 | 50% |
+| Verdite | ×1.6 | 21.5% |
+| Aurum | ×2.4 | 13.5% |
+| Ember | ×3.6 | 8% |
+| Azure | ×5.5 | 4.5% |
+| Obsidian | ×9 | 1.5% |
+| Prism | ×14 | 0.8% |
+| Lumen | ×25 | 0.2% |
 
 One balance, so shards are about the moment of the pull rather than six
 separate wallets. Every type you have pulled is tracked and shown on `$k`.

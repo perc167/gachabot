@@ -71,7 +71,7 @@ async def main():
     import config, utils
 
     check("rarity tiers are gone", not hasattr(config, "RARITY_TIERS"))
-    check("six shard types", len(config.SHARD_TYPES) == 6,
+    check("eight shard types", len(config.SHARD_TYPES) == 8,
           str(len(config.SHARD_TYPES)))
     check("shard keys unique",
           len({s[0] for s in config.SHARD_TYPES}) == len(config.SHARD_TYPES))

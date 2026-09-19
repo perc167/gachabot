@@ -56,18 +56,20 @@ CLAIMED_COLOUR = 0x43B581
 #   1. python tools/make_shards.py          -> writes assets/shards/*.png
 #   2. Discord: Server Settings -> Emoji -> Upload Emoji, one per file.
 #      Name them to match the keys below: dust, verdite, aurum, ember,
-#      azure, prism.
+#      azure, obsidian, prism, lumen.
 #   3. Type \:dust: in a channel, send it, then copy what Discord expands it
 #      to - "<:dust:1234567890123>" - and paste that in place of the Unicode
 #      icon below.
 # The bot needs Use External Emoji in any server where it posts them.
 SHARD_TYPES = [
-    ("dust",    "Karuda Dust", "\U0001f7e3",  1.0, 50, 0x9B8AFB),
-    ("verdite", "Verdite",     "\U0001f7e2",  1.6, 22, 0x43B581),
-    ("aurum",   "Aurum",       "\U0001f7e1",  2.4, 14, 0xF1C40F),
-    ("ember",   "Ember",       "\U0001f7e0",  3.6,  8, 0xE67E22),
-    ("azure",   "Azure",       "\U0001f535",  5.5,  5, 0x3498DB),
-    ("prism",   "Prism",       "\U0001f308", 12.0,  1, 0xFF4D6D),
+    ("dust",     "Karuda Dust", "\U0001f7e3",  1.0, 500, 0x9B8AFB),
+    ("verdite",  "Verdite",     "\U0001f7e2",  1.6, 215, 0x43B581),
+    ("aurum",    "Aurum",       "\U0001f7e1",  2.4, 135, 0xF1C40F),
+    ("ember",    "Ember",       "\U0001f7e0",  3.6,  80, 0xE67E22),
+    ("azure",    "Azure",       "\U0001f535",  5.5,  45, 0x3498DB),
+    ("obsidian", "Obsidian",    "⚫",      9.0,  15, 0x2E2E38),
+    ("prism",    "Prism",       "\U0001f308", 14.0,   8, 0xFF4D6D),
+    ("lumen",    "Lumen",       "⚪",     25.0,   2, 0xEDEFF5),
 ]
 
 SHARDS_BY_KEY = {key: (key, name, icon, mult, weight, colour)
