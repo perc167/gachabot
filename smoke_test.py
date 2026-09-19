@@ -481,6 +481,30 @@ async def main():
         if row:
             db.delete_character(row["id"])
 
+    # 20b. Icon lookup falls back cleanly and prefers uploaded emoji.
+    check("icon falls back to unicode with no bot",
+          utils.shard_icon("dust") == config.shard("dust")[2])
+    check("unknown shard still yields an icon", utils.shard_icon("nope"))
+
+    class _FakeEmoji:
+        def __init__(self, name):
+            self.name = name
+
+        def __str__(self):
+            return f"<:{self.name}:42>"
+
+    class _FakeBot:
+        emojis = [_FakeEmoji("dust"), _FakeEmoji("prism")]
+
+    utils.use_emoji_from(_FakeBot())
+    check("uploaded emoji is preferred", utils.shard_icon("dust") == "<:dust:42>")
+    check("missing upload still falls back",
+          utils.shard_icon("aurum") == config.shard("aurum")[2])
+    card = utils.character_embed(db, GUILD, top)
+    check("card uses the uploaded icon",
+          "<:dust:42>" in str(card.fields[0].value), str(card.fields[0].value))
+    utils.use_emoji_from(None)
+
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)
     check("shard pull increments", db.record_shard(GUILD, ALICE, "prism") == 2)

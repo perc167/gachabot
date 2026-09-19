@@ -7,6 +7,7 @@ from discord.ext import commands
 
 import config
 from db import Database
+import utils
 from utils import Cooldowns
 
 logging.basicConfig(
@@ -41,6 +42,8 @@ class GachaBot(commands.Bot):
         self.cooldowns = Cooldowns(self.db)
 
     async def setup_hook(self):
+        # Shard icons prefer custom emoji uploaded to the server.
+        utils.use_emoji_from(self)
         for cog in COGS:
             await self.load_extension(cog)
             log.info("loaded %s", cog)

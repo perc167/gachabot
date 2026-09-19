@@ -189,9 +189,12 @@ decides the payout:
 
 One balance, so shards are about the moment of the pull rather than six
 separate wallets. Every type you have pulled is tracked and shown on `$k`.
-`$shards` lists the table above live. The icons are plain Unicode so they work
-with no setup — to use custom server emoji, paste the full `<:name:id>` form
-into `SHARD_TYPES` in `config.py`.
+`$shards` lists the table above live. The icons start as plain Unicode. To use the
+crystal art, run `python tools/make_shards.py` and upload the files from
+`assets/shards/` as server emoji, named exactly as the shard keys — `dust`,
+`verdite`, `aurum`, `ember`, `azure`, `obsidian`, `prism`, `lumen`. The bot
+looks emoji up by name at runtime, so there are no ids to copy and nothing to
+configure; `$shards` tells you how many it can currently see.
 
 **Ranks and value.** Every character carries two popularity ranks, 1 being the
 most popular, exactly as Mudae does: a **claim rank** for how sought-after they

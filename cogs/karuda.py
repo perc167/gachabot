@@ -31,7 +31,7 @@ class Karuda(commands.Cog):
         embed = discord.Embed(
             title=f"{member.display_name}", colour=config.CARD_COLOUR
         )
-        icon = config.SHARD_TYPES[0][2]
+        icon = utils.shard_icon(config.SHARD_TYPES[0][0])
         embed.add_field(
             name="Balance", value=f"{icon} **{player['karuda']:,}**", inline=True
         )
@@ -44,10 +44,10 @@ class Karuda(commands.Cog):
         pulled = db.shards_of(gid, member.id)
         if pulled:
             lines = []
-            for key, name, shard_icon, _, _, _ in config.SHARD_TYPES:
+            for key, name, _fallback, _, _, _ in config.SHARD_TYPES:
                 count = pulled.get(key, 0)
                 if count:
-                    lines.append(f"{shard_icon} {name} ×{count}")
+                    lines.append(f"{utils.shard_icon(key)} {name} ×{count}")
                 else:
                     lines.append(f"— *{name}*")
             embed.add_field(name="Shards pulled", value="\n".join(lines), inline=False)
@@ -67,7 +67,8 @@ class Karuda(commands.Cog):
             await ctx.send(f"Next daily in {fmt_duration(remaining)}.")
             return
         # The pull is the point: which shard you get decides the payout.
-        key, name, icon, multiplier, _, colour = config.roll_shard(random)
+        key, name, _fallback, multiplier, _, colour = config.roll_shard(random)
+        icon = utils.shard_icon(key)
         base = random.randint(DAILY_MIN, DAILY_MAX)
         amount = round(base * multiplier)
 
@@ -95,7 +96,10 @@ class Karuda(commands.Cog):
         """What each shard type is worth, and how often it turns up."""
         total_weight = sum(s[4] for s in config.SHARD_TYPES)
         lines = []
-        for _, name, icon, multiplier, weight, _ in config.SHARD_TYPES:
+        custom = 0
+        for key, name, fallback, multiplier, weight, _ in config.SHARD_TYPES:
+            icon = utils.shard_icon(key)
+            custom += icon != fallback
             chance = 100 * weight / total_weight
             shown = f"{chance:.0f}%" if chance >= 1 else f"{chance:.1f}%"
             lines.append(f"{icon} **{name}** — ×{multiplier:g} payout, {shown}")
@@ -104,7 +108,11 @@ class Karuda(commands.Cog):
             description="\n".join(lines),
             colour=config.CARD_COLOUR,
         )
-        embed.set_footer(text=f"One pull per {ctx.prefix}daily, every 20 hours.")
+        art = (f"{custom}/{len(config.SHARD_TYPES)} crystal emoji found"
+               if custom else "using fallback icons - upload assets/shards/")
+        embed.set_footer(
+            text=f"One pull per {ctx.prefix}daily, every 20 hours • {art}"
+        )
         await ctx.send(embed=embed)
 
     @commands.command(name="pay", aliases=["sendkaruda"])

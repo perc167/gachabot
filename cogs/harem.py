@@ -33,7 +33,7 @@ class Harem(commands.Cog):
         total_karuda = sum(utils.karuda_value(r, rate) for r in rows)
 
         lines = []
-        icon = config.SHARD_TYPES[0][2]
+        icon = utils.shard_icon(config.SHARD_TYPES[0][0])
         for i, row in enumerate(rows, 1):
             note = f" — _{row['note']}_" if row["note"] else ""
             lines.append(

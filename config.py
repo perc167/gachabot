@@ -47,20 +47,18 @@ CURRENCY_TITLE = "Karuda"
 CARD_COLOUR = 0x7C6BF0
 CLAIMED_COLOUR = 0x43B581
 
-# The six kinds of shard a $daily can turn up.
-#   key, display name, icon, payout multiplier, weight, embed colour
-# Weights are relative: Dust lands about half the time, Prism about 1 in 100.
-# Icons are plain Unicode so the bot works with no setup.
+# The eight kinds of shard a $daily can turn up.
+#   key, display name, fallback icon, payout multiplier, weight, embed colour
+# Weights are relative out of 1000: Dust lands half the time, Lumen 1 in 500.
 #
-# To use the crystal art instead:
-#   1. python tools/make_shards.py          -> writes assets/shards/*.png
-#   2. Discord: Server Settings -> Emoji -> Upload Emoji, one per file.
-#      Name them to match the keys below: dust, verdite, aurum, ember,
-#      azure, obsidian, prism, lumen.
-#   3. Type \:dust: in a channel, send it, then copy what Discord expands it
-#      to - "<:dust:1234567890123>" - and paste that in place of the Unicode
-#      icon below.
-# The bot needs Use External Emoji in any server where it posts them.
+# The icon here is only a fallback. To use the crystal art:
+#   1. python tools/make_shards.py     -> writes assets/shards/*.png
+#   2. Discord: Server Settings -> Emoji -> Upload Emoji, one per file,
+#      named exactly as the key below: dust, verdite, aurum, ember, azure,
+#      obsidian, prism, lumen.
+# That is all. The bot finds emoji by name at runtime, so there are no ids to
+# copy; $shards reports how many it can see. It needs Use External Emoji in
+# any server where it posts them.
 SHARD_TYPES = [
     ("dust",     "Karuda Dust", "\U0001f7e3",  1.0, 500, 0x9B8AFB),
     ("verdite",  "Verdite",     "\U0001f7e2",  1.6, 215, 0x43B581),

@@ -24,6 +24,32 @@ def fmt_duration(seconds: int) -> str:
     return f"{minutes}m"
 
 
+# Set once at startup so icon lookups can see the server's custom emoji.
+# A module-level binding rather than a parameter threaded through every embed
+# helper: which icon to draw is presentation, not something callers decide.
+_bot = None
+
+
+def use_emoji_from(bot):
+    """Remember the bot, so shard icons can resolve uploaded emoji."""
+    global _bot
+    _bot = bot
+
+
+def shard_icon(key: str) -> str:
+    """The uploaded crystal for this shard, or the Unicode fallback.
+
+    If any server the bot is in has an emoji named after the shard - dust,
+    verdite, prism and so on - that emoji is used. Upload the files from
+    assets/shards/ and they appear on their own, with nothing to configure.
+    """
+    fallback = config.shard(key)[2]
+    if _bot is None:
+        return fallback
+    emoji = discord.utils.get(_bot.emojis, name=key)
+    return str(emoji) if emoji else fallback
+
+
 def karuda_value(character, rate_percent: int) -> int:
     """base_karuda already encodes how famous the character is, so the only
     adjustment is the server's own rate."""
@@ -120,7 +146,7 @@ def character_embed(
         )
 
     # Three short inline fields read as columns rather than a wall of bullets.
-    icon = config.SHARD_TYPES[0][2]
+    icon = shard_icon(config.SHARD_TYPES[0][0])
     embed.add_field(
         name="Value",
         value=f"{icon} **{karuda_value(character, rate):,}**",
