@@ -562,16 +562,20 @@ async def main():
         id = ALICE
         display_name = "tester"
 
-    rolled = [config.roll_shard(_random) for _ in range(2)]
+    from cogs.karuda import DAILY_DROPS
+
+    rolled = [config.roll_shard(_random) for _ in range(DAILY_DROPS)]
     drops = [(k, n, m, c, 100) for k, n, _i, m, _w, c in rolled]
     view = ShardDrops(b, GUILD, _Author(), drops)
-    check("dk offers two drops", len(view.children) == 2)
-    check("dk starts uncollected", view.collected == [False, False])
+    check("dk offers a button per drop", len(view.children) == DAILY_DROPS,
+          f"{len(view.children)} for {DAILY_DROPS} drops")
+    check("dk starts uncollected", view.collected == [False] * DAILY_DROPS)
     body = view.render().description
-    check("dk names both shards",
+    check("dk names every shard it dropped",
           all(d[1] in body for d in drops), body[:90])
     check("dk footer counts what is left",
-          "2 left" in view.render().footer.text, view.render().footer.text)
+          f"{DAILY_DROPS} left" in view.render().footer.text,
+          view.render().footer.text)
 
     # 20e. Likes: a vote you can take back, counted per server.
     liked = by_rank[5]
@@ -740,6 +744,71 @@ async def main():
     check("help view has a jump menu and arrows", len(view.children) == 4)
     check("help opens on the overview", view.index is None)
     check("help renders a section", helpmod.category_embed(0, "$").title)
+
+    # 20k. Badges and the tower, and the perks they actually apply.
+    import perks as perksmod
+
+    check("badges are priced and described",
+          all(price > 0 and desc for _k, _i, _n, price, desc, _p in perksmod.BADGES))
+    check("badge keys unique",
+          len({b[0] for b in perksmod.BADGES}) == len(perksmod.BADGES))
+    check("tower costs only go up",
+          [c for c, _ in perksmod.TOWER_FLOORS]
+          == sorted(c for c, _ in perksmod.TOWER_FLOORS))
+    check("no perk key is a typo",
+          all(set(p).issubset(perksmod.EMPTY)
+              for *_r, p in perksmod.BADGES)
+          and all(set(p).issubset(perksmod.EMPTY)
+                  for _c, p in perksmod.TOWER_FLOORS))
+
+    CLIMBER = 777
+    base = perksmod.effective(db, GUILD, CLIMBER)
+    check("a new player has no perks", base == perksmod.EMPTY, str(base))
+
+    db.add_badge(GUILD, CLIMBER, "collector")
+    check("badge recorded", db.badges_of(GUILD, CLIMBER) == ["collector"])
+    check("buying twice refused", not db.add_badge(GUILD, CLIMBER, "collector"))
+    check("badge perk applies",
+          perksmod.effective(db, GUILD, CLIMBER)["rolls"] == 2)
+    check("badges are per server", db.badges_of(999, CLIMBER) == [])
+
+    db.update_player(GUILD, CLIMBER, tower_floor=4)
+    stacked = perksmod.effective(db, GUILD, CLIMBER)
+    check("tower perks accumulate up the floors",
+          stacked["rolls"] == 2 + 2 and stacked["grab_percent"] == 2
+          and stacked["claim_percent"] == 5, str(stacked))
+
+    # Extra rolls have to reach the actual roll budget, not just the display.
+    db.update_player(GUILD, CLIMBER, rolls_reset_at=0)
+    left, _ = cd.rolls_left(GUILD, CLIMBER)
+    check("extra rolls reach the roll budget",
+          left == db.get_setting(GUILD, "roll_limit") + stacked["rolls"],
+          f"{left}")
+
+    # And the claim reduction has to shorten a real cooldown.
+    db.update_player(GUILD, CLIMBER, tower_floor=0)
+    cd.start_claim_cooldown(GUILD, CLIMBER)
+    plain = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
+    db.add_badge(GUILD, CLIMBER, "swift")
+    cd.start_claim_cooldown(GUILD, CLIMBER)
+    shortened = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
+    check("claim reduction shortens the real cooldown", shortened < plain,
+          f"{shortened} vs {plain}")
+
+    check("claim reduction is capped",
+          perksmod.combine({"claim_percent": 90})["claim_percent"] == 90
+          and perksmod.effective(db, GUILD, CLIMBER)["claim_percent"] <= 60)
+    check("describe reads as a sentence",
+          "rolls" in perksmod.describe({**perksmod.EMPTY, "rolls": 3}))
+    check("describe says so when there is nothing",
+          perksmod.describe(perksmod.EMPTY) == "nothing yet")
+    check("bar fills proportionally",
+          perksmod.bar(5, 10).count("▰") == 5)
+    check("top floor has no next cost",
+          perksmod.floor_cost(perksmod.MAX_FLOOR + 1) is None)
+    check("tower leaderboard finds the climber",
+          any(r["user_id"] == CLIMBER for r in db.top_towers(GUILD))
+          or db.get_player(GUILD, CLIMBER)["tower_floor"] == 0)
 
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)

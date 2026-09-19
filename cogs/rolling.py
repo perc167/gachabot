@@ -4,6 +4,7 @@ import random
 import discord
 from discord.ext import commands
 
+import perks
 import utils
 from utils import fmt_duration, karuda_value
 
@@ -139,6 +140,7 @@ class KarudaView(discord.ui.View):
 
         rate = db.get_setting(self.guild_id, "karuda_rate")
         percent = db.get_setting(self.guild_id, "karuda_grab_percent")
+        percent += perks.effective(db, self.guild_id, user.id)["grab_percent"]
         # A grab is a cut of the character's worth, not the whole thing -
         # paying full value made grinding the only sensible way to play.
         owner_id = db.owner_of(self.guild_id, self.character["id"])

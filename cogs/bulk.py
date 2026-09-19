@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 import config
+import perks
 import utils
 from views import Confirm, Paginator, choose_character
 
@@ -141,9 +142,11 @@ class Bulk(commands.Cog):
         if not title:
             return
 
-        limit = db.get_setting(gid, "wish_limit") + db.get_player(
-            gid, ctx.author.id
-        )["extra_wish_slots"]
+        limit = (
+            db.get_setting(gid, "wish_limit")
+            + db.get_player(gid, ctx.author.id)["extra_wish_slots"]
+            + perks.effective(db, gid, ctx.author.id)["wish_slots"]
+        )
         room = limit - db.wish_count(gid, ctx.author.id)
         if room <= 0:
             await ctx.send(f"Your wishlist is full ({limit}).")

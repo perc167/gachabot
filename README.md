@@ -138,8 +138,8 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$mm [@user] [likes\|name\|recent\|karuda]` | Browse a harem |
 | `$im <name>` | Character card |
 | `$search <text>` | Search by character or series |
-| `$divorce <name>` | Release a character, refunds half its karuda |
-| `$note <name> \| <text>` | Annotate one of your characters |
+| `$divorce` | Release a character — pick from a menu |
+| `$note` | Annotate one of yours — pick, then type in a box |
 | `$top` | Biggest harems in the server |
 | `$series <name>` | A series and everyone in it |
 | `$divorceall` / `$divorceseries` / `$divorceallbut [n]` | Let go in bulk, with confirmation |
@@ -151,7 +151,7 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$myid` / `$invite` / `$ping` / `$uptime` | Utility |
 | `$alea [low] [high]` / `$jankenpon` | Dice and rock-paper-scissors |
 | `$k [@user]` | Karuda balance and shard collection |
-| `$dk` | Two karuda drops to collect, every 20h |
+| `$dk` | A karuda shard to collect, every 20h |
 | `$shards` | What each shard pays, and its odds |
 | `$pay @user <amount>` | Send karuda |
 | `$richest` | Karuda leaderboard |
@@ -171,6 +171,9 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$access` / `$redeem <key>` | Access status and key redemption |
 | `$addcustom Name \| Series \| url` | A character only this server rolls |
 | `$customlist` / `$imgcustom` / `$namecustom` / `$valuecustom` / `$deletecustom` | Manage them |
+| `$badges` / `$buybadge <name>` | One-off perks bought with karuda |
+| `$kt` / `$ktup` / `$toptower` | The karuda tower, climbed a floor at a time |
+| `$perks` | What your badges and tower add up to |
 | `$pool` | Pool size and most-liked characters |
 | `$missingart [series]` | Characters that still need artwork |
 | `$setimage <id> <url>` | Give a character its art (owner-only) |
@@ -201,8 +204,8 @@ default, because claiming costs nothing and a refund turned the claim
 cooldown into a money printer. Both are settings
 (`karuda_grab_percent`, `divorce_refund_percent`) if you want it looser.
 
-**Shards.** `$dk` drops two shards as buttons you collect, each rolled
-independently from eight types, and which one you get decides the payout:
+**Shards.** `$dk` drops one shard as a button you collect, rolled from
+eight types, and which one you get decides the payout:
 
 | Shard | Payout | Chance |
 |---|---|---|
@@ -359,6 +362,25 @@ about 70 assertions, a few seconds, no Discord connection.
 
 Adding a setting is one line in `GUILD_SETTINGS` — `$settings` and `$set` pick
 it up automatically.
+
+## Badges and the tower
+
+Two long-term karuda sinks, both feeding one perks table.
+
+**Badges** are one-off purchases: Collector (+2 rolls), Prospector (+4% grab),
+Devoted (+2 wishes), Swift (−15% claim wait), Lucky (+15% daily), Archivist
+(+1 roll, +2% grab). `$badges` lists them, `$buybadge <name>` buys one.
+
+**The tower** is ten floors climbed one at a time, each costing more than the
+last — 2,500 for the first, 160,000 for the tenth, 429,000 for the lot.
+`$kt` shows where you are, `$ktup` climbs.
+
+`$perks` shows what it all adds up to. Everything stacks into one effect and
+is applied where it matters — the roll budget, the claim cooldown, the grab
+percentage, wishlist size and daily payouts — rather than being a number on a
+profile. A fully kitted player rolls about half again as often as a new one,
+not ten times, and the claim reduction is capped at 60% so the cooldown never
+disappears.
 
 ## Custom characters
 

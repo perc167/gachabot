@@ -5,21 +5,22 @@ import discord
 from discord.ext import commands
 
 import config
+import perks
 import utils
 from utils import fmt_duration
 
 DAILY_COOLDOWN = 20 * 60 * 60  # 20 hours, so it drifts earlier each day
-DAILY_DROPS = 2
-# Halved when $dk went from one payout to two, so a day is worth the same.
-DAILY_MIN, DAILY_MAX = 55, 130
+DAILY_DROPS = 1
+# Back to the full amount now that a $dk drops one shard rather than two.
+DAILY_MIN, DAILY_MAX = 100, 240
 
 
 class ShardDrops(discord.ui.View):
-    """The two shards a $dk turns up, as buttons you collect.
+    """The shard a $dk turns up, as a button you collect.
 
-    Each is rolled before the message is sent, so the icon on the button
+    It is rolled before the message is sent, so the icon on the button
     already tells you what you got - the click is collecting it, not
-    deciding it. Only the person who ran the command can press them.
+    deciding it. Only the person who ran the command can press it.
     """
 
     def __init__(self, bot, guild_id: int, author, drops, timeout: float = 600):
@@ -90,7 +91,7 @@ class ShardDrops(discord.ui.View):
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author.id:
             await interaction.response.send_message(
-                "These are not your drops. Run `$dk` for your own.", ephemeral=True
+                "Not your drop. Run `$dk` for your own.", ephemeral=True
             )
             return False
         return True
@@ -163,14 +164,20 @@ class Karuda(commands.Cog):
             )
             return
 
-        # Two shards, rolled independently. The cooldown starts now rather
-        # than on collection, so leaving a drop unclaimed costs you it.
+        # The cooldown starts now rather than on collection, so leaving the
+        # drop unclaimed costs you it.
         drops = []
         for _ in range(DAILY_DROPS):
             key, name, _fallback, multiplier, _weight, colour = config.roll_shard(
                 random
             )
-            amount = round(random.randint(DAILY_MIN, DAILY_MAX) * multiplier)
+            bonus = perks.effective(db, gid, ctx.author.id)["daily_percent"]
+            amount = round(
+                random.randint(DAILY_MIN, DAILY_MAX)
+                * multiplier
+                * (100 + bonus)
+                / 100
+            )
             drops.append((key, name, multiplier, colour, amount))
         db.update_player(
             gid, ctx.author.id, daily_ready_at=utils.now() + DAILY_COOLDOWN

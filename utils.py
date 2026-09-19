@@ -4,6 +4,7 @@ import time
 import discord
 
 import config
+import perks
 
 
 def now() -> int:
@@ -70,7 +71,8 @@ class Cooldowns:
     def rolls_left(self, guild_id: int, user_id: int) -> tuple:
         """Returns (rolls_left, seconds_until_reset)."""
         player = self.db.get_player(guild_id, user_id)
-        limit = self.db.get_setting(guild_id, "roll_limit")
+        earned = perks.effective(self.db, guild_id, user_id)
+        limit = self.db.get_setting(guild_id, "roll_limit") + earned["rolls"]
         window = self.db.get_setting(guild_id, "roll_reset_minutes") * 60
         current = now()
 
@@ -104,7 +106,10 @@ class Cooldowns:
 
     def start_claim_cooldown(self, guild_id: int, user_id: int):
         minutes = self.db.get_setting(guild_id, "claim_interval_minutes")
-        self.db.update_player(guild_id, user_id, claim_ready_at=now() + minutes * 60)
+        # Badges and tower floors shorten the wait.
+        reduction = perks.effective(self.db, guild_id, user_id)["claim_percent"]
+        seconds = int(minutes * 60 * (100 - reduction) / 100)
+        self.db.update_player(guild_id, user_id, claim_ready_at=now() + seconds)
 
     def karuda_ready(self, guild_id: int, user_id: int) -> tuple:
         player = self.db.get_player(guild_id, user_id)

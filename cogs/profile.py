@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 import config
+import perks
 import utils
 from utils import fmt_duration
 
@@ -50,8 +51,14 @@ class Profile(commands.Cog):
             if best["image_url"]:
                 embed.set_image(url=best["image_url"])
 
+        earned = perks.effective(db, gid, member.id)
+        owned_badges = db.badges_of(gid, member.id)
         wishes = db.wish_count(gid, member.id)
-        slots = db.get_setting(gid, "wish_limit") + player["extra_wish_slots"]
+        slots = (
+            db.get_setting(gid, "wish_limit")
+            + player["extra_wish_slots"]
+            + earned["wish_slots"]
+        )
         likes = len(db.likes_of(gid, member.id))
         shards = db.shards_of(gid, member.id)
         embed.add_field(
@@ -60,6 +67,21 @@ class Profile(commands.Cog):
                   f" {len(shards)}/{len(config.SHARD_TYPES)} shard types",
             inline=False,
         )
+
+        if owned_badges or player["tower_floor"]:
+            marks = " ".join(
+                perks.BADGES_BY_KEY[key][1]
+                for key in owned_badges
+                if key in perks.BADGES_BY_KEY
+            )
+            embed.add_field(
+                name="Progress",
+                value=f"Tower floor **{player['tower_floor']}**"
+                      f"/{perks.MAX_FLOOR}  {perks.bar(player['tower_floor'], perks.MAX_FLOOR)}"
+                      + (f"\n{marks}" if marks else "")
+                      + f"\n_{perks.describe(earned)}_",
+                inline=False,
+            )
 
         left, reset_in = self.bot.cooldowns.rolls_left(gid, member.id)
         claim_ready, claim_in = self.bot.cooldowns.claim_ready(gid, member.id)

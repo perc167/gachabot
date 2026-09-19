@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS players (
     extra_wish_slots INTEGER NOT NULL DEFAULT 0,
     first_seen      INTEGER NOT NULL DEFAULT 0,
     premium         INTEGER NOT NULL DEFAULT 0,
+    tower_floor     INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
 );
 
@@ -130,6 +131,16 @@ CREATE INDEX IF NOT EXISTS idx_likes_character
 
 -- How many of each shard type a player has pulled. Flavour and bragging
 -- rights; the spendable balance is players.karuda.
+-- Badges a player has bought. Perks are looked up from perks.py by key, so
+-- rebalancing a badge does not need a migration.
+CREATE TABLE IF NOT EXISTS badges (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    badge    TEXT NOT NULL,
+    bought_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id, badge)
+);
+
 CREATE TABLE IF NOT EXISTS shard_pulls (
     guild_id INTEGER NOT NULL,
     user_id  INTEGER NOT NULL,
@@ -186,7 +197,7 @@ class Database:
         }
         for column in (
             "daily_ready_at", "rolls_bought", "extra_wish_slots", "first_seen",
-            "premium",
+            "premium", "tower_floor",
         ):
             if column not in existing:
                 self.conn.execute(
@@ -600,6 +611,7 @@ class Database:
             "extra_wish_slots",
             "first_seen",
             "premium",
+            "tower_floor",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:
@@ -903,6 +915,44 @@ class Database:
                 "SELECT 1 FROM premium_keys WHERE redeemed_by = ? LIMIT 1", (user_id,)
             ).fetchone()
         )
+
+    # ---------- badges and the tower ----------
+
+    def add_badge(self, guild_id: int, user_id: int, badge: str) -> bool:
+        try:
+            self.conn.execute(
+                "INSERT INTO badges (guild_id, user_id, badge, bought_at)"
+                " VALUES (?, ?, ?, ?)",
+                (guild_id, user_id, badge, int(time.time())),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def badges_of(self, guild_id: int, user_id: int) -> list:
+        return [
+            row["badge"]
+            for row in self.conn.execute(
+                "SELECT badge FROM badges WHERE guild_id = ? AND user_id = ?"
+                " ORDER BY bought_at",
+                (guild_id, user_id),
+            )
+        ]
+
+    def badge_holders(self, guild_id: int, badge: str) -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) AS c FROM badges WHERE guild_id = ? AND badge = ?",
+            (guild_id, badge),
+        ).fetchone()["c"]
+
+    def top_towers(self, guild_id: int, limit: int = 10) -> list:
+        return self.conn.execute(
+            "SELECT user_id, tower_floor FROM players"
+            " WHERE guild_id = ? AND tower_floor > 0"
+            " ORDER BY tower_floor DESC, karuda DESC LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
 
     # ---------- likes ----------
 

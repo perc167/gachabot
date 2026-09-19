@@ -5,6 +5,7 @@ from discord.ext import commands
 
 import utils
 import config
+import perks
 from views import CharacterPicker, Paginator, choose_character
 
 
@@ -28,9 +29,11 @@ class Wishlist(commands.Cog):
         if not character:
             return
 
-        limit = db.get_setting(gid, "wish_limit") + db.get_player(
-            gid, ctx.author.id
-        )["extra_wish_slots"]
+        limit = (
+            db.get_setting(gid, "wish_limit")
+            + db.get_player(gid, ctx.author.id)["extra_wish_slots"]
+            + perks.effective(db, gid, ctx.author.id)["wish_slots"]
+        )
         if db.wish_count(gid, ctx.author.id) >= limit:
             await ctx.send(
                 f"Your wishlist is full ({limit})."
@@ -98,9 +101,11 @@ class Wishlist(commands.Cog):
             await ctx.send(f"{member.display_name} has no wishes.")
             return
 
-        limit = db.get_setting(gid, "wish_limit") + db.get_player(
-            gid, member.id
-        )["extra_wish_slots"]
+        limit = (
+            db.get_setting(gid, "wish_limit")
+            + db.get_player(gid, member.id)["extra_wish_slots"]
+            + perks.effective(db, gid, member.id)["wish_slots"]
+        )
         lines = []
         for i, row in enumerate(rows, 1):
             owner_id = db.owner_of(gid, row["id"])

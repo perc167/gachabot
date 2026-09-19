@@ -41,7 +41,7 @@ CATEGORIES = [
         ("wishremoveall", "Empty your wishlist"),
     ]),
     ("\U0001f48e", "Karuda", "The currency", [
-        ("dk", "Two shard drops to collect, every 20h"),
+        ("dk", "A karuda shard to collect, every 20h"),
         ("shards", "What each shard pays, and the odds"),
         ("", ""),
         ("k [@user]", "Balance and shard collection"),
@@ -54,6 +54,16 @@ CATEGORIES = [
         ("buyrolls [n]", "More rolls this window"),
         ("resetclaim", "Claim again now"),
         ("wishslot", "A permanent wishlist slot"),
+    ]),
+    ("🏅", "Badges & tower", "Long-term perks", [
+        ("badges", "What you can buy, and what you own"),
+        ("buybadge <name>", "Buy one"),
+        ("", ""),
+        ("kt", "Your tower, and the next floor"),
+        ("ktup", "Climb a floor"),
+        ("toptower", "Who has climbed highest"),
+        ("", ""),
+        ("perks", "What it all adds up to"),
     ]),
     ("⭐", "Wishes", "Get pinged when they roll", [
         ("wish <name>", "Add a wish"),
