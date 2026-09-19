@@ -38,20 +38,24 @@ GUILD_SETTINGS = {
     "wish_limit": (20, 1, 200, "How many characters a user may wish for"),
 }
 
-# Likes thresholds -> (tier name, embed colour, kakera multiplier).
+# Rarity is read off base_kakera, which is how famous the character is
+# (see tools/build_roster.py). Likes are earned by players over time and do
+# not decide the tier, so a brand new pool still has a full rarity spread.
+#
+# base_kakera threshold -> (tier name, embed colour).
 # Ordered high to low; the first threshold a character clears wins.
 RARITY_TIERS = [
-    (1500, "Mythic", 0xFF4D6D, 3.0),
-    (700, "Legendary", 0xF4A261, 2.2),
-    (300, "Epic", 0xB388EB, 1.6),
-    (100, "Rare", 0x4EA8DE, 1.25),
-    (0, "Common", 0x8D99AE, 1.0),
+    (105, "Mythic", 0xFF4D6D),
+    (90, "Legendary", 0xF4A261),
+    (80, "Epic", 0xB388EB),
+    (65, "Rare", 0x4EA8DE),
+    (0, "Common", 0x8D99AE),
 ]
 
 
-def rarity_for(likes: int):
-    """Return (name, colour, multiplier) for a character's like count."""
-    for threshold, name, colour, mult in RARITY_TIERS:
-        if likes >= threshold:
-            return name, colour, mult
-    return RARITY_TIERS[-1][1], RARITY_TIERS[-1][2], RARITY_TIERS[-1][3]
+def rarity_for(base_kakera: int):
+    """Return (tier name, embed colour) for a character's kakera value."""
+    for threshold, name, colour in RARITY_TIERS:
+        if base_kakera >= threshold:
+            return name, colour
+    return RARITY_TIERS[-1][1], RARITY_TIERS[-1][2]

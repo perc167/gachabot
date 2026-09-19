@@ -11,6 +11,7 @@ import discord
 from discord.ext import commands
 
 import config
+import utils
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "characters.json")
 FIELDS = ("name", "series", "image_url", "likes", "base_kakera")
@@ -39,21 +40,24 @@ class Admin(commands.Cog):
         likes and base_kakera are optional (default 0 / 50).
         """
         parts = [p.strip() for p in args.split("|")]
-        if len(parts) < 3:
+        if len(parts) < 2:
             await ctx.send(
                 f"Usage: `{ctx.prefix}addchar Name | Series | image_url"
-                " | likes | base_kakera`"
+                " | likes | base_kakera`\nEverything after Series is optional."
             )
             return
-        name, series, image_url = parts[0], parts[1], parts[2]
+        name, series = parts[0], parts[1]
+        image_url = parts[2] if len(parts) > 2 else ""
+        if image_url.lower() in ("none", "-", "n/a"):
+            image_url = ""
         try:
             likes = int(parts[3]) if len(parts) > 3 and parts[3] else 0
             base_kakera = int(parts[4]) if len(parts) > 4 and parts[4] else 50
         except ValueError:
             await ctx.send("likes and base_kakera must be whole numbers.")
             return
-        if not image_url.startswith(("http://", "https://")):
-            await ctx.send("image_url must be an http(s) link.")
+        if image_url and not image_url.startswith(("http://", "https://")):
+            await ctx.send("image_url must be an http(s) link, or left out.")
             return
 
         char_id = self.bot.db.add_character(name, series, image_url, likes, base_kakera)
@@ -82,6 +86,77 @@ class Admin(commands.Cog):
                 return
         self.bot.db.update_character(character_id, **{field: value})
         await ctx.send(f"Updated `{character_id}`: {field} = {value}")
+
+    @commands.command(name="setimage", aliases=["setart", "img"])
+    @is_bot_owner()
+    async def setimage(self, ctx, character_id: int, url: str = None):
+        """`$setimage <id> <url>` — attach art to a character.
+
+        You can also attach an image file to the message instead of a URL,
+        though Discord's own attachment links expire, so a permanent host is
+        better for anything you want to keep.
+        """
+        character = self.bot.db.get_character(character_id)
+        if not character:
+            await ctx.send(f"No character with ID `{character_id}`.")
+            return
+
+        if url is None and ctx.message.attachments:
+            url = ctx.message.attachments[0].url
+        if not url:
+            await ctx.send(
+                f"Give me a link: `{ctx.prefix}setimage {character_id} https://...`"
+            )
+            return
+        if not url.startswith(("http://", "https://")):
+            await ctx.send("That is not an http(s) link.")
+            return
+
+        self.bot.db.update_character(character_id, image_url=url)
+        embed = utils.character_embed(
+            self.bot.db, ctx.guild.id, self.bot.db.get_character(character_id)
+        )
+        await ctx.send(f"Art set for **{character['name']}**.", embed=embed)
+
+    @commands.command(name="missingart", aliases=["noart"])
+    @commands.guild_only()
+    async def missingart(self, ctx, *, series: str = None):
+        """Which characters still have no image. Optionally filter by series."""
+        db = self.bot.db
+        if series:
+            rows = db.conn.execute(
+                "SELECT * FROM characters WHERE image_url = ''"
+                " AND series LIKE ? ORDER BY base_kakera DESC LIMIT 40",
+                (f"%{series}%",),
+            ).fetchall()
+        else:
+            rows = db.conn.execute(
+                "SELECT * FROM characters WHERE image_url = ''"
+                " ORDER BY base_kakera DESC LIMIT 40"
+            ).fetchall()
+
+        total = db.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters WHERE image_url = ''"
+        ).fetchone()["c"]
+        if not total:
+            await ctx.send("Every character has art. Nice.")
+            return
+        if not rows:
+            await ctx.send(f"No characters without art match `{series}`.")
+            return
+
+        lines = [
+            f"`{r['id']:>4}` **{r['name']}** • {r['series']}" for r in rows
+        ]
+        embed = discord.Embed(
+            title=f"{total} characters still need art",
+            description="\n".join(lines),
+            colour=0x8D99AE,
+        )
+        embed.set_footer(
+            text=f"Showing {len(rows)}. Add one with {ctx.prefix}setimage <id> <url>"
+        )
+        await ctx.send(embed=embed)
 
     @commands.command(name="delchar")
     @is_bot_owner()
@@ -128,12 +203,15 @@ class Admin(commands.Cog):
             try:
                 name = str(entry["name"]).strip()
                 series = str(entry["series"]).strip()
-                image_url = str(entry["image_url"]).strip()
+                image_url = str(entry.get("image_url", "")).strip()
             except (KeyError, TypeError):
-                skipped.append(f"#{index}: missing name/series/image_url")
+                skipped.append(f"#{index}: missing name or series")
                 continue
-            if not (name and series and image_url.startswith(("http://", "https://"))):
-                skipped.append(f"#{index} ({name or 'unnamed'}): bad field")
+            if not (name and series):
+                skipped.append(f"#{index} ({name or 'unnamed'}): blank name or series")
+                continue
+            if image_url and not image_url.startswith(("http://", "https://")):
+                skipped.append(f"#{index} ({name}): image_url is not an http link")
                 continue
             self.bot.db.upsert_character(
                 name,

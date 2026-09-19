@@ -68,16 +68,30 @@ async def main():
     # 3. Rarity tiers and kakera math.
     import config, utils
 
-    check("mythic tier", config.rarity_for(1820)[0] == "Mythic")
-    check("common tier", config.rarity_for(5)[0] == "Common")
-    top = db.find_character_by_name("Ren Ashgrove")
-    check("name lookup exact", top is not None and top["name"] == "Ren Ashgrove")
-    check("name lookup prefix", db.find_character_by_name("Ren Ash") is not None)
-    check("kakera scales with rarity",
-          utils.kakera_value(top, 100) > top["base_kakera"],
+    check("mythic tier", config.rarity_for(115)[0] == "Mythic")
+    check("common tier", config.rarity_for(56)[0] == "Common")
+    check("tiers ordered high to low",
+          [t[0] for t in config.RARITY_TIERS]
+          == sorted((t[0] for t in config.RARITY_TIERS), reverse=True))
+    top = db.find_character_by_name("Naruto Uzumaki")
+    check("name lookup exact", top is not None and top["name"] == "Naruto Uzumaki")
+    check("name lookup prefix", db.find_character_by_name("Naruto Uz") is not None)
+    check("kakera equals base at 100%",
+          utils.kakera_value(top, 100) == top["base_kakera"],
           f"{utils.kakera_value(top, 100)} vs {top['base_kakera']}")
     check("kakera_rate applies",
           utils.kakera_value(top, 200) == utils.kakera_value(top, 100) * 2)
+
+    # Rarity must not collapse to one tier just because likes are all zero.
+    all_rows = db.search_characters("", limit=1000)
+    check("all seeded likes are zero", all(r["likes"] == 0 for r in all_rows))
+    tiers = {utils.rarity_of(r)[0] for r in all_rows}
+    check("rarity spread survives zero likes", len(tiers) >= 4, f"tiers: {sorted(tiers)}")
+    leads = [r for r in all_rows if r["name"] in ("Naruto Uzumaki", "Monkey D. Luffy")]
+    minor = [r for r in all_rows if r["name"] in ("Ein", "Felt")]
+    check("famous leads outvalue minor characters",
+          leads and minor and min(r["base_kakera"] for r in leads)
+          > max(r["base_kakera"] for r in minor))
 
     # 4. Roll budget.
     limit = db.get_setting(GUILD, "roll_limit")
@@ -110,7 +124,7 @@ async def main():
     check("daily column exists", "daily_ready_at" in db.get_player(GUILD, ALICE).keys())
 
     # 7. Wishes.
-    second = db.find_character_by_name("Sable Quint")
+    second = db.find_character_by_name("Rukia Kuchiki")
     check("wish added", db.add_wish(GUILD, BOB, second["id"]))
     check("duplicate wish blocked", not db.add_wish(GUILD, BOB, second["id"]))
     check("wishers listed", db.wishers_of(GUILD, second["id"]) == [BOB])
@@ -179,7 +193,14 @@ async def main():
     # 14. Embed builder actually produces a valid embed.
     embed = utils.character_embed(db, GUILD, top, footer="smoke")
     check("embed has title", embed.title == top["name"])
-    check("embed has image", bool(embed.image.url))
+    check("embed handles missing art", not embed.image.url
+          and "no image yet" in embed.description)
+    db.update_character(top["id"], image_url="https://example.com/art.png")
+    with_art = utils.character_embed(db, GUILD, db.get_character(top["id"]))
+    check("embed shows art when present",
+          with_art.image.url == "https://example.com/art.png"
+          and "no image yet" not in with_art.description)
+    db.update_character(top["id"], image_url="")
     check("embed shows owner", any("Belongs to" in f.name for f in embed.fields))
     check("embed under discord limit", len(embed) < 6000, str(len(embed)))
 

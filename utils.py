@@ -25,13 +25,14 @@ def fmt_duration(seconds: int) -> str:
 
 
 def kakera_value(character, rate_percent: int) -> int:
-    """Base value scaled by rarity tier and the guild's kakera_rate."""
-    _, _, mult = config.rarity_for(character["likes"])
-    return max(1, int(character["base_kakera"] * mult * rate_percent / 100))
+    """base_kakera already encodes how famous the character is, so the only
+    adjustment is the server's own rate."""
+    return max(1, int(character["base_kakera"] * rate_percent / 100))
 
 
 def rarity_of(character):
-    return config.rarity_for(character["likes"])
+    """Returns (tier name, embed colour)."""
+    return config.rarity_for(character["base_kakera"])
 
 
 class Cooldowns:
@@ -88,12 +89,17 @@ def character_embed(
     db, guild_id: int, character, *, footer: str = None, show_owner: bool = True
 ) -> discord.Embed:
     """The card shown for a roll, a `$im` lookup, or a harem page."""
-    tier, colour, _ = rarity_of(character)
+    tier, colour = rarity_of(character)
     rate = db.get_setting(guild_id, "kakera_rate")
 
     embed = discord.Embed(title=character["name"], colour=colour)
     embed.description = character["series"]
-    embed.set_image(url=character["image_url"])
+
+    # Characters can exist before anyone has added art for them.
+    if character["image_url"]:
+        embed.set_image(url=character["image_url"])
+    else:
+        embed.description += f"\n*no image yet — `$setimage {character['id']} <url>`*"
 
     lines = [
         f"{character['likes']} likes",

@@ -53,12 +53,14 @@ SECTIONS = [
             ("set <key> <value>", "Change one (needs Manage Server)"),
             ("resetsettings", "Back to defaults"),
             ("pool", "Pool size and most-liked characters"),
+            ("missingart [series]", "Characters that still need an image"),
         ],
     ),
     (
         "Bot owner",
         [
-            ("addchar Name | Series | url | likes | kakera", "Add one character"),
+            ("addchar Name | Series", "Add a character (art and stats optional)"),
+            ("setimage <id> <url>", "Give a character its art"),
             ("editchar <id> <field> <value>", "Edit a character"),
             ("delchar <id>", "Delete a character"),
             ("import [path]", "Bulk import JSON (or attach a file)"),

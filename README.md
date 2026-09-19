@@ -151,6 +151,8 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$trade @user <yours> \| <theirs>` | Swap two characters (both confirm) |
 | `$settings` / `$set <key> <value>` / `$resetsettings` | Per-server tuning (Manage Server) |
 | `$pool` | Pool size and most-liked characters |
+| `$missingart [series]` | Characters that still need artwork |
+| `$setimage <id> <url>` | Give a character its art (owner-only) |
 | `$addchar` / `$editchar` / `$delchar` / `$import` / `$export` | Owner-only pool management |
 
 ## How the game works
@@ -166,47 +168,82 @@ person *per server* — each server has its own independent game state over a
 shared character pool.
 
 **Kakera.** Rolling a character someone already owns drops a Kakera button
-instead. Grabbing pays out based on the character's `base_kakera`, their rarity
-tier, and the server's `kakera_rate`, with a ±20% jitter — 60% payout if the
-character is not yours. Gated by `kakera_interval_minutes`.
+instead. Grabbing pays out the character's `base_kakera` scaled by the server's
+`kakera_rate`, with a ±20% jitter — 60% payout if the character is not yours.
+Gated by `kakera_interval_minutes`.
 
-**Rarity.** Derived from a character's `likes`, not stored separately. The tiers
-and their kakera multipliers live in `RARITY_TIERS` in `config.py`; edit that
-list to change the curve.
+**Rarity.** Read off `base_kakera`, which is how famous the character is. Likes
+are earned by players over time and deliberately do *not* decide the tier, so a
+brand new pool still shows a full spread of Common through Mythic. Thresholds
+and colours live in `RARITY_TIERS` in `config.py`.
 
 **Wishes.** When a wished character rolls, every wisher gets pinged, and for
 `wish_protect_seconds` only wishers may press Claim. Wishes are consumed once
 the character is claimed.
 
-## Adding your own characters
+## The character pool
 
-`data/characters.json` is a list of objects:
+`$import` loads `data/characters.json` — currently **149 characters across 20
+series** (Naruto, One Piece, Dragon Ball, Attack on Titan, Demon Slayer, Jujutsu
+Kaisen, and so on).
 
-```json
-[
-  {
-    "name": "Ren Ashgrove",
-    "series": "Lanternfall",
-    "image_url": "https://example.com/ren.png",
-    "likes": 1820,
-    "base_kakera": 95
-  }
-]
+### How kakera values were decided
+
+Values are not hand-typed. `tools/build_roster.py` computes each one from two
+things:
+
+```
+base_kakera = how famous the series is + how central the character is
 ```
 
-`likes` and `base_kakera` are optional (default 0 and 50). Imports match on
-`name` + `series`, so re-importing updates rather than duplicates.
+Series sit in fame tiers (`S` = household name, down to `C` = niche), and each
+character is a `lead`, `main` or `support` within their own series. So Naruto
+Uzumaki lands at 115 and Ein from Cowboy Bebop at 56. Disagree with a ranking?
+Edit the tables at the top of that file and re-run:
 
-The shipped seed file is 14 placeholder characters with randomly generated
-images, there so the bot works the moment you start it. **Replace them.** Do not
-scrape anime art off the internet for a public bot — use art you own, art you
-have permission for, or public-domain images.
+```bash
+python tools/build_roster.py
+```
+
+Then `$import` again — matching is on `name` + `series`, so it updates in place
+rather than duplicating, and nobody loses a character they already claimed.
+
+### Artwork
+
+**Every character ships with no image.** That is deliberate: anime character art
+is copyrighted, and a bot that hotlinks scraped wiki images is asking for
+trouble, especially a public one. Names, series and stats are just facts and are
+fine to ship.
+
+Fill art in yourself, using images you have the right to use:
+
+```
+$missingart              # what still needs art, most valuable first
+$missingart naruto       # narrow it to one series
+$setimage 42 https://... # attach art to character 42
+```
+
+Characters without art still roll, claim and trade perfectly well — the card
+just shows a note where the picture goes.
+
+### Adding characters by hand
+
+```
+$addchar Sakura Haruno | Naruto
+$addchar Sakura Haruno | Naruto | https://example.com/art.png | 0 | 98
+```
+
+Everything after the series is optional (art blank, likes 0, kakera 50). Or edit
+`data/characters.json` directly — it's a list of objects with `name`, `series`,
+and optional `image_url`, `likes`, `base_kakera` — and run `$import`. You can
+also attach your own `.json` file to the `$import` message.
 
 ## Layout
 
 ```
 start-bot.bat       double-click launcher, finds Python and starts the bot
 bot.py              entry point, cog loading, error handling
+tools/build_roster.py  regenerates data/characters.json and its kakera values
 config.py           settings table, rarity tiers, env vars
 db.py               all SQL; every query lives here
 utils.py            cooldown bookkeeping, kakera math, embed building

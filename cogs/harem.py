@@ -33,7 +33,7 @@ class Harem(commands.Cog):
 
         lines = []
         for i, row in enumerate(rows, 1):
-            tier, _, _ = utils.rarity_of(row)
+            tier, _ = utils.rarity_of(row)
             note = f" — _{row['note']}_" if row["note"] else ""
             lines.append(
                 f"`{i:>3}.` **{row['name']}** • {row['series']}"

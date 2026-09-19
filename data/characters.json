@@ -1,100 +1,1045 @@
 [
   {
-    "name": "Ren Ashgrove",
-    "series": "Lanternfall",
-    "image_url": "https://picsum.photos/seed/ren-ashgrove/600/800",
-    "likes": 1820,
-    "base_kakera": 95
+    "name": "Eren Yeager",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
   },
   {
-    "name": "Vega Calloway",
-    "series": "Lanternfall",
-    "image_url": "https://picsum.photos/seed/vega-calloway/600/800",
-    "likes": 1540,
-    "base_kakera": 90
+    "name": "Mikasa Ackerman",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
   },
   {
-    "name": "Sable Quint",
-    "series": "Nine Hollow Kings",
-    "image_url": "https://picsum.photos/seed/sable-quint/600/800",
-    "likes": 980,
-    "base_kakera": 80
+    "name": "Nezuko Kamado",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
   },
   {
-    "name": "Ilyra Vantt",
-    "series": "Nine Hollow Kings",
-    "image_url": "https://picsum.photos/seed/ilyra-vantt/600/800",
-    "likes": 745,
-    "base_kakera": 75
+    "name": "Tanjiro Kamado",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
   },
   {
-    "name": "Marek Solheim",
-    "series": "The Glass Meridian",
-    "image_url": "https://picsum.photos/seed/marek-solheim/600/800",
-    "likes": 520,
+    "name": "Son Goku",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Vegeta",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Naruto Uzumaki",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Sasuke Uchiha",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Monkey D. Luffy",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Ash Ketchum",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Pikachu",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 115
+  },
+  {
+    "name": "Ichigo Kurosaki",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Rukia Kuchiki",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Denji",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Makima",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "L Lawliet",
+    "series": "Death Note",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Light Yagami",
+    "series": "Death Note",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Edward Elric",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Gon Freecss",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Killua Zoldyck",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Satoru Gojo",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Yuji Itadori",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Izuku Midoriya",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Asuka Langley Soryu",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Rei Ayanami",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Shinji Ikari",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Usagi Tsukino",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Anya Forger",
+    "series": "Spy x Family",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Loid Forger",
+    "series": "Spy x Family",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Yor Forger",
+    "series": "Spy x Family",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 99
+  },
+  {
+    "name": "Armin Arlert",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Levi Ackerman",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Giyu Tomioka",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Inosuke Hashibira",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Kyojuro Rengoku",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Shinobu Kocho",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Zenitsu Agatsuma",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Bulma",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Frieza",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Piccolo",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Son Gohan",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Hinata Hyuga",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Itachi Uchiha",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Jiraiya",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Kakashi Hatake",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Sakura Haruno",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Nami",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Nico Robin",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Portgas D. Ace",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Roronoa Zoro",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Sanji",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Brock",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Misty",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 98
+  },
+  {
+    "name": "Annie Leonhart",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Erwin Smith",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Historia Reiss",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Sasha Blouse",
+    "series": "Attack on Titan",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Mitsuri Kanroji",
+    "series": "Demon Slayer",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Krillin",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Trunks",
+    "series": "Dragon Ball",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Gaara",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Madara Uchiha",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Rock Lee",
+    "series": "Naruto",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Boa Hancock",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Shanks",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Tony Tony Chopper",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Trafalgar D. Water Law",
+    "series": "One Piece",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Gary Oak",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "James",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Jessie",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "Serena",
+    "series": "Pokemon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 86
+  },
+  {
+    "name": "C.C.",
+    "series": "Code Geass",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Lelouch vi Britannia",
+    "series": "Code Geass",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Spike Spiegel",
+    "series": "Cowboy Bebop",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Emilia",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Rem",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Subaru Natsuki",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Kurisu Makise",
+    "series": "Steins;Gate",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Rintaro Okabe",
+    "series": "Steins;Gate",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 85
+  },
+  {
+    "name": "Byakuya Kuchiki",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Orihime Inoue",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Sosuke Aizen",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Uryu Ishida",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Aki Hayakawa",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Power",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Misa Amane",
+    "series": "Death Note",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Ryuk",
+    "series": "Death Note",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Alphonse Elric",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Riza Hawkeye",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Roy Mustang",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Winry Rockbell",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Hisoka Morow",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Kurapika",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Leorio Paradinight",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Megumi Fushiguro",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Nobara Kugisaki",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Ryomen Sukuna",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "All Might",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Katsuki Bakugo",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Ochaco Uraraka",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Shoto Todoroki",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Misato Katsuragi",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Ami Mizuno",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Makoto Kino",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Mamoru Chiba",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Minako Aino",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Rei Hino",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 82
+  },
+  {
+    "name": "Toshiro Hitsugaya",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
     "base_kakera": 70
   },
   {
-    "name": "Ophelia Crane",
-    "series": "The Glass Meridian",
-    "image_url": "https://picsum.photos/seed/ophelia-crane/600/800",
-    "likes": 430,
-    "base_kakera": 65
+    "name": "Yoruichi Shihoin",
+    "series": "Bleach",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Juno Belltower",
-    "series": "Saltwind Academy",
-    "image_url": "https://picsum.photos/seed/juno-belltower/600/800",
-    "likes": 310,
-    "base_kakera": 60
+    "name": "Himeno",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Cassius Vale",
-    "series": "Saltwind Academy",
-    "image_url": "https://picsum.photos/seed/cassius-vale/600/800",
-    "likes": 265,
-    "base_kakera": 58
+    "name": "Kobeni Higashiyama",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Nim Teodor",
-    "series": "Saltwind Academy",
-    "image_url": "https://picsum.photos/seed/nim-teodor/600/800",
-    "likes": 180,
-    "base_kakera": 55
+    "name": "Reze",
+    "series": "Chainsaw Man",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Perrin Hale",
-    "series": "Duskfare",
-    "image_url": "https://picsum.photos/seed/perrin-hale/600/800",
-    "likes": 120,
-    "base_kakera": 52
+    "name": "Mello",
+    "series": "Death Note",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Wren Odalis",
-    "series": "Duskfare",
-    "image_url": "https://picsum.photos/seed/wren-odalis/600/800",
-    "likes": 64,
-    "base_kakera": 48
+    "name": "Near",
+    "series": "Death Note",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Tobias Fenn",
-    "series": "Duskfare",
-    "image_url": "https://picsum.photos/seed/tobias-fenn/600/800",
-    "likes": 41,
-    "base_kakera": 45
+    "name": "Ling Yao",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Liora Nast",
-    "series": "Coldwater Orbit",
-    "image_url": "https://picsum.photos/seed/liora-nast/600/800",
-    "likes": 22,
-    "base_kakera": 40
+    "name": "Olivier Mira Armstrong",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
   },
   {
-    "name": "Hadrian Vosk",
-    "series": "Coldwater Orbit",
-    "image_url": "https://picsum.photos/seed/hadrian-vosk/600/800",
-    "likes": 9,
-    "base_kakera": 38
+    "name": "Biscuit Krueger",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Chrollo Lucilfer",
+    "series": "Hunter x Hunter",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Kento Nanami",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Maki Zenin",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Toge Inumaki",
+    "series": "Jujutsu Kaisen",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Himiko Toga",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Momo Yaoyorozu",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Tsuyu Asui",
+    "series": "My Hero Academia",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Gendo Ikari",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Kaworu Nagisa",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Mari Makinami",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Chibiusa",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Hotaru Tomoe",
+    "series": "Sailor Moon",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Bond Forger",
+    "series": "Spy x Family",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Damian Desmond",
+    "series": "Spy x Family",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Yuri Briar",
+    "series": "Spy x Family",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 70
+  },
+  {
+    "name": "Kallen Stadtfeld",
+    "series": "Code Geass",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Suzaku Kururugi",
+    "series": "Code Geass",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Edward Wong",
+    "series": "Cowboy Bebop",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Faye Valentine",
+    "series": "Cowboy Bebop",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Jet Black",
+    "series": "Cowboy Bebop",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Beatrice",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Ram",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Mayuri Shiina",
+    "series": "Steins;Gate",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 68
+  },
+  {
+    "name": "Euphemia li Britannia",
+    "series": "Code Geass",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Nunnally vi Britannia",
+    "series": "Code Geass",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Ein",
+    "series": "Cowboy Bebop",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Julia",
+    "series": "Cowboy Bebop",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Felt",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Roswaal L Mathers",
+    "series": "Re:Zero",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Faris NyanNyan",
+    "series": "Steins;Gate",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Itaru Hashida",
+    "series": "Steins;Gate",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
+  },
+  {
+    "name": "Suzuha Amane",
+    "series": "Steins;Gate",
+    "image_url": "",
+    "likes": 0,
+    "base_kakera": 56
   }
 ]
