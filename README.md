@@ -149,6 +149,9 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$profile [@user]` | Balance, best claim, cooldowns |
 | `$stats` | Pool size and what this server has claimed |
 | `$myid` / `$invite` / `$ping` / `$uptime` | Utility |
+| `$quiz` | Name the character in the picture |
+| `$slots [bet]` | Three reels, karuda on the line |
+| `$duel @user [bet]` | Your best character against theirs |
 | `$alea [low] [high]` / `$jankenpon` | Dice and rock-paper-scissors |
 | `$k [@user]` | Karuda balance and shard collection |
 | `$dk` | A karuda shard to collect, every 20h |
@@ -206,7 +209,7 @@ default, because claiming costs nothing and a refund turned the claim
 cooldown into a money printer. Both are settings
 (`karuda_grab_percent`, `divorce_refund_percent`) if you want it looser.
 
-**Shards.** `$dk` drops one shard as a button you collect, rolled from
+**Shards.** `$dk` shows two shards and you keep one, each rolled from
 eight types, and which one you get decides the payout:
 
 | Shard | Payout | Chance |
@@ -383,6 +386,22 @@ percentage, wishlist size and daily payouts — rather than being a number on a
 profile. A fully kitted player rolls about half again as often as a new one,
 not ten times, and the claim reduction is capped at 60% so the cooldown never
 disappears.
+
+## Minigames
+
+Three, each doing a different job in the economy.
+
+**`$quiz`** shows a character's portrait and the series; first person to type
+the name wins karuda, scaled so obscurer characters pay more. Answers accept
+any distinctive part of the name, so `gojou` counts for Satoru Gojou —
+requiring the exact romanisation would make it a spelling test.
+
+**`$slots [bet]`** spins three reels. Three of a kind pays 10×, three Obsidian
+25×, a pair returns 1.4×. Payback is about 93%, so the table is a sink.
+
+**`$duel @user [bet]`** puts your most valuable character against theirs, both
+sides confirming. Value tilts the odds without deciding them, so an underdog
+can win. Karuda only moves between players; the duel creates none.
 
 ## Soulmates and keys
 

@@ -10,17 +10,16 @@ import utils
 from utils import fmt_duration
 
 DAILY_COOLDOWN = 20 * 60 * 60  # 20 hours, so it drifts earlier each day
-DAILY_DROPS = 1
-# Back to the full amount now that a $dk drops one shard rather than two.
+DAILY_OFFERS = 2  # two shards appear, one is yours
 DAILY_MIN, DAILY_MAX = 100, 240
 
 
 class ShardDrops(discord.ui.View):
-    """The shard a $dk turns up, as a button you collect.
+    """Two shards, one choice.
 
-    It is rolled before the message is sent, so the icon on the button
-    already tells you what you got - the click is collecting it, not
-    deciding it. Only the person who ran the command can press it.
+    Both are rolled and both are shown with their icon and payout, so the
+    decision is made with full information - the interesting case is an
+    Aurum next to an Azure, not a mystery box. Taking one forfeits the other.
     """
 
     def __init__(self, bot, guild_id: int, author, drops, timeout: float = 600):
@@ -29,12 +28,12 @@ class ShardDrops(discord.ui.View):
         self.guild_id = guild_id
         self.author = author
         self.drops = drops
-        self.collected = [False] * len(drops)
+        self.taken = None  # index of the one they chose
         self.message = None
 
-        for index, (key, name, _mult, _colour, _amount) in enumerate(drops):
+        for index, (key, name, _mult, _colour, amount) in enumerate(drops):
             button = discord.ui.Button(
-                label=name,
+                label=f"{name} · {amount:,}",
                 style=discord.ButtonStyle.secondary,
                 emoji=discord.PartialEmoji.from_str(utils.shard_icon(key)),
             )
@@ -45,46 +44,52 @@ class ShardDrops(discord.ui.View):
         lines = []
         for index, (key, name, mult, _colour, amount) in enumerate(self.drops):
             icon = utils.shard_icon(key)
-            if self.collected[index]:
-                lines.append(f"{icon} **{name}** ×{mult:g} — collected **{amount:,}**")
+            if self.taken is None:
+                lines.append(f"{icon} **{name}** ×{mult:g} — **{amount:,}**")
+            elif index == self.taken:
+                lines.append(f"{icon} **{name}** ×{mult:g} — taken, **{amount:,}**")
             else:
-                lines.append(f"{icon} **{name}** ×{mult:g} — waiting")
-        outstanding = self.collected.count(False)
-        # The best of the two, so a rare drop is obvious at a glance.
-        colour = max(self.drops, key=lambda d: d[2])[3]
+                lines.append(f"~~{icon} {name} ×{mult:g} — {amount:,}~~")
+
+        if self.taken is None:
+            colour = max(self.drops, key=lambda d: d[2])[3]
+            footer = "Pick one — the other is lost"
+        else:
+            colour = self.drops[self.taken][3]
+            footer = "Chosen · next in 20h"
+
         embed = discord.Embed(
             title=f"{self.author.display_name}'s daily karuda",
             description="\n".join(lines),
             colour=colour,
         )
-        embed.set_footer(
-            text=(
-                f"{outstanding} left to collect"
-                if outstanding
-                else "All collected • next in 20h"
-            )
-        )
+        embed.set_footer(text=footer)
         return embed
 
     def _collector(self, index: int):
         async def callback(interaction: discord.Interaction):
-            if self.collected[index]:
+            if self.taken is not None:
                 await interaction.response.send_message(
-                    "Already collected.", ephemeral=True
+                    "You already chose.", ephemeral=True
                 )
                 return
-            key, name, _mult, _colour, amount = self.drops[index]
-            self.collected[index] = True
+            key, _name, _mult, _colour, amount = self.drops[index]
+            self.taken = index
             total = self.bot.db.add_karuda(self.guild_id, self.author.id, amount)
             self.bot.db.record_shard(self.guild_id, self.author.id, key)
 
-            self.children[index].disabled = True
-            self.children[index].style = discord.ButtonStyle.success
-            if all(self.collected):
-                self.stop()
+            # Both close: one because it is spent, the other because it is gone.
+            for position, child in enumerate(self.children):
+                child.disabled = True
+                child.style = (
+                    discord.ButtonStyle.success
+                    if position == index
+                    else discord.ButtonStyle.secondary
+                )
             embed = self.render()
             embed.add_field(name="Balance", value=f"{total:,}", inline=True)
             await interaction.response.edit_message(embed=embed, view=self)
+            self.stop()
 
         return callback
 
@@ -97,7 +102,7 @@ class ShardDrops(discord.ui.View):
         return True
 
     async def on_timeout(self):
-        if self.message and not all(self.collected):
+        if self.message and self.taken is None:
             for child in self.children:
                 child.disabled = True
             try:
@@ -152,7 +157,7 @@ class Karuda(commands.Cog):
     @commands.command(name="dk", aliases=["daily", "dailykaruda"])
     @commands.guild_only()
     async def dk(self, ctx):
-        """Two karuda drops to claim, once every 20 hours."""
+        """Two shards appear, you keep one. Once every 20 hours."""
         db = self.bot.db
         gid = ctx.guild.id
         player = db.get_player(gid, ctx.author.id)
@@ -164,10 +169,10 @@ class Karuda(commands.Cog):
             )
             return
 
-        # The cooldown starts now rather than on collection, so leaving the
-        # drop unclaimed costs you it.
+        # The cooldown starts now rather than on choosing, so walking away
+        # from the decision costs you the day.
         drops = []
-        for _ in range(DAILY_DROPS):
+        for _ in range(DAILY_OFFERS):
             key, name, _fallback, multiplier, _weight, colour = config.roll_shard(
                 random
             )

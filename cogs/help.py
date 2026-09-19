@@ -41,7 +41,7 @@ CATEGORIES = [
         ("wishremoveall", "Empty your wishlist"),
     ]),
     ("\U0001f48e", "Karuda", "The currency", [
-        ("dk", "A karuda shard to collect, every 20h"),
+        ("dk", "Two shards appear, keep one · every 20h"),
         ("shards", "What each shard pays, and the odds"),
         ("", ""),
         ("k [@user]", "Balance and shard collection"),
@@ -102,9 +102,6 @@ CATEGORIES = [
         ("myid", "Your Discord id"),
         ("invite", "Add the bot elsewhere"),
         ("ping", "Latency"),
-        ("", ""),
-        ("alea [low] [high]", "Random number"),
-        ("jankenpon <throw>", "Rock paper scissors"),
     ]),
     ("✨", "Custom characters", "Your own · Manage Server", [
         ("addcustom Name | Series | url", "One only this server rolls"),

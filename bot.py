@@ -31,6 +31,7 @@ COGS = [
     "cogs.custom",
     "cogs.progress",
     "cogs.bonds",
+    "cogs.games",
     "cogs.admin",
     "cogs.settings",
     "cogs.help",

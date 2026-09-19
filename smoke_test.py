@@ -562,20 +562,24 @@ async def main():
         id = ALICE
         display_name = "tester"
 
-    from cogs.karuda import DAILY_DROPS
+    from cogs.karuda import DAILY_OFFERS
 
-    rolled = [config.roll_shard(_random) for _ in range(DAILY_DROPS)]
-    drops = [(k, n, m, c, 100) for k, n, _i, m, _w, c in rolled]
+    rolled = [config.roll_shard(_random) for _ in range(DAILY_OFFERS)]
+    drops = [(k, n, m, c, 100 * (i + 1)) for i, (k, n, _i, m, _w, c) in enumerate(rolled)]
     view = ShardDrops(b, GUILD, _Author(), drops)
-    check("dk offers a button per drop", len(view.children) == DAILY_DROPS,
-          f"{len(view.children)} for {DAILY_DROPS} drops")
-    check("dk starts uncollected", view.collected == [False] * DAILY_DROPS)
+    check("dk offers a button per shard", len(view.children) == DAILY_OFFERS,
+          f"{len(view.children)} for {DAILY_OFFERS} offers")
+    check("dk starts with nothing chosen", view.taken is None)
     body = view.render().description
-    check("dk names every shard it dropped",
-          all(d[1] in body for d in drops), body[:90])
-    check("dk footer counts what is left",
-          f"{DAILY_DROPS} left" in view.render().footer.text,
-          view.render().footer.text)
+    check("dk shows both shards up front",
+          all(d[1] in body for d in drops), body[:120])
+    check("dk shows each amount before choosing",
+          all(f"{d[4]:,}" in body for d in drops), body[:120])
+    check("dk says only one may be taken",
+          "one" in view.render().footer.text.lower(), view.render().footer.text)
+    check("dk labels buttons with the payout",
+          all(str(d[4]) in c.label.replace(",", "") for d, c in zip(drops, view.children)),
+          " | ".join(c.label for c in view.children))
 
     # 20e. Likes: a vote you can take back, counted per server.
     liked = by_rank[5]
@@ -854,6 +858,48 @@ async def main():
     check("perk goes with it",
           perksmod.effective(db, GUILD, KEYER)["grab_percent"] == 0)
     db.divorce(GUILD, keyed_char["id"], KEYER)
+
+    # 20n. Minigames.
+    from cogs import games as gamesmod
+
+    # Answers should be forgiving about romanisation and punctuation, but not
+    # so loose that any word wins.
+    check("quiz accepts the full name",
+          gamesmod.answer_matches("Satoru Gojou", "Satoru Gojou"))
+    check("quiz ignores case and punctuation",
+          gamesmod.answer_matches("  satoru  gojou ", "Satoru Gojou"))
+    check("quiz accepts a distinctive part",
+          gamesmod.answer_matches("gojou", "Satoru Gojou"))
+    check("quiz rejects a different character",
+          not gamesmod.answer_matches("Levi", "Satoru Gojou"))
+    check("quiz rejects an empty guess",
+          not gamesmod.answer_matches("   ", "Satoru Gojou"))
+    check("quiz rejects a short fragment",
+          not gamesmod.answer_matches("go", "Satoru Gojou"))
+
+    # The slot table has to lose money over time or it is a second income.
+    _random.seed(11)
+    stake, returned, spins = 0, 0, 40000
+    for _ in range(spins):
+        reels = [_random.choice(gamesmod.SLOT_SYMBOLS) for _ in range(3)]
+        stake += 100
+        if len(set(reels)) == 1:
+            mult = (gamesmod.SLOT_JACKPOT
+                    if reels[0] == gamesmod.SLOT_SYMBOLS[-1]
+                    else gamesmod.SLOT_TRIPLE)
+        elif len(set(reels)) == 2:
+            mult = gamesmod.SLOT_PAIR
+        else:
+            mult = 0
+        returned += 100 * mult
+    payback = returned / stake
+    check("slots pay back less than they take",
+          0.85 < payback < 1.0, f"{payback:.3f} over {spins:,} spins")
+    check("slot bets are bounded",
+          gamesmod.SLOT_MIN_BET > 0
+          and gamesmod.SLOT_MAX_BET > gamesmod.SLOT_MIN_BET)
+    check("every slot symbol is a real shard",
+          all(config.shard(k)[0] == k for k in gamesmod.SLOT_SYMBOLS))
 
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)
