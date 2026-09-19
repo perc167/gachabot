@@ -193,14 +193,16 @@ async def main():
     # 14. Embed builder actually produces a valid embed.
     embed = utils.character_embed(db, GUILD, top, footer="smoke")
     check("embed has title", embed.title == top["name"])
-    check("embed handles missing art", not embed.image.url
-          and "no image yet" in embed.description)
+    # Explicitly drive both states rather than relying on what the roster ships.
+    db.update_character(top["id"], image_url="")
+    without_art = utils.character_embed(db, GUILD, db.get_character(top["id"]))
+    check("embed handles missing art", not without_art.image.url
+          and "no image yet" in without_art.description)
     db.update_character(top["id"], image_url="https://example.com/art.png")
     with_art = utils.character_embed(db, GUILD, db.get_character(top["id"]))
     check("embed shows art when present",
           with_art.image.url == "https://example.com/art.png"
           and "no image yet" not in with_art.description)
-    db.update_character(top["id"], image_url="")
     check("embed shows owner", any("Belongs to" in f.name for f in embed.fields))
     check("embed under discord limit", len(embed) < 6000, str(len(embed)))
 
@@ -229,6 +231,67 @@ async def main():
     check("Paginator hides nav on one page", len(single.children) == 0)
     conf = views.Confirm({ALICE, BOB})
     check("Confirm builds", len(conf.children) == 2)
+
+    # 17. Art fetcher name matching. Every one of the "reject" cases is a real
+    # wrong match this matcher made at some point: characters who share a
+    # surname are the trap.
+    sys.path.insert(0, os.path.join(PROJECT, "tools"))
+    import fetch_art
+
+    MATCH_CASES = [
+        # (our name, AniList name, should it be accepted?)
+        ("Levi Ackerman", "Mikasa Ackerman", False),
+        ("Lelouch vi Britannia", "Rolo Vi Britannia", False),
+        ("Lelouch vi Britannia", "Clovis la Britannia", False),
+        ("Bond Forger", "Loid Forger", False),
+        ("Sasuke Uchiha", "Itachi Uchiha", False),
+        ("Ram", "Rem", False),
+        ("Levi Ackerman", "Levi", True),
+        ("Bond Forger", "Bond", True),
+        ("Son Goku", "Gokuu Son", True),            # reversed name order
+        ("Tanjiro Kamado", "Tanjirou Kamado", True),  # long-vowel spelling
+        ("Shinobu Kocho", "Shinobu Kochou", True),
+        ("Monkey D. Luffy", "Luffy Monkey", True),
+        ("Portgas D. Ace", "Ace Portgas", True),
+        ("Mari Makinami", "Mari Makinami Illustrious", True),
+        ("Edward Wong", "Edward Wong Hau Pepelu Tivrusky IV", True),
+        ("Historia Reiss", "Krista Lenz", True),     # via ALIASES
+        ("Nunnally vi Britannia", "Nunnally Lamperouge", True),
+    ]
+    wrong = []
+    for ours, theirs, should_accept in MATCH_CASES:
+        wanted = [ours] + fetch_art.ALIASES.get(ours, [])
+        accepted = fetch_art.name_score(wanted, [theirs]) >= fetch_art.NAME_THRESHOLD
+        if accepted != should_accept:
+            wrong.append(f"{ours} vs {theirs}")
+    check("art matcher accepts and rejects correctly", not wrong, "; ".join(wrong))
+
+    check("series matcher handles romanised titles",
+          fetch_art.series_matches("Demon Slayer", ["Demon Slayer: Kimetsu no Yaiba"])
+          and fetch_art.series_matches("Spy x Family", ["SPY×FAMILY"])
+          and fetch_art.series_matches("Pokemon", ["Pokémon"])
+          and not fetch_art.series_matches("Naruto", ["Bleach"]))
+
+    # Every character in the shipped roster should be usable by the bot.
+    with open(os.path.join(PROJECT, "data", "characters.json"), encoding="utf-8") as fh:
+        roster = json.load(fh)
+    check("roster entries all have name and series",
+          all(r.get("name") and r.get("series") for r in roster))
+    bad_urls = [r["name"] for r in roster
+                if r.get("image_url") and not r["image_url"].startswith("https://")]
+    check("roster image urls are https", not bad_urls, ", ".join(bad_urls[:5]))
+    check("no duplicate name+series pairs",
+          len({(r["name"], r["series"]) for r in roster}) == len(roster))
+
+    # Two characters sharing one AniList id means the matcher mapped someone
+    # onto the wrong person - how Levi ended up with Mikasa's portrait.
+    ids = [r["anilist_id"] for r in roster if r.get("anilist_id")]
+    shared = {i for i in ids if ids.count(i) > 1}
+    clashes = [
+        f"{i}: {[r['name'] for r in roster if r.get('anilist_id') == i]}"
+        for i in shared
+    ]
+    check("no two characters share an AniList id", not clashes, "; ".join(clashes))
 
     await b.close()
 

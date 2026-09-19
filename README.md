@@ -223,6 +223,31 @@ $missingart naruto       # narrow it to one series
 $setimage 42 https://... # attach art to character 42
 ```
 
+Or pull it from AniList's public GraphQL API, which is documented and meant to
+be called by apps:
+
+```bash
+python tools/fetch_art.py --dry-run
+```
+
+```bash
+python tools/fetch_art.py
+```
+
+`--dry-run` reports what it would change without writing. Other flags:
+`--series Naruto` to do one show, `--force` to replace art already set,
+`--limit N` to try a handful first, `--delay` to change the request spacing
+(default 1.5s, well inside AniList's rate limit).
+
+It will not guess. A match needs the **series** to line up *and* the **name** to
+be close, or the character is reported and left alone — wrong art is worse than
+none. The matcher handles AniList's romanisation (`Tanjirou` for Tanjiro) and
+its name ordering (`Gokuu Son` for Son Goku). Matched characters gain a
+`source` and `anilist_id` field, and the previous file is kept as
+`data/characters.json.bak`.
+
+Run `$import` afterwards to push the art to the bot.
+
 Characters without art still roll, claim and trade perfectly well — the card
 just shows a note where the picture goes.
 
@@ -244,6 +269,7 @@ also attach your own `.json` file to the `$import` message.
 start-bot.bat       double-click launcher, finds Python and starts the bot
 bot.py              entry point, cog loading, error handling
 tools/build_roster.py  regenerates data/characters.json and its kakera values
+tools/fetch_art.py     fills in image_url from the AniList API
 config.py           settings table, rarity tiers, env vars
 db.py               all SQL; every query lives here
 utils.py            cooldown bookkeeping, kakera math, embed building
