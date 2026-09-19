@@ -83,7 +83,7 @@ async def main():
           pulls.count(config.SHARD_TYPES[-1][0]) < pulls.count(config.SHARD_TYPES[0][0]) / 10)
     check("shard() falls back for an unknown key",
           config.shard("nonsense") == config.SHARD_TYPES[0])
-    top = sorted(db.search_characters("", limit=5000),
+    top = sorted(db.search_characters("", limit=100000),
                  key=lambda r: r["like_rank"] or 99999)[0]
     check("name lookup exact",
           db.find_character_by_name(top["name"])["id"] == top["id"])
@@ -96,7 +96,7 @@ async def main():
           utils.karuda_value(top, 200) == utils.karuda_value(top, 100) * 2)
 
     # Rarity must not collapse to one tier just because likes are all zero.
-    all_rows = db.search_characters("", limit=6000)
+    all_rows = db.search_characters("", limit=100000)  # the whole pool
     check("all seeded likes are zero", all(r["likes"] == 0 for r in all_rows))
     check("roster is sizeable", len(all_rows) > 4000, str(len(all_rows)))
     by_rank = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)
@@ -108,8 +108,9 @@ async def main():
     ranked = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)
     check("ranks are populated", all(r["like_rank"] for r in all_rows))
     check("best rank is 1", ranked[0]["like_rank"] == 1, str(ranked[0]["like_rank"]))
-    check("ranks stay inside 1..10000",
-          all(1 <= r["like_rank"] <= 10000 and 1 <= r["claim_rank"] <= 10000
+    size = len(all_rows)
+    check("ranks stay inside the pool",
+          all(1 <= r["like_rank"] <= size and 1 <= r["claim_rank"] <= size
               for r in all_rows))
     check("claim rank differs from like rank for most",
           sum(1 for r in all_rows if r["claim_rank"] != r["like_rank"]) > len(all_rows) // 2)
@@ -155,7 +156,7 @@ async def main():
     check("daily column exists", "daily_ready_at" in db.get_player(GUILD, ALICE).keys())
 
     # 7. Wishes.
-    second = sorted(db.search_characters("", limit=5000),
+    second = sorted(db.search_characters("", limit=100000),
                     key=lambda r: r["like_rank"] or 99999)[1]
     check("wish added", db.add_wish(GUILD, BOB, second["id"]))
     check("duplicate wish blocked", not db.add_wish(GUILD, BOB, second["id"]))
@@ -517,6 +518,45 @@ async def main():
     check("card uses the uploaded icon",
           "<:dust:42>" in str(card.fields[0].value), str(card.fields[0].value))
     utils.use_emoji_from(None)
+
+    # 20c. Name lookups can offer every match, not just an arbitrary one.
+    dupe_names = {}
+    for row in all_rows:
+        dupe_names.setdefault(row["name"].lower(), []).append(row)
+    shared = next((v for v in dupe_names.values() if len(v) > 1), None)
+    if shared:
+        found = db.find_characters_by_name(shared[0]["name"])
+        check("ambiguous name returns every match", len(found) > 1,
+              f"{shared[0]['name']}: {len(found)}")
+    else:
+        check("ambiguous name returns every match", True, "no shared names")
+    check("unique name returns one",
+          len(db.find_characters_by_name(by_rank[0]["name"])) >= 1)
+    check("unknown name returns nothing",
+          db.find_characters_by_name("zzzz no such character") == [])
+
+    single = await views.choose_character(None, [by_rank[0]], "pick")
+    check("single match needs no prompt", single["id"] == by_rank[0]["id"])
+    check("no matches yields nothing",
+          await views.choose_character(None, [], "pick") is None)
+
+    # 20d. $dk drops two shards as buttons.
+    from cogs.karuda import ShardDrops
+
+    class _Author:
+        id = ALICE
+        display_name = "tester"
+
+    rolled = [config.roll_shard(_random) for _ in range(2)]
+    drops = [(k, n, m, c, 100) for k, n, _i, m, _w, c in rolled]
+    view = ShardDrops(b, GUILD, _Author(), drops)
+    check("dk offers two drops", len(view.children) == 2)
+    check("dk starts uncollected", view.collected == [False, False])
+    body = view.render().description
+    check("dk names both shards",
+          all(d[1] in body for d in drops), body[:90])
+    check("dk footer counts what is left",
+          "2 left" in view.render().footer.text, view.render().footer.text)
 
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)

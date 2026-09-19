@@ -224,3 +224,26 @@ class Confirm(discord.ui.View):
         self._finish()
         await interaction.response.edit_message(view=self)
         self.stop()
+
+
+async def choose_character(ctx, rows, prompt: str, colour: int = 0x7C6BF0):
+    """Pick one row from several. Returns the row, or None if they backed out.
+
+    A single match is returned straight away - nobody should have to confirm
+    a choice that was never ambiguous.
+    """
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return rows[0]
+
+    view = CharacterPicker(rows, ctx.author.id, prompt)
+    listing = "\n".join(
+        f"**{row['name']}** · {row['series']}" for row in rows[:10]
+    )
+    if len(rows) > 10:
+        listing += f"\n…and {len(rows) - 10} more"
+    embed = discord.Embed(title="Which one?", description=listing, colour=colour)
+    view.message = await ctx.send(embed=embed, view=view)
+    await view.wait()
+    return view.chosen

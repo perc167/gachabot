@@ -4,9 +4,60 @@ from discord.ext import commands
 
 import config
 import utils
-from views import Paginator
+from views import CharacterPicker, Paginator, choose_character
 
 ORDERS = ("likes", "name", "recent", "karuda")
+
+
+class NoteModal(discord.ui.Modal, title="Note"):
+    text = discord.ui.TextInput(
+        label="Your note",
+        placeholder="best girl",
+        required=False,
+        max_length=200,
+        style=discord.TextStyle.short,
+    )
+
+    def __init__(self, db, guild_id, user_id, character):
+        super().__init__()
+        self.db = db
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.character = character
+
+    async def on_submit(self, interaction: discord.Interaction):
+        note = str(self.text) or None
+        if self.db.set_note(
+            self.guild_id, self.character["id"], self.user_id, note
+        ):
+            wording = f"Note on **{self.character['name']}**: _{note}_" if note \
+                else f"Note cleared on **{self.character['name']}**."
+            await interaction.response.send_message(wording)
+        else:
+            await interaction.response.send_message(
+                f"You no longer own **{self.character['name']}**.", ephemeral=True
+            )
+
+
+class NoteButton(discord.ui.View):
+    """One button, whose only job is to give the modal an interaction."""
+
+    def __init__(self, db, guild_id, user_id, character, timeout: float = 120):
+        super().__init__(timeout=timeout)
+        self.db = db
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.character = character
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.user_id
+
+    @discord.ui.button(label="Write the note", style=discord.ButtonStyle.primary)
+    async def write(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(
+            NoteModal(self.db, self.guild_id, self.user_id, self.character)
+        )
+        self.stop()
 
 
 class Harem(commands.Cog):
@@ -62,9 +113,14 @@ class Harem(commands.Cog):
     @commands.guild_only()
     async def info(self, ctx, *, name: str):
         """Look up a character by name."""
-        character = self.bot.db.find_character_by_name(name)
-        if not character:
+        matches = self.bot.db.find_characters_by_name(name)
+        if not matches:
             await ctx.send(f"No character matching `{name}`.")
+            return
+        character = await choose_character(
+            ctx, matches, "Which character?", config.CARD_COLOUR
+        )
+        if not character:
             return
         embed = utils.character_embed(
             self.bot.db, ctx.guild.id, character, footer=f"ID {character['id']}"
@@ -96,13 +152,42 @@ class Harem(commands.Cog):
 
     @commands.command(name="divorce", aliases=["dv"])
     @commands.guild_only()
-    async def divorce(self, ctx, *, name: str):
-        """Release a character back into the pool. Refunds half their karuda."""
+    async def divorce(self, ctx, *, name: str = None):
+        """`$divorce` — pick from your harem, or name someone directly."""
         db = self.bot.db
         gid = ctx.guild.id
-        character = db.find_character_by_name(name)
+
+        if name:
+            owned = [
+                row
+                for row in db.find_characters_by_name(name)
+                if db.owner_of(gid, row["id"]) == ctx.author.id
+            ]
+            if not owned:
+                await ctx.send(f"You do not own anyone matching `{name}`.")
+                return
+            character = await choose_character(
+                ctx, owned, "Which one?", config.CARD_COLOUR
+            )
+        else:
+            rows = db.harem(gid, ctx.author.id)
+            if not rows:
+                await ctx.send("You have not claimed anyone yet.")
+                return
+            view = CharacterPicker(rows, ctx.author.id, "Choose who to let go")
+            view.message = await ctx.send(
+                embed=discord.Embed(
+                    title="Divorce",
+                    description="This cannot be undone - they go back in the pool.",
+                    colour=config.CARD_COLOUR,
+                ),
+                view=view,
+            )
+            await view.wait()
+            character = view.chosen
+
         if not character:
-            await ctx.send(f"No character matching `{name}`.")
+            await ctx.send("Nothing divorced.")
             return
         if not db.divorce(gid, character["id"], ctx.author.id):
             await ctx.send(f"You do not own **{character['name']}**.")
@@ -123,23 +208,49 @@ class Harem(commands.Cog):
 
     @commands.command(name="note")
     @commands.guild_only()
-    async def note(self, ctx, *, args: str):
-        """`$note <name> | <text>` — annotate one of your characters."""
-        if "|" not in args:
-            await ctx.send(f"Usage: `{ctx.prefix}note <name> | <text>`")
+    async def note(self, ctx, *, args: str = None):
+        """`$note` — pick a character, then write the note in a box.
+
+        `$note <name> | <text>` still works in one line.
+        """
+        db = self.bot.db
+        gid = ctx.guild.id
+
+        if args and "|" in args:
+            name, _, text = args.partition("|")
+            character = db.find_character_by_name(name.strip())
+            if not character:
+                await ctx.send(f"No character matching `{name.strip()}`.")
+                return
+            if db.set_note(gid, character["id"], ctx.author.id, text.strip()[:200] or None):
+                await ctx.send(f"Note set on **{character['name']}**.")
+            else:
+                await ctx.send(f"You do not own **{character['name']}**.")
             return
-        name, _, text = args.partition("|")
-        character = self.bot.db.find_character_by_name(name.strip())
-        if not character:
-            await ctx.send(f"No character matching `{name.strip()}`.")
+
+        rows = db.harem(gid, ctx.author.id)
+        if not rows:
+            await ctx.send("You have not claimed anyone to annotate.")
             return
-        text = text.strip()[:200]
-        if self.bot.db.set_note(
-            ctx.guild.id, character["id"], ctx.author.id, text or None
-        ):
-            await ctx.send(f"Note set on **{character['name']}**.")
-        else:
-            await ctx.send(f"You do not own **{character['name']}**.")
+        view = CharacterPicker(rows, ctx.author.id, "Choose who to annotate")
+        view.message = await ctx.send(
+            embed=discord.Embed(
+                title="Note",
+                description="Pick a character, then write the note.",
+                colour=config.CARD_COLOUR,
+            ),
+            view=view,
+        )
+        await view.wait()
+        if not view.chosen:
+            return
+
+        # The picker already used up its interaction, so the modal needs a
+        # fresh one: one button, which opens the box.
+        await ctx.send(
+            f"Writing a note for **{view.chosen['name']}**.",
+            view=NoteButton(db, gid, ctx.author.id, view.chosen),
+        )
 
     @commands.command(name="top", aliases=["lb", "leaderboard"])
     @commands.guild_only()

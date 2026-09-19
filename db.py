@@ -354,6 +354,26 @@ class Database:
             (f"{name}%",),
         ).fetchone()
 
+    def find_characters_by_name(self, name: str, limit: int = 25) -> list:
+        """Every plausible match for a typed name, best known first.
+
+        find_character_by_name picks one arbitrarily, which is wrong when two
+        characters share a name - there are several Shiros. Callers use this
+        and ask which one was meant.
+        """
+        exact = self.conn.execute(
+            "SELECT * FROM characters WHERE name = ? COLLATE NOCASE"
+            " ORDER BY like_rank LIMIT ?",
+            (name, limit),
+        ).fetchall()
+        if exact:
+            return exact
+        return self.conn.execute(
+            "SELECT * FROM characters WHERE name LIKE ? COLLATE NOCASE"
+            " ORDER BY like_rank LIMIT ?",
+            (f"{name}%", limit),
+        ).fetchall()
+
     def random_character(
         self, guild_id: int, include_claimed: bool
     ) -> Optional[sqlite3.Row]:

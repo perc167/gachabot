@@ -4,7 +4,8 @@ import discord
 from discord.ext import commands
 
 import utils
-from views import Paginator
+import config
+from views import CharacterPicker, Paginator, choose_character
 
 
 class Wishlist(commands.Cog):
@@ -17,9 +18,14 @@ class Wishlist(commands.Cog):
         """Add a character to your wishlist."""
         db = self.bot.db
         gid = ctx.guild.id
-        character = db.find_character_by_name(name)
-        if not character:
+        matches = db.find_characters_by_name(name)
+        if not matches:
             await ctx.send(f"No character matching `{name}`.")
+            return
+        character = await choose_character(
+            ctx, matches, "Which one do you want?", config.CARD_COLOUR
+        )
+        if not character:
             return
 
         limit = db.get_setting(gid, "wish_limit") + db.get_player(
@@ -48,13 +54,33 @@ class Wishlist(commands.Cog):
 
     @commands.command(name="unwish", aliases=["uw"])
     @commands.guild_only()
-    async def unwish(self, ctx, *, name: str):
-        """Remove a character from your wishlist."""
+    async def unwish(self, ctx, *, name: str = None):
+        """`$unwish` — pick from your wishlist, or name someone directly."""
         db = self.bot.db
-        character = db.find_character_by_name(name)
-        if not character:
-            await ctx.send(f"No character matching `{name}`.")
-            return
+        if name:
+            matches = db.find_characters_by_name(name)
+            character = await choose_character(
+                ctx, matches, "Which one?", config.CARD_COLOUR
+            )
+            if not character:
+                await ctx.send(f"No character matching `{name}`.")
+                return
+        else:
+            rows = db.wishes_of(ctx.guild.id, ctx.author.id)
+            if not rows:
+                await ctx.send("Your wishlist is empty.")
+                return
+            view = CharacterPicker(rows, ctx.author.id, "Choose a wish to drop")
+            view.message = await ctx.send(
+                embed=discord.Embed(
+                    title="Your wishlist", colour=config.CARD_COLOUR
+                ),
+                view=view,
+            )
+            await view.wait()
+            character = view.chosen
+            if not character:
+                return
         if db.remove_wish(ctx.guild.id, ctx.author.id, character["id"]):
             await ctx.send(f"Removed **{character['name']}** from your wishlist.")
         else:

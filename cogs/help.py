@@ -26,7 +26,7 @@ SECTIONS = [
         "Karuda",
         [
             ("k [@user]", "Balance and harem worth"),
-            ("daily", "Pull a karuda shard, every 20h"),
+            ("dk", "Two karuda drops to collect, every 20h"),
             ("shards", "What each shard type pays, and its odds"),
             ("pay @user <amount>", "Send karuda"),
             ("richest", "Karuda leaderboard"),

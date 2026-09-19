@@ -9,7 +9,100 @@ import utils
 from utils import fmt_duration
 
 DAILY_COOLDOWN = 20 * 60 * 60  # 20 hours, so it drifts earlier each day
-DAILY_MIN, DAILY_MAX = 100, 240
+DAILY_DROPS = 2
+# Halved when $dk went from one payout to two, so a day is worth the same.
+DAILY_MIN, DAILY_MAX = 55, 130
+
+
+class ShardDrops(discord.ui.View):
+    """The two shards a $dk turns up, as buttons you collect.
+
+    Each is rolled before the message is sent, so the icon on the button
+    already tells you what you got - the click is collecting it, not
+    deciding it. Only the person who ran the command can press them.
+    """
+
+    def __init__(self, bot, guild_id: int, author, drops, timeout: float = 600):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.guild_id = guild_id
+        self.author = author
+        self.drops = drops
+        self.collected = [False] * len(drops)
+        self.message = None
+
+        for index, (key, name, _mult, _colour, _amount) in enumerate(drops):
+            button = discord.ui.Button(
+                label=name,
+                style=discord.ButtonStyle.secondary,
+                emoji=discord.PartialEmoji.from_str(utils.shard_icon(key)),
+            )
+            button.callback = self._collector(index)
+            self.add_item(button)
+
+    def render(self) -> discord.Embed:
+        lines = []
+        for index, (key, name, mult, _colour, amount) in enumerate(self.drops):
+            icon = utils.shard_icon(key)
+            if self.collected[index]:
+                lines.append(f"{icon} **{name}** ×{mult:g} — collected **{amount:,}**")
+            else:
+                lines.append(f"{icon} **{name}** ×{mult:g} — waiting")
+        outstanding = self.collected.count(False)
+        # The best of the two, so a rare drop is obvious at a glance.
+        colour = max(self.drops, key=lambda d: d[2])[3]
+        embed = discord.Embed(
+            title=f"{self.author.display_name}'s daily karuda",
+            description="\n".join(lines),
+            colour=colour,
+        )
+        embed.set_footer(
+            text=(
+                f"{outstanding} left to collect"
+                if outstanding
+                else "All collected • next in 20h"
+            )
+        )
+        return embed
+
+    def _collector(self, index: int):
+        async def callback(interaction: discord.Interaction):
+            if self.collected[index]:
+                await interaction.response.send_message(
+                    "Already collected.", ephemeral=True
+                )
+                return
+            key, name, _mult, _colour, amount = self.drops[index]
+            self.collected[index] = True
+            total = self.bot.db.add_karuda(self.guild_id, self.author.id, amount)
+            self.bot.db.record_shard(self.guild_id, self.author.id, key)
+
+            self.children[index].disabled = True
+            self.children[index].style = discord.ButtonStyle.success
+            if all(self.collected):
+                self.stop()
+            embed = self.render()
+            embed.add_field(name="Balance", value=f"{total:,}", inline=True)
+            await interaction.response.edit_message(embed=embed, view=self)
+
+        return callback
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message(
+                "These are not your drops. Run `$dk` for your own.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        if self.message and not all(self.collected):
+            for child in self.children:
+                child.disabled = True
+            try:
+                await self.message.edit(view=self)
+            except discord.HTTPException:
+                pass
 
 
 class Karuda(commands.Cog):
@@ -55,41 +148,38 @@ class Karuda(commands.Cog):
             embed.set_footer(text=f"{found}/{len(config.SHARD_TYPES)} shard types found")
         await ctx.send(embed=embed)
 
-    @commands.command(name="daily")
+    @commands.command(name="dk", aliases=["daily", "dailykaruda"])
     @commands.guild_only()
-    async def daily(self, ctx):
-        """Free karuda, once every 20 hours."""
+    async def dk(self, ctx):
+        """Two karuda drops to claim, once every 20 hours."""
         db = self.bot.db
         gid = ctx.guild.id
         player = db.get_player(gid, ctx.author.id)
         remaining = player["daily_ready_at"] - utils.now()
         if remaining > 0:
-            await ctx.send(f"Next daily in {fmt_duration(remaining)}.")
+            await ctx.send(
+                f"{ctx.author.mention} your next {ctx.prefix}dk is in"
+                f" {fmt_duration(remaining)}."
+            )
             return
-        # The pull is the point: which shard you get decides the payout.
-        key, name, _fallback, multiplier, _, colour = config.roll_shard(random)
-        icon = utils.shard_icon(key)
-        base = random.randint(DAILY_MIN, DAILY_MAX)
-        amount = round(base * multiplier)
 
-        total = db.add_karuda(gid, ctx.author.id, amount)
-        pulled = db.record_shard(gid, ctx.author.id, key)
+        # Two shards, rolled independently. The cooldown starts now rather
+        # than on collection, so leaving a drop unclaimed costs you it.
+        drops = []
+        for _ in range(DAILY_DROPS):
+            key, name, _fallback, multiplier, _weight, colour = config.roll_shard(
+                random
+            )
+            amount = round(random.randint(DAILY_MIN, DAILY_MAX) * multiplier)
+            drops.append((key, name, multiplier, colour, amount))
         db.update_player(
             gid, ctx.author.id, daily_ready_at=utils.now() + DAILY_COOLDOWN
         )
 
-        odds = 100 * config.shard(key)[4] / sum(s[4] for s in config.SHARD_TYPES)
-        embed = discord.Embed(
-            title=f"{icon}  {name}",
-            description=f"{ctx.author.mention} pulled **{amount:,}** {config.CURRENCY}.",
-            colour=colour,
+        view = ShardDrops(self.bot, gid, ctx.author, drops)
+        view.message = await ctx.send(
+            content=ctx.author.mention, embed=view.render(), view=view
         )
-        embed.add_field(name="Multiplier", value=f"×{multiplier:g}", inline=True)
-        embed.add_field(name="Balance", value=f"{total:,}", inline=True)
-        embed.add_field(name="Pulled before", value=f"{pulled - 1}", inline=True)
-        rarity_note = f"{odds:.0f}% chance" if odds >= 1 else f"{odds:.1f}% chance"
-        embed.set_footer(text=f"{rarity_note} • next daily in 20h")
-        await ctx.send(embed=embed)
 
     @commands.command(name="shards", aliases=["types"])
     async def shards(self, ctx):

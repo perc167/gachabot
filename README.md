@@ -142,7 +142,7 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$note <name> \| <text>` | Annotate one of your characters |
 | `$top` | Biggest harems in the server |
 | `$k [@user]` | Karuda balance and shard collection |
-| `$daily` | Pull a karuda shard, every 20h |
+| `$dk` | Two karuda drops to collect, every 20h |
 | `$shards` | What each shard pays, and its odds |
 | `$pay @user <amount>` | Send karuda |
 | `$richest` | Karuda leaderboard |
@@ -185,8 +185,8 @@ default, because claiming costs nothing and a refund turned the claim
 cooldown into a money printer. Both are settings
 (`karuda_grab_percent`, `divorce_refund_percent`) if you want it looser.
 
-**Shards.** `$daily` pulls one of eight shard types, and which one you get
-decides the payout:
+**Shards.** `$dk` drops two shards as buttons you collect, each rolled
+independently from eight types, and which one you get decides the payout:
 
 | Shard | Payout | Chance |
 |---|---|---|
@@ -229,9 +229,9 @@ the character is claimed.
 
 ## The character pool
 
-`$import` loads `data/characters.json` — currently **149 characters across 20
-series** (Naruto, One Piece, Dragon Ball, Attack on Titan, Demon Slayer, Jujutsu
-Kaisen, and so on).
+`$import` loads `data/characters.json` — currently **29,962 characters across
+2,208 series**, every one with artwork, built by `tools/fetch_roster.py` from
+AniList.
 
 ### How karuda values were decided
 
