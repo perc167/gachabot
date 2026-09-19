@@ -58,6 +58,25 @@ def value_with_keys(db, guild_id: int, character, rate_percent: int) -> int:
                       * perks.key_multiplier(level)))
 
 
+def value_for_rank(rank: int, total: int) -> int:
+    """Rank to base value, matching tools/fetch_roster.py.
+
+    Kept here as well so a series added at runtime is priced on the same
+    curve as everything that arrived in the bulk fetch.
+    """
+    import math
+
+    low, high, premium_rank, premium_value = 20, 1300, 300, 300
+    if total <= 1:
+        return high
+    rank = max(1, min(rank, total))
+    t = math.log(rank) / math.log(total)
+    pin = math.log(premium_rank) / math.log(total)
+    share = (premium_value - low) / (high - low)
+    exponent = math.log(share) / math.log(1 - pin) if 0 < pin < 1 else 2.0
+    return max(low, round(low + (high - low) * (1 - t) ** exponent))
+
+
 def karuda_value(character, rate_percent: int) -> int:
     """base_karuda already encodes how famous the character is, so the only
     adjustment is the server's own rate."""

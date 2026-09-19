@@ -182,6 +182,7 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$pool` | Pool size and most-liked characters |
 | `$missingart [series]` | Characters that still need artwork |
 | `$setimage <id> <url>` | Give a character its art (owner-only) |
+| `$addseries <name>` | Pull one series in from AniList |
 | `$addchar` / `$editchar` / `$delchar` / `$import` / `$export` | Owner-only pool management |
 
 ## How the game works
@@ -259,8 +260,8 @@ the character is claimed.
 
 ## The character pool
 
-`$import` loads `data/characters.json` — currently **29,962 characters across
-2,208 series**, every one with artwork, built by `tools/fetch_roster.py` from
+`$import` loads `data/characters.json` — currently **30,012 characters across
+2,200-odd series**, every one with artwork, built by `tools/fetch_roster.py` from
 AniList.
 
 ### How karuda values were decided
@@ -283,6 +284,29 @@ python tools/build_roster.py
 
 Then `$import` again — matching is on `name` + `series`, so it updates in place
 rather than duplicating, and nobody loses a character they already claimed.
+
+### Adding a niche series
+
+The bulk fetch walks anime by popularity and stops once it has enough
+characters, around 2,200 shows in. Anything below that line never arrives —
+MILGRAM sits at popularity 6,870, so it was missing despite AniList having
+all twelve of its cast with art.
+
+Either of these pulls one in:
+
+```
+$addseries MILGRAM
+```
+
+```bash
+python tools/add_series.py "MILGRAM" --dry-run
+```
+
+Every character stores their AniList favourites count, so a newcomer is
+placed by counting how many existing characters have more — exact, and
+without renumbering thirty thousand rows. MILGRAM's cast landed between
+#5,017 and #11,000, worth 40–66 karuda, which is what their global
+popularity earns them.
 
 ### Artwork
 

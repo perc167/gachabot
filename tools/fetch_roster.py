@@ -215,7 +215,6 @@ def main():
         row["base_karuda"] = karuda_for_rank(
             max(1, (row["like_rank"] + row["claim_rank"]) // 2), total
         )
-        row.pop("favourites", None)
 
     # One compact record per line: a third the size of indented JSON, and it
     # still diffs line by line when the roster changes.

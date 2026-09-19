@@ -12,6 +12,7 @@ import time
 import discord
 from discord.ext import commands
 
+import anilist
 import config
 import utils
 from db import DuplicateCharacter
@@ -350,6 +351,61 @@ class Admin(commands.Cog):
         if skipped:
             message += f"\nSkipped {len(skipped)}:\n" + "\n".join(skipped[:10])
         await notice.edit(content=message[:1900])
+
+    @commands.command(name="addseries", aliases=["importseries"])
+    @is_bot_owner()
+    async def addseries(self, ctx, *, search: str):
+        """Pull one series in from AniList, however niche.
+
+        The bulk roster stops at the popular end, so anything further down
+        never arrives on its own. This fetches a named series and slots its
+        cast in at the rank their favourites earn them.
+        """
+        notice = await ctx.send(f"Looking up **{search}** on AniList...")
+        try:
+            title, cast = await asyncio.to_thread(anilist.find_series, search)
+        except anilist.AniListError as error:
+            await notice.edit(content=f"AniList did not answer: {error}")
+            return
+        if not cast:
+            await notice.edit(content=f"Nothing usable found for `{search}`.")
+            return
+
+        db = self.bot.db
+        before = db.character_count()
+        records, already = [], 0
+        for entry in cast:
+            matches = db.find_characters_by_name(entry["name"])
+            if any(row["series"] == title for row in matches):
+                already += 1
+                continue
+            rank, pool = db.rank_for_favourites(entry["favourites"])
+            record = dict(entry)
+            record["like_rank"] = rank
+            record["claim_rank"] = rank
+            record["base_karuda"] = utils.value_for_rank(rank, pool)
+            records.append(record)
+
+        if not records:
+            await notice.edit(
+                content=f"**{title}** is already in the pool ({already} characters)."
+            )
+            return
+
+        result = await asyncio.to_thread(db.import_characters, records)
+        lines = [
+            f"**{row['name']}** · #{row['like_rank']:,} · {row['base_karuda']:,}"
+            for row in sorted(records, key=lambda r: r["like_rank"])[:12]
+        ]
+        embed = discord.Embed(
+            title=title, description="\n".join(lines), colour=config.CARD_COLOUR
+        )
+        embed.set_footer(
+            text=f"Added {result['inserted']} · pool {before:,} to"
+                 f" {db.character_count():,}"
+                 + (f" · {already} already in" if already else "")
+        )
+        await notice.edit(content=None, embed=embed)
 
     @commands.command(name="export")
     @is_bot_owner()

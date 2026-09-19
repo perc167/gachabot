@@ -126,6 +126,7 @@ CATEGORIES = [
     ]),
     ("\U0001f527", "Bot owner", "Pool management", [
         ("import [path]", "Bulk load characters"),
+        ("addseries <name>", "Pull one series in from AniList"),
         ("export", "Dump the pool"),
         ("", ""),
         ("addchar / editchar / delchar", "One at a time"),

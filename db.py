@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS characters (
     -- 0 for the shared pool; a guild id for a character that server invented,
     -- which only rolls there.
     guild_id    INTEGER NOT NULL DEFAULT 0,
+    -- AniList favourites, kept so a series added later can be ranked against
+    -- everyone already here rather than guessed at.
+    favourites  INTEGER NOT NULL DEFAULT 0,
     UNIQUE (name, series)
 );
 
@@ -221,7 +224,7 @@ class Database:
             row["name"]
             for row in self.conn.execute("PRAGMA table_info(characters)").fetchall()
         }
-        for column in ("like_rank", "claim_rank", "guild_id"):
+        for column in ("like_rank", "claim_rank", "guild_id", "favourites"):
             if column not in character_columns:
                 self.conn.execute(
                     f"ALTER TABLE characters ADD COLUMN {column}"
@@ -313,14 +316,15 @@ class Database:
                     int(entry.get("base_karuda", entry.get("base_kakera", 50))),
                     int(entry.get("like_rank", 0)),
                     int(entry.get("claim_rank", 0)),
+                    int(entry.get("favourites", 0)),
                 )
                 character_id = existing.get(key)
                 if character_id is None:
                     cur = self.conn.execute(
                         "INSERT INTO characters"
                         " (name, series, image_url, likes, base_karuda,"
-                        "  like_rank, claim_rank)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        "  like_rank, claim_rank, favourites)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         (entry["name"], entry["series"], *values),
                     )
                     character_id = cur.lastrowid
@@ -329,7 +333,8 @@ class Database:
                 else:
                     self.conn.execute(
                         "UPDATE characters SET image_url = ?, likes = ?,"
-                        " base_karuda = ?, like_rank = ?, claim_rank = ?"
+                        " base_karuda = ?, like_rank = ?, claim_rank = ?,"
+                        " favourites = ?"
                         " WHERE id = ?",
                         (*values, character_id),
                     )
@@ -754,6 +759,20 @@ class Database:
             " GROUP BY m.user_id ORDER BY owned DESC, likes DESC LIMIT ?",
             (guild_id, limit),
         ).fetchall()
+
+    def rank_for_favourites(self, favourites: int) -> tuple:
+        """Where a newcomer sits, and how big the pool is.
+
+        Exact rather than approximate: count who already has more. That means
+        a series added later slots into the right place without renumbering
+        thirty thousand rows.
+        """
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS above FROM characters WHERE favourites > ?",
+            (favourites,),
+        ).fetchone()
+        total = self.character_count()
+        return row["above"] + 1, max(total, 1)
 
     # ---------- custom characters ----------
 
