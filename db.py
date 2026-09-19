@@ -167,6 +167,93 @@ class Database:
             self.add_image(row["id"], image_url, source="import")
         return row["id"]
 
+    def import_characters(self, entries) -> dict:
+        """Bulk import in a single transaction.
+
+        The per-character helpers each commit, which meant a 1000-character
+        import did several thousand commits and took minutes. This does one.
+
+        `entries` are dicts with name and series, optionally image_url, likes,
+        base_kakera, like_rank, claim_rank and an images list. Returns counts.
+        """
+        timestamp = int(time.time())
+        inserted = updated = images_added = 0
+
+        with self.conn:  # one transaction; rolls back entirely on error
+            # One lookup for the whole run rather than a SELECT per row.
+            existing = {
+                (row["name"], row["series"]): row["id"]
+                for row in self.conn.execute("SELECT id, name, series FROM characters")
+            }
+
+            album_rows = []
+            for entry in entries:
+                key = (entry["name"], entry["series"])
+                values = (
+                    entry.get("image_url", ""),
+                    int(entry.get("likes", 0)),
+                    int(entry.get("base_kakera", 50)),
+                    int(entry.get("like_rank", 0)),
+                    int(entry.get("claim_rank", 0)),
+                )
+                character_id = existing.get(key)
+                if character_id is None:
+                    cur = self.conn.execute(
+                        "INSERT INTO characters"
+                        " (name, series, image_url, likes, base_kakera,"
+                        "  like_rank, claim_rank)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (entry["name"], entry["series"], *values),
+                    )
+                    character_id = cur.lastrowid
+                    existing[key] = character_id
+                    inserted += 1
+                else:
+                    self.conn.execute(
+                        "UPDATE characters SET image_url = ?, likes = ?,"
+                        " base_kakera = ?, like_rank = ?, claim_rank = ?"
+                        " WHERE id = ?",
+                        (*values, character_id),
+                    )
+                    updated += 1
+
+                album = [entry["image_url"]] if entry.get("image_url") else []
+                album += list(entry.get("images") or [])
+                for url in album:
+                    album_rows.append((character_id, url, "import", timestamp))
+
+            if album_rows:
+                before = self.conn.execute(
+                    "SELECT COUNT(*) AS c FROM character_images"
+                ).fetchone()["c"]
+                self.conn.executemany(
+                    "INSERT OR IGNORE INTO character_images"
+                    " (character_id, url, source, added_at) VALUES (?, ?, ?, ?)",
+                    album_rows,
+                )
+                after = self.conn.execute(
+                    "SELECT COUNT(*) AS c FROM character_images"
+                ).fetchone()["c"]
+                images_added = after - before
+
+            # A character with no primary image but a populated album gets one.
+            self.conn.execute(
+                "UPDATE characters SET image_url = ("
+                "  SELECT url FROM character_images"
+                "  WHERE character_id = characters.id"
+                "  ORDER BY added_at, url LIMIT 1"
+                ") WHERE image_url = '' AND EXISTS ("
+                "  SELECT 1 FROM character_images WHERE character_id = characters.id"
+                ")"
+            )
+
+        return {
+            "inserted": inserted,
+            "updated": updated,
+            "images": images_added,
+            "total": inserted + updated,
+        }
+
     def delete_character(self, character_id: int) -> bool:
         cur = self.conn.execute("DELETE FROM characters WHERE id = ?", (character_id,))
         self.conn.execute(

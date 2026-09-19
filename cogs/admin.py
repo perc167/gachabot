@@ -3,9 +3,11 @@
 Restricted to the bot's owner(s) — these commands change the pool for every
 server the bot is in.
 """
+import asyncio
 import io
 import json
 import os
+import time
 
 import discord
 from discord.ext import commands
@@ -291,8 +293,7 @@ class Admin(commands.Cog):
             await ctx.send("Expected a JSON list of character objects.")
             return
 
-        added, images = 0, 0
-        skipped = []
+        clean, skipped = [], []
         for index, entry in enumerate(payload):
             try:
                 name = str(entry["name"]).strip()
@@ -307,37 +308,48 @@ class Admin(commands.Cog):
             if image_url and not image_url.startswith(("http://", "https://")):
                 skipped.append(f"#{index} ({name}): image_url is not an http link")
                 continue
-            char_id = self.bot.db.upsert_character(
-                name,
-                series,
-                image_url,
-                int(entry.get("likes", 0)),
-                int(entry.get("base_kakera", 50)),
-            )
-            ranks = {
-                key: int(entry[key])
-                for key in ("like_rank", "claim_rank")
-                if str(entry.get(key, "")).strip().isdigit()
+
+            record = {
+                "name": name,
+                "series": series,
+                "image_url": image_url,
+                "likes": int(entry.get("likes", 0) or 0),
+                "base_kakera": int(entry.get("base_kakera", 50) or 50),
+                "like_rank": int(entry.get("like_rank", 0) or 0),
+                "claim_rank": int(entry.get("claim_rank", 0) or 0),
+                "images": [
+                    str(u).strip()
+                    for u in (entry.get("images") or [])
+                    if str(u).strip().startswith(("http://", "https://"))
+                ],
             }
-            if ranks:
-                self.bot.db.update_character(char_id, **ranks)
+            clean.append(record)
 
-            album = [image_url] if image_url else []
-            album += [
-                str(u).strip()
-                for u in (entry.get("images") or [])
-                if str(u).strip().startswith(("http://", "https://"))
-            ]
-            if album:
-                images += self.bot.db.add_images(char_id, album)
-            added += 1
+        if not clean:
+            await ctx.send("Nothing importable in that file.")
+            return
 
-        message = f"Imported **{added}** characters and **{images}** new images"
-        message += f" from `{source}`."
-        message += f" Pool is now {self.bot.db.character_count()}."
+        # A thousand characters is a lot of writes; do them in one transaction
+        # off the event loop so the bot keeps responding meanwhile.
+        notice = await ctx.send(f"Importing {len(clean)} characters...")
+        started = time.perf_counter()
+        try:
+            result = await asyncio.to_thread(self.bot.db.import_characters, clean)
+        except Exception as error:  # a bad file should not kill the cog
+            await notice.edit(content=f"Import failed, nothing changed: {error}")
+            raise
+        elapsed = time.perf_counter() - started
+
+        message = (
+            f"Imported **{result['total']}** characters from `{source}`"
+            f" in {elapsed:.1f}s"
+            f" ({result['inserted']} new, {result['updated']} updated,"
+            f" {result['images']} new images)."
+            f"\nPool is now {self.bot.db.character_count()}."
+        )
         if skipped:
             message += f"\nSkipped {len(skipped)}:\n" + "\n".join(skipped[:10])
-        await ctx.send(message[:1900])
+        await notice.edit(content=message[:1900])
 
     @commands.command(name="export")
     @is_bot_owner()

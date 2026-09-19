@@ -417,6 +417,54 @@ async def main():
           roll_embed.image.url in db.images_for(cid))
     check("embed shows album size", "images" in str(roll_embed.fields[0].value))
 
+    # 20. Batched import: one transaction, idempotent, all-or-nothing.
+    before_count = db.character_count()
+    batch = [
+        {"name": "Batch One", "series": "Batch QA", "image_url":
+         "https://example.com/1.png", "base_kakera": 700,
+         "like_rank": 42, "claim_rank": 51,
+         "images": ["https://example.com/2.png", "https://example.com/3.png"]},
+        {"name": "Batch Two", "series": "Batch QA", "base_kakera": 90},
+    ]
+    result = db.import_characters(batch)
+    check("batched import inserts", result["inserted"] == 2, str(result))
+    check("batched import adds albums", result["images"] == 3, str(result))
+    one = db.find_character_by_name("Batch One")
+    check("batched import carries ranks",
+          one["like_rank"] == 42 and one["claim_rank"] == 51)
+    check("batched import builds the album", db.image_count(one["id"]) == 3)
+    two = db.find_character_by_name("Batch Two")
+    check("art-less entry still imports", two is not None and two["image_url"] == "")
+
+    again = db.import_characters(batch)
+    check("re-import inserts nothing", again["inserted"] == 0, str(again))
+    check("re-import re-adds no images", again["images"] == 0, str(again))
+    check("re-import does not duplicate",
+          db.character_count() == before_count + 2)
+
+    # A bad row must roll the whole batch back, not half-apply it.
+    poisoned = [
+        {"name": "Batch Three", "series": "Batch QA", "base_kakera": 100},
+        {"series": "Batch QA", "base_kakera": 100},  # no name -> KeyError
+    ]
+    count_before_failure = db.character_count()
+    blew_up = False
+    try:
+        db.import_characters(poisoned)
+    except (KeyError, TypeError):
+        blew_up = True
+    check("a bad row raises", blew_up)
+    check("failed import rolls back entirely",
+          db.character_count() == count_before_failure,
+          f"{db.character_count()} vs {count_before_failure}")
+    check("no partial row survived rollback",
+          db.find_character_by_name("Batch Three") is None)
+
+    for name in ("Batch One", "Batch Two"):
+        row = db.find_character_by_name(name)
+        if row:
+            db.delete_character(row["id"])
+
     await b.close()
 
 
