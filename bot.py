@@ -26,6 +26,8 @@ COGS = [
     "cogs.likes",
     "cogs.bulk",
     "cogs.profile",
+    "cogs.serverconfig",
+    "cogs.access",
     "cogs.admin",
     "cogs.settings",
     "cogs.help",
@@ -38,7 +40,7 @@ class GachaBot(commands.Bot):
         intents.message_content = True  # needed for prefix commands
         intents.members = True  # needed to resolve @mentions in trades
         super().__init__(
-            command_prefix=commands.when_mentioned_or(config.PREFIX),
+            command_prefix=self._prefix_for,
             intents=intents,
             help_command=None,
             case_insensitive=True,
@@ -47,9 +49,39 @@ class GachaBot(commands.Bot):
         self.started_at = time.time()
         self.cooldowns = Cooldowns(self.db)
 
+    async def _prefix_for(self, bot, message):
+        """Servers can set their own prefix; mentions always work."""
+        custom = None
+        if message.guild:
+            custom = self.db.get_prefix(message.guild.id)
+        return commands.when_mentioned_or(custom or config.PREFIX)(bot, message)
+
+    async def on_guild_join(self, guild):
+        self.db.note_guild(guild.id)
+
+    async def check_allowed(self, ctx) -> bool:
+        """Global gate: disabled commands, and the channel allow list.
+
+        Runs before every command. Owner commands ignore it, so a server
+        cannot lock the bot owner out of their own bot.
+        """
+        if ctx.guild is None:
+            return True
+        self.db.note_guild(ctx.guild.id)
+        if ctx.author.id in config.OWNERS:
+            return True
+
+        allowed = self.db.allowed_channels(ctx.guild.id)
+        if allowed and ctx.channel.id not in allowed:
+            return False
+        if ctx.command and ctx.command.name in self.db.disabled_commands(ctx.guild.id):
+            raise commands.DisabledCommand()
+        return True
+
     async def setup_hook(self):
         # Shard icons prefer custom emoji uploaded to the server.
         utils.use_emoji_from(self)
+        self.add_check(self.check_allowed)
         for cog in COGS:
             await self.load_extension(cog)
             log.info("loaded %s", cog)
@@ -73,6 +105,13 @@ class GachaBot(commands.Bot):
         if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
             await ctx.send(f"Usage: `{config.PREFIX}{ctx.command.qualified_name} {ctx.command.signature}`")
             return
+        if isinstance(error, commands.DisabledCommand):
+            await ctx.send(
+                f"`{ctx.command.name}` is switched off on this server."
+            )
+            return
+        if isinstance(error, commands.CheckFailure):
+            return  # wrong channel; staying quiet is the point
         if isinstance(error, commands.NoPrivateMessage):
             await ctx.send("This one only works in a server.")
             return

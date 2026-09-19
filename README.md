@@ -164,6 +164,11 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$gift @user` | Give a character away — pick from a menu |
 | `$trade @user` | Swap characters — you each pick from a menu |
 | `$settings` / `$set <key> <value>` / `$resetsettings` | Per-server tuning (Manage Server) |
+| `$setrolls` / `$setclaim` / `$setinterval` / `$setrate` … | Friendly setters for the same settings |
+| `$prefix <char>` | Change the prefix for this server |
+| `$disable` / `$enable` / `$enableall` / `$disablelist` | Switch commands off per server |
+| `$channelallow` / `$channeldeny` / `$channellist` | Limit the bot to certain channels |
+| `$access` / `$redeem <key>` | Access status and key redemption |
 | `$pool` | Pool size and most-liked characters |
 | `$missingart [series]` | Characters that still need artwork |
 | `$setimage <id> <url>` | Give a character its art (owner-only) |
@@ -352,6 +357,22 @@ about 70 assertions, a few seconds, no Discord connection.
 
 Adding a setting is one line in `GUILD_SETTINGS` — `$settings` and `$set` pick
 it up automatically.
+
+## Early players and keys
+
+Everything is free. The bot still records **when each player and server first
+appeared**, and supports redeemable keys, because neither can be reconstructed
+after the fact — if paid features ever arrive, the people who were here first
+have to be identifiable, and that only works if it was written down from the
+beginning.
+
+- `$access` shows when someone started and whether they hold a key
+- `$redeem <key>` claims one, `$genkey` (owner) mints them and DMs them over
+- `FOUNDER_CUTOFF` in `config.py` is `0`, meaning *everyone so far counts*.
+  Set it to a timestamp at the moment you start gating something, not before.
+
+Nothing checks any of this yet. It is only bookkeeping, so the option stays
+open.
 
 ## Notes
 

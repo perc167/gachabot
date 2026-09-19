@@ -51,6 +51,12 @@ GUILD_SETTINGS = {
     "price_wish_slot": (1200, 10, 1000000, "Cost of one extra wishlist slot"),
 }
 
+# Everyone who started playing before this unix timestamp counts as an early
+# player, and keeps whatever becomes paid later. 0 means "everyone so far",
+# which is the right answer until there is something to charge for: set it to
+# the moment you start gating, not before.
+FOUNDER_CUTOFF = 0
+
 # The currency. Karuda are shards; every payout is measured in them.
 CURRENCY = "karuda"
 CURRENCY_TITLE = "Karuda"

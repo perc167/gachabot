@@ -371,7 +371,15 @@ async def main():
         guild_only = any(
             "guild_only" in getattr(chk, "__qualname__", "") for chk in cmd.checks
         )
-        guarded = "if ctx.guild else" in source
+        # A cog can guard its whole set at once with a cog_check.
+        cog_guard = False
+        cog_check = getattr(type(cmd.cog), "cog_check", None) if cmd.cog else None
+        if cog_check is not None:
+            try:
+                cog_guard = "NoPrivateMessage" in inspect.getsource(cog_check)
+            except (OSError, TypeError):
+                cog_guard = False
+        guarded = "if ctx.guild else" in source or cog_guard
         if not guild_only and not guarded:
             unsafe.append(cmd.name)
     check("no command crashes when used in a DM", not unsafe, ", ".join(unsafe))
@@ -605,6 +613,57 @@ async def main():
           [r["like_rank"] for r in db.characters_in_series(series_name)]
           == sorted(r["like_rank"] for r in db.characters_in_series(series_name)))
     db.divorce_many(GUILD, BOB, [r["id"] for r in victims])
+
+    # 20g. Server configuration and the gate it drives.
+    check("prefix defaults to none", db.get_prefix(GUILD) is None)
+    db.set_prefix(GUILD, "!")
+    check("prefix stored", db.get_prefix(GUILD) == "!")
+    check("prefix is per guild", db.get_prefix(999) is None)
+    db.clear_prefix(GUILD)
+    check("prefix cleared", db.get_prefix(GUILD) is None)
+
+    check("command disables", db.disable_command(GUILD, "roll"))
+    check("disabling twice is a no-op", not db.disable_command(GUILD, "roll"))
+    check("disabled list reports it", db.disabled_commands(GUILD) == {"roll"})
+    check("other guild unaffected", db.disabled_commands(999) == set())
+    check("command enables", db.enable_command(GUILD, "roll"))
+    db.disable_command(GUILD, "roll")
+    db.disable_command(GUILD, "dk")
+    check("enable_all clears the lot", db.enable_all_commands(GUILD) == 2)
+
+    check("no channel rule means no restriction", db.allowed_channels(GUILD) == set())
+    db.allow_channel(GUILD, 555)
+    check("channel allowed", db.allowed_channels(GUILD) == {555})
+    check("removing a channel works", db.unallow_channel(GUILD, 555))
+    db.allow_channel(GUILD, 1)
+    db.allow_channel(GUILD, 2)
+    check("clearing returns the count", db.clear_allowed_channels(GUILD) == 2)
+
+    # Protected commands must stay reachable or a server locks itself out.
+    from cogs.serverconfig import PROTECTED, SETTERS
+
+    check("lockout-protected commands exist",
+          all(b.get_command(name) for name in PROTECTED),
+          ", ".join(n for n in PROTECTED if not b.get_command(n)))
+    check("every friendly setter maps to a real setting",
+          all(key in config.GUILD_SETTINGS for key, _unit in SETTERS.values()),
+          ", ".join(k for k, _ in SETTERS.values() if k not in config.GUILD_SETTINGS))
+    check("setter aliases are all registered",
+          all(b.get_command(name) for name in SETTERS))
+
+    # 20h. First seen, recorded so early users can be recognised later.
+    fresh = db.get_player(GUILD, 4242)
+    check("players record when they arrived", fresh["first_seen"] > 0)
+    stamp = db.note_guild(GUILD)
+    check("guilds record when they arrived", stamp > 0)
+    check("note_guild is stable once set", db.note_guild(GUILD) == stamp)
+
+    db.add_key("KEY-ONE", "test")
+    check("key redeems", db.redeem_key("KEY-ONE", ALICE) == "ok")
+    check("key cannot be reused", db.redeem_key("KEY-ONE", BOB) == "used")
+    check("unknown key rejected", db.redeem_key("NOPE", BOB) == "unknown")
+    check("holder recognised", db.key_holder(ALICE))
+    check("non-holder not recognised", not db.key_holder(BOB))
 
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)

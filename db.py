@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS players (
     daily_ready_at  INTEGER NOT NULL DEFAULT 0,
     rolls_bought    INTEGER NOT NULL DEFAULT 0,
     extra_wish_slots INTEGER NOT NULL DEFAULT 0,
+    first_seen      INTEGER NOT NULL DEFAULT 0,
+    premium         INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
 );
 
@@ -74,8 +76,43 @@ CREATE TABLE IF NOT EXISTS wishes (
 CREATE INDEX IF NOT EXISTS idx_wishes_character
     ON wishes (guild_id, character_id);
 
--- How many of each shard type a player has pulled. Flavour and bragging
--- rights; the spendable balance is players.karuda.
+-- Per-guild prefix. Separate from guild_settings, which only holds numbers.
+CREATE TABLE IF NOT EXISTS guild_prefixes (
+    guild_id INTEGER PRIMARY KEY,
+    prefix   TEXT NOT NULL
+);
+
+-- Commands a server has switched off, and channels it has restricted the
+-- bot to. No rows for a guild means no restriction.
+CREATE TABLE IF NOT EXISTS disabled_commands (
+    guild_id INTEGER NOT NULL,
+    command  TEXT NOT NULL,
+    PRIMARY KEY (guild_id, command)
+);
+CREATE TABLE IF NOT EXISTS allowed_channels (
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, channel_id)
+);
+
+-- When a server first used the bot. Recorded from the start because
+-- grandfathering early adopters is impossible if nobody wrote down who was
+-- early; see players.first_seen for the same reason.
+CREATE TABLE IF NOT EXISTS guilds (
+    guild_id   INTEGER PRIMARY KEY,
+    first_seen INTEGER NOT NULL
+);
+
+-- Redeemable keys. Nothing is gated yet; this exists so keys handed out now
+-- still mean something when something is.
+CREATE TABLE IF NOT EXISTS premium_keys (
+    key         TEXT PRIMARY KEY,
+    note        TEXT,
+    created_at  INTEGER NOT NULL,
+    redeemed_by INTEGER,
+    redeemed_at INTEGER
+);
+
 -- Who likes whom. Likes are per server, like everything else, and a like is
 -- a vote you can take back - hence a table rather than a counter.
 CREATE TABLE IF NOT EXISTS character_likes (
@@ -88,6 +125,8 @@ CREATE TABLE IF NOT EXISTS character_likes (
 CREATE INDEX IF NOT EXISTS idx_likes_character
     ON character_likes (guild_id, character_id);
 
+-- How many of each shard type a player has pulled. Flavour and bragging
+-- rights; the spendable balance is players.karuda.
 CREATE TABLE IF NOT EXISTS shard_pulls (
     guild_id INTEGER NOT NULL,
     user_id  INTEGER NOT NULL,
@@ -142,7 +181,10 @@ class Database:
             row["name"]
             for row in self.conn.execute("PRAGMA table_info(players)").fetchall()
         }
-        for column in ("daily_ready_at", "rolls_bought", "extra_wish_slots"):
+        for column in (
+            "daily_ready_at", "rolls_bought", "extra_wish_slots", "first_seen",
+            "premium",
+        ):
             if column not in existing:
                 self.conn.execute(
                     f"ALTER TABLE players ADD COLUMN {column}"
@@ -514,7 +556,8 @@ class Database:
         if row:
             return row
         self.conn.execute(
-            "INSERT INTO players (guild_id, user_id) VALUES (?, ?)", (guild_id, user_id)
+            "INSERT INTO players (guild_id, user_id, first_seen) VALUES (?, ?, ?)",
+            (guild_id, user_id, int(time.time())),
         )
         self.conn.commit()
         return self.conn.execute(
@@ -532,6 +575,8 @@ class Database:
             "daily_ready_at",
             "rolls_bought",
             "extra_wish_slots",
+            "first_seen",
+            "premium",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:
@@ -659,6 +704,145 @@ class Database:
             " GROUP BY m.user_id ORDER BY owned DESC, likes DESC LIMIT ?",
             (guild_id, limit),
         ).fetchall()
+
+    # ---------- server configuration ----------
+
+    def get_prefix(self, guild_id: int):
+        row = self.conn.execute(
+            "SELECT prefix FROM guild_prefixes WHERE guild_id = ?", (guild_id,)
+        ).fetchone()
+        return row["prefix"] if row else None
+
+    def set_prefix(self, guild_id: int, prefix: str):
+        self.conn.execute(
+            "INSERT INTO guild_prefixes (guild_id, prefix) VALUES (?, ?)"
+            " ON CONFLICT (guild_id) DO UPDATE SET prefix = excluded.prefix",
+            (guild_id, prefix),
+        )
+        self.conn.commit()
+
+    def clear_prefix(self, guild_id: int):
+        self.conn.execute(
+            "DELETE FROM guild_prefixes WHERE guild_id = ?", (guild_id,)
+        )
+        self.conn.commit()
+
+    def disable_command(self, guild_id: int, command: str) -> bool:
+        try:
+            self.conn.execute(
+                "INSERT INTO disabled_commands (guild_id, command) VALUES (?, ?)",
+                (guild_id, command),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def enable_command(self, guild_id: int, command: str) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM disabled_commands WHERE guild_id = ? AND command = ?",
+            (guild_id, command),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def enable_all_commands(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM disabled_commands WHERE guild_id = ?", (guild_id,)
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def disabled_commands(self, guild_id: int) -> set:
+        return {
+            row["command"]
+            for row in self.conn.execute(
+                "SELECT command FROM disabled_commands WHERE guild_id = ?",
+                (guild_id,),
+            )
+        }
+
+    def allow_channel(self, guild_id: int, channel_id: int) -> bool:
+        try:
+            self.conn.execute(
+                "INSERT INTO allowed_channels (guild_id, channel_id) VALUES (?, ?)",
+                (guild_id, channel_id),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+    def unallow_channel(self, guild_id: int, channel_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM allowed_channels WHERE guild_id = ? AND channel_id = ?",
+            (guild_id, channel_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def allowed_channels(self, guild_id: int) -> set:
+        return {
+            row["channel_id"]
+            for row in self.conn.execute(
+                "SELECT channel_id FROM allowed_channels WHERE guild_id = ?",
+                (guild_id,),
+            )
+        }
+
+    def clear_allowed_channels(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM allowed_channels WHERE guild_id = ?", (guild_id,)
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    # ---------- who was here first ----------
+
+    def note_guild(self, guild_id: int) -> int:
+        """Record a server the first time it is seen. Returns first_seen."""
+        row = self.conn.execute(
+            "SELECT first_seen FROM guilds WHERE guild_id = ?", (guild_id,)
+        ).fetchone()
+        if row:
+            return row["first_seen"]
+        stamp = int(time.time())
+        self.conn.execute(
+            "INSERT INTO guilds (guild_id, first_seen) VALUES (?, ?)",
+            (guild_id, stamp),
+        )
+        self.conn.commit()
+        return stamp
+
+    def add_key(self, key: str, note: str = None):
+        self.conn.execute(
+            "INSERT INTO premium_keys (key, note, created_at) VALUES (?, ?, ?)",
+            (key, note, int(time.time())),
+        )
+        self.conn.commit()
+
+    def redeem_key(self, key: str, user_id: int) -> str:
+        """Returns 'ok', 'unknown', or 'used'."""
+        row = self.conn.execute(
+            "SELECT redeemed_by FROM premium_keys WHERE key = ?", (key,)
+        ).fetchone()
+        if not row:
+            return "unknown"
+        if row["redeemed_by"]:
+            return "used"
+        self.conn.execute(
+            "UPDATE premium_keys SET redeemed_by = ?, redeemed_at = ? WHERE key = ?",
+            (user_id, int(time.time()), key),
+        )
+        self.conn.commit()
+        return "ok"
+
+    def key_holder(self, user_id: int) -> bool:
+        return bool(
+            self.conn.execute(
+                "SELECT 1 FROM premium_keys WHERE redeemed_by = ? LIMIT 1", (user_id,)
+            ).fetchone()
+        )
 
     # ---------- likes ----------
 
