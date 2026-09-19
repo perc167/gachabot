@@ -538,7 +538,7 @@ ROSTER = {
     "My Dress-Up Darling": ("B", [
         ("Marin Kitagawa", "lead"), ("Wakana Gojou", "lead"),
         ("Sajuna Inui", "main"), ("Shinju Inui", "main"),
-        ("Kaoru Gojou", "support"), ("Nowa Kitagawa", "support"),
+        ("Kaoru Gojou", "support"),
     ]),
     "Komi Can't Communicate": ("B", [
         ("Shouko Komi", "lead"), ("Hitohito Tadano", "lead"),

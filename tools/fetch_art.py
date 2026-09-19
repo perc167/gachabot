@@ -47,6 +47,26 @@ DATA = os.path.join(ROOT, "data", "characters.json")
 # How close a name has to be before we accept it, once the series matches.
 NAME_THRESHOLD = 0.72
 
+# Words that mean "someone related to X" rather than X. AniList files minor
+# family members this way, which is how Sesshomaru first matched
+# "Sesshomaru no Haha" - his mother.
+RELATION_WORDS = {
+    "haha", "chichi", "hahaue", "chichiue", "okaasan", "otousan",
+    "ane", "imouto", "ani", "otouto", "musume", "musuko",
+    "tsuma", "otto", "oba", "oji", "sofu", "sobo",
+    "mother", "father", "sister", "brother", "daughter", "son",
+    "wife", "husband", "mom", "dad", "grandmother", "grandfather",
+}
+
+# Honorifics that sit in front of a name. "Colonel Shikishima" is the same
+# person as "Shikishima", and "Princess Hibana" the same as "Hibana".
+TITLES = {
+    "colonel", "captain", "commander", "general", "major", "sergeant",
+    "princess", "prince", "queen", "lady", "lord", "sir", "dame",
+    "doctor", "dr", "professor", "master", "mister", "mr", "mrs", "miss", "ms",
+    "saint", "father", "sister", "chief", "officer", "detective",
+}
+
 # Characters AniList files under a different name than we do. Add to this when
 # the run reports someone as unmatched.
 ALIASES = {
@@ -54,6 +74,10 @@ ALIASES = {
     "Eto Yoshimura": ["Eto"],
     "Chi-Chi": ["Chichi"],
     "Obito Uchiha": ["Tobi"],  # AniList files him under his masked alias
+    "Harlequin": ["King"],  # Seven Deadly Sins: renamed here to avoid a clash
+    "Sesshomaru": ["Sesshoumaru"],
+    "Bandou": ["Bando"],
+    "Makina": ["Kiwako Flugel Makina", "Kiwako Makina"],
     "Chris": ["Eris"],  # KonoSuba: Chris is Eris in disguise
     "Nunnally vi Britannia": ["Nunnally Lamperouge"],
     "Lelouch vi Britannia": ["Lelouch Lamperouge"],
@@ -75,6 +99,7 @@ def collapse_long_vowels(text: str) -> str:
     """AniList romanises long vowels as doubled letters: Gokuu, Tanjirou,
     Kyoujurou. Fold those down so they meet our spellings in the middle."""
     text = re.sub(r"ou", "o", text)
+    text = re.sub(r"oh(?=[bcdfgjklmnpqrstvwxyz])", "o", text)
     text = re.sub(r"([aeiou])\1+", r"\1", text)
     return text
 
@@ -119,6 +144,13 @@ def _pair_one(wanted: str, name: str) -> float:
 
     want_folded, have_folded = collapse_long_vowels(want), collapse_long_vowels(have)
     want_tokens, have_tokens = name_tokens(wanted), name_tokens(name)
+
+    # "Sesshomaru" is not "Sesshomaru no Haha". If one side adds a relation
+    # word the other lacks, it names a relative, not the character.
+    if (have_tokens - want_tokens) & RELATION_WORDS:
+        return 0.0
+    if (want_tokens - have_tokens) & RELATION_WORDS:
+        return 0.0
 
     # Same words in either order: "Son Goku" == "Gokuu Son".
     if want_tokens and have_tokens == want_tokens:
@@ -168,13 +200,33 @@ def _pair_one(wanted: str, name: str) -> float:
     return difflib.SequenceMatcher(None, want_folded, have_folded).ratio()
 
 
+def without_title(name: str) -> str:
+    """Drop a leading honorific, if anything is left afterwards."""
+    parts = re.split(r"([^A-Za-z0-9]+)", name or "")
+    words = [p for p in parts if p.strip()]
+    if len(words) > 1 and normalise(words[0]) in TITLES:
+        return " ".join(words[1:])
+    return ""
+
+
+def _variants(name: str) -> list:
+    """The name, plus a version with any honorific removed."""
+    out = [name]
+    stripped = without_title(name)
+    if stripped:
+        out.append(stripped)
+    return out
+
+
 def name_score(wanted, candidate_names) -> float:
     """Best similarity between our name (or any alias of it) and any name
     AniList knows the character by."""
     wanted_names = [wanted] if isinstance(wanted, str) else list(wanted)
+    mine_all = [v for n in wanted_names for v in _variants(n)]
+    theirs_all = [v for n in candidate_names for v in _variants(n)]
     best = 0.0
-    for mine in wanted_names:
-        for theirs in candidate_names:
+    for mine in mine_all:
+        for theirs in theirs_all:
             best = max(best, _pair_one(mine, theirs))
             if best >= 1.0:
                 return 1.0
