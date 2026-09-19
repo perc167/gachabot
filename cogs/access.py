@@ -106,9 +106,9 @@ class Access(commands.Cog):
                 " the premium_keys table."
             )
 
-    @commands.command(name="keys")
+    @commands.command(name="keystats", aliases=["premiumkeys"])
     @is_bot_owner()
-    async def keys(self, ctx):
+    async def keystats(self, ctx):
         """How many keys exist and how many are spent."""
         rows = self.bot.db.conn.execute(
             "SELECT COUNT(*) AS total,"

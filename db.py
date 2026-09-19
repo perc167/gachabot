@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS players (
     first_seen      INTEGER NOT NULL DEFAULT 0,
     premium         INTEGER NOT NULL DEFAULT 0,
     tower_floor     INTEGER NOT NULL DEFAULT 0,
+    keys            INTEGER NOT NULL DEFAULT 0,
+    soulmate_id     INTEGER NOT NULL DEFAULT 0,
+    soulmate_set_at INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
 );
 
@@ -133,6 +136,15 @@ CREATE INDEX IF NOT EXISTS idx_likes_character
 -- rights; the spendable balance is players.karuda.
 -- Badges a player has bought. Perks are looked up from perks.py by key, so
 -- rebalancing a badge does not need a migration.
+-- A key spent on a character raises their level, which is worth more karuda
+-- to whoever owns them. Per guild, like everything else.
+CREATE TABLE IF NOT EXISTS character_keys (
+    guild_id     INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    level        INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, character_id)
+);
+
 CREATE TABLE IF NOT EXISTS badges (
     guild_id INTEGER NOT NULL,
     user_id  INTEGER NOT NULL,
@@ -197,7 +209,7 @@ class Database:
         }
         for column in (
             "daily_ready_at", "rolls_bought", "extra_wish_slots", "first_seen",
-            "premium", "tower_floor",
+            "premium", "tower_floor", "keys", "soulmate_id", "soulmate_set_at",
         ):
             if column not in existing:
                 self.conn.execute(
@@ -612,6 +624,9 @@ class Database:
             "first_seen",
             "premium",
             "tower_floor",
+            "keys",
+            "soulmate_id",
+            "soulmate_set_at",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:
@@ -915,6 +930,67 @@ class Database:
                 "SELECT 1 FROM premium_keys WHERE redeemed_by = ? LIMIT 1", (user_id,)
             ).fetchone()
         )
+
+    # ---------- keys and soulmates ----------
+
+    def add_keys(self, guild_id: int, user_id: int, amount: int) -> int:
+        player = self.get_player(guild_id, user_id)
+        total = max(0, player["keys"] + amount)
+        self.update_player(guild_id, user_id, keys=total)
+        return total
+
+    def key_level(self, guild_id: int, character_id: int) -> int:
+        row = self.conn.execute(
+            "SELECT level FROM character_keys"
+            " WHERE guild_id = ? AND character_id = ?",
+            (guild_id, character_id),
+        ).fetchone()
+        return row["level"] if row else 0
+
+    def raise_key_level(self, guild_id: int, character_id: int) -> int:
+        self.conn.execute(
+            "INSERT INTO character_keys (guild_id, character_id, level)"
+            " VALUES (?, ?, 1)"
+            " ON CONFLICT (guild_id, character_id)"
+            " DO UPDATE SET level = level + 1",
+            (guild_id, character_id),
+        )
+        self.conn.commit()
+        return self.key_level(guild_id, character_id)
+
+    def keyed_characters(self, guild_id: int, user_id: int) -> list:
+        """A player's characters that have had keys spent on them."""
+        return self.conn.execute(
+            "SELECT c.*, k.level FROM character_keys k"
+            " JOIN characters c ON c.id = k.character_id"
+            " JOIN marriages m"
+            "   ON m.character_id = c.id AND m.guild_id = k.guild_id"
+            " WHERE k.guild_id = ? AND m.user_id = ? AND k.level > 0"
+            " ORDER BY k.level DESC, c.like_rank",
+            (guild_id, user_id),
+        ).fetchall()
+
+    def set_soulmate(self, guild_id: int, user_id: int, character_id: int):
+        self.update_player(
+            guild_id,
+            user_id,
+            soulmate_id=character_id,
+            soulmate_set_at=int(time.time()),
+        )
+
+    def soulmate_of(self, guild_id: int, user_id: int):
+        character_id = self.get_player(guild_id, user_id)["soulmate_id"]
+        return self.get_character(character_id) if character_id else None
+
+    def soulmate_holders(self, guild_id: int, character_id: int) -> list:
+        return [
+            row["user_id"]
+            for row in self.conn.execute(
+                "SELECT user_id FROM players"
+                " WHERE guild_id = ? AND soulmate_id = ?",
+                (guild_id, character_id),
+            )
+        ]
 
     # ---------- badges and the tower ----------
 

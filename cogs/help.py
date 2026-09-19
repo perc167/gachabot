@@ -65,6 +65,15 @@ CATEGORIES = [
         ("", ""),
         ("perks", "What it all adds up to"),
     ]),
+    ("💖", "Bonds", "Soulmates and keys", [
+        ("setsoulmate", "Name one character your soulmate"),
+        ("soulmate [@user]", "See a soulmate"),
+        ("soulmates", "Who everyone here has chosen"),
+        ("", ""),
+        ("keys", "Keys you hold and have spent"),
+        ("key", "Spend one to raise a character's value"),
+        ("keyed [@user]", "Everyone you have keyed"),
+    ]),
     ("⭐", "Wishes", "Get pinged when they roll", [
         ("wish <name>", "Add a wish"),
         ("wishseries <name>", "Wish a whole series"),
@@ -127,7 +136,7 @@ CATEGORIES = [
         ("missingart [series]", "What still needs art"),
         ("", ""),
         ("genkey [n] [note]", "Mint keys"),
-        ("keys", "How many exist and are spent"),
+        ("keystats", "How many premium keys exist and are spent"),
     ]),
 ]
 

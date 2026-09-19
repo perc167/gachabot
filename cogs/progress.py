@@ -159,6 +159,7 @@ class Progress(commands.Cog):
 
         db.add_karuda(gid, ctx.author.id, -cost)
         db.update_player(gid, ctx.author.id, tower_floor=nxt)
+        keys_held = db.add_keys(gid, ctx.author.id, 1)  # a key per floor
         earned = perks.effective(db, gid, ctx.author.id)
 
         embed = discord.Embed(
@@ -168,6 +169,9 @@ class Progress(commands.Cog):
             colour=config.CARD_COLOUR,
         )
         embed.add_field(name="All your perks", value=perks.describe(earned), inline=False)
+        embed.add_field(
+            name="Key", value=f"\U0001f511 +1  (you hold {keys_held})", inline=False
+        )
         following = perks.floor_cost(nxt + 1)
         embed.set_footer(
             text=f"-{cost:,} karuda"

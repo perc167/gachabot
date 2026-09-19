@@ -30,6 +30,7 @@ COGS = [
     "cogs.access",
     "cogs.custom",
     "cogs.progress",
+    "cogs.bonds",
     "cogs.admin",
     "cogs.settings",
     "cogs.help",

@@ -45,6 +45,14 @@ TOWER_FLOORS = [
 
 MAX_FLOOR = len(TOWER_FLOORS)
 
+# Naming one character your soulmate is free and reversible, so the perk is
+# small - it is a statement, not a build.
+SOULMATE_PERK = {"grab_percent": 5, "daily_percent": 5}
+
+# What each key level adds to a character's worth, for whoever owns them.
+KEY_STEP_PERCENT = 15
+MAX_KEY_LEVEL = 5
+
 EMPTY = {
     "rolls": 0,
     "grab_percent": 0,
@@ -101,11 +109,19 @@ def effective(db, guild_id: int, user_id: int) -> dict:
     """Every perk a player currently has, from badges and their tower."""
     owned = db.badges_of(guild_id, user_id)
     badge_perks = [BADGES_BY_KEY[key][5] for key in owned if key in BADGES_BY_KEY]
-    floor = db.get_player(guild_id, user_id)["tower_floor"]
-    result = combine(*badge_perks, tower_perks(floor))
+    player = db.get_player(guild_id, user_id)
+    sources = [*badge_perks, tower_perks(player["tower_floor"])]
+    if player["soulmate_id"]:
+        sources.append(SOULMATE_PERK)
+    result = combine(*sources)
     # A claim that costs nothing to wait for would break the claim economy.
     result["claim_percent"] = min(result["claim_percent"], 60)
     return result
+
+
+def key_multiplier(level: int) -> float:
+    """How much a keyed character is worth, as a multiplier."""
+    return 1 + KEY_STEP_PERCENT * max(0, min(level, MAX_KEY_LEVEL)) / 100
 
 
 def bar(done: int, total: int, width: int = 10) -> str:

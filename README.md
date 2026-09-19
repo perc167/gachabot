@@ -174,6 +174,8 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$badges` / `$buybadge <name>` | One-off perks bought with karuda |
 | `$kt` / `$ktup` / `$toptower` | The karuda tower, climbed a floor at a time |
 | `$perks` | What your badges and tower add up to |
+| `$setsoulmate` / `$soulmate` / `$soulmates` | Name one character your soulmate |
+| `$key` / `$keys` / `$keyed` | Spend keys to raise a character's value |
 | `$pool` | Pool size and most-liked characters |
 | `$missingart [series]` | Characters that still need artwork |
 | `$setimage <id> <url>` | Give a character its art (owner-only) |
@@ -381,6 +383,20 @@ percentage, wishlist size and daily payouts — rather than being a number on a
 profile. A fully kitted player rolls about half again as often as a new one,
 not ten times, and the claim reduction is capped at 60% so the cooldown never
 disappears.
+
+## Soulmates and keys
+
+**A soulmate** is one character you single out with `$setsoulmate`, picked
+from your harem. They carry a 💖 on their card, appear on `$soulmates`, and
+grant a small perk (+5% grab, +5% daily) — a statement rather than a build.
+Free and reversible. If you trade them away the card says so, rather than
+quietly pretending the bond still holds.
+
+**Keys** raise a character's worth. One comes with every tower floor you
+climb; `$key` spends one on a character you own, adding +15% to their value
+per level up to five levels. `$keys` shows what you hold, `$keyed` what you
+have spent them on. Key levels are per server and follow the character, so a
+keyed character is worth more to whoever owns them.
 
 ## Custom characters
 

@@ -51,6 +51,13 @@ def shard_icon(key: str) -> str:
     return str(emoji) if emoji else fallback
 
 
+def value_with_keys(db, guild_id: int, character, rate_percent: int) -> int:
+    """A character's worth including any keys spent on them here."""
+    level = db.key_level(guild_id, character["id"])
+    return max(1, int(karuda_value(character, rate_percent)
+                      * perks.key_multiplier(level)))
+
+
 def karuda_value(character, rate_percent: int) -> int:
     """base_karuda already encodes how famous the character is, so the only
     adjustment is the server's own rate."""
@@ -162,9 +169,12 @@ def character_embed(
 
     # Three short inline fields read as columns rather than a wall of bullets.
     icon = shard_icon(config.SHARD_TYPES[0][0])
+    level = db.key_level(guild_id, character["id"])
+    worth = value_with_keys(db, guild_id, character, rate)
     embed.add_field(
         name="Value",
-        value=f"{icon} **{karuda_value(character, rate):,}**",
+        value=f"{icon} **{worth:,}**"
+              + (f"\n\U0001f511 ×{level}" if level else ""),
         inline=True,
     )
     if character["claim_rank"] or character["like_rank"]:
@@ -190,7 +200,11 @@ def character_embed(
         embed.add_field(name="​", value="\n".join(extras), inline=True)
 
     if owner_id:
-        embed.add_field(name="Belongs to", value=f"<@{owner_id}>", inline=False)
+        hearts = db.soulmate_holders(guild_id, character["id"])
+        mark = " \U0001f496" if owner_id in hearts else ""
+        embed.add_field(
+            name="Belongs to", value=f"<@{owner_id}>{mark}", inline=False
+        )
 
     if footer:
         embed.set_footer(text=footer)

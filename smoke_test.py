@@ -810,6 +810,51 @@ async def main():
           any(r["user_id"] == CLIMBER for r in db.top_towers(GUILD))
           or db.get_player(GUILD, CLIMBER)["tower_floor"] == 0)
 
+    # 20l. Keys raise a character's worth for whoever owns them.
+    KEYER = 888
+    keyed_char = by_rank[20]
+    rate_now = db.get_setting(GUILD, "karuda_rate")
+    plain_worth = utils.value_with_keys(db, GUILD, keyed_char, rate_now)
+    check("an unkeyed character is worth its base",
+          plain_worth == utils.karuda_value(keyed_char, rate_now))
+    check("keys start at zero", db.key_level(GUILD, keyed_char["id"]) == 0)
+
+    check("keys are granted", db.add_keys(GUILD, KEYER, 3) == 3)
+    check("keys are spent", db.add_keys(GUILD, KEYER, -1) == 2)
+    check("keys never go negative", db.add_keys(GUILD, KEYER, -99) == 0)
+
+    db.raise_key_level(GUILD, keyed_char["id"])
+    check("key level rises", db.key_level(GUILD, keyed_char["id"]) == 1)
+    keyed_worth = utils.value_with_keys(db, GUILD, keyed_char, rate_now)
+    check("a keyed character is worth more", keyed_worth > plain_worth,
+          f"{keyed_worth} vs {plain_worth}")
+    check("key levels are per server", db.key_level(999, keyed_char["id"]) == 0)
+    check("key multiplier caps out",
+          perksmod.key_multiplier(99)
+          == perksmod.key_multiplier(perksmod.MAX_KEY_LEVEL))
+    check("card shows the key level",
+          "🔑" in " ".join(
+              str(f.value) for f in utils.character_embed(db, GUILD, keyed_char).fields
+          ))
+
+    # 20m. Soulmates.
+    check("no soulmate by default", db.soulmate_of(GUILD, KEYER) is None)
+    db.claim(GUILD, keyed_char["id"], KEYER)
+    db.set_soulmate(GUILD, KEYER, keyed_char["id"])
+    mate = db.soulmate_of(GUILD, KEYER)
+    check("soulmate stored", mate and mate["id"] == keyed_char["id"])
+    check("soulmate holder found",
+          KEYER in db.soulmate_holders(GUILD, keyed_char["id"]))
+    check("soulmate is per server", db.soulmate_of(999, KEYER) is None)
+    check("soulmate grants its perk",
+          perksmod.effective(db, GUILD, KEYER)["grab_percent"]
+          >= perksmod.SOULMATE_PERK["grab_percent"])
+    db.set_soulmate(GUILD, KEYER, 0)
+    check("soulmate cleared", db.soulmate_of(GUILD, KEYER) is None)
+    check("perk goes with it",
+          perksmod.effective(db, GUILD, KEYER)["grab_percent"] == 0)
+    db.divorce(GUILD, keyed_char["id"], KEYER)
+
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)
     check("shard pull increments", db.record_shard(GUILD, ALICE, "prism") == 2)
