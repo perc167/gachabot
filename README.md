@@ -177,6 +177,14 @@ are earned by players over time and deliberately do *not* decide the tier, so a
 brand new pool still shows a full spread of Common through Mythic. Thresholds
 and colours live in `RARITY_TIERS` in `config.py`.
 
+Rarity does **not** change your odds of rolling someone. Rolls are a flat,
+uniform pick across the pool, so every character is equally likely and a tier
+is a statement about what they are *worth*, not how hard they are to find. This
+is deliberate, and it is what Mudae does — rarity there expresses itself
+through kakera payouts and through who gets to the Claim button first. If you
+ever want weighted rolls instead, the change is a weight per tier applied in
+`Database.random_character`.
+
 **Wishes.** When a wished character rolls, every wisher gets pinged, and for
 `wish_protect_seconds` only wishers may press Claim. Wishes are consumed once
 the character is claimed.
