@@ -12,6 +12,7 @@ from discord.ext import commands
 
 import config
 import utils
+from db import DuplicateCharacter
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "characters.json")
 FIELDS = ("name", "series", "image_url", "likes", "base_kakera")
@@ -84,7 +85,18 @@ class Admin(commands.Cog):
             except ValueError:
                 await ctx.send(f"{field} must be a whole number.")
                 return
-        self.bot.db.update_character(character_id, **{field: value})
+        try:
+            self.bot.db.update_character(character_id, **{field: value})
+        except DuplicateCharacter:
+            current = self.bot.db.get_character(character_id)
+            name = value if field == "name" else current["name"]
+            series = value if field == "series" else current["series"]
+            await ctx.send(
+                f"**{name}** already exists in **{series}**. A name can only"
+                " appear once per series — rename the other entry, or use"
+                f" `{ctx.prefix}delchar` if it is a duplicate."
+            )
+            return
         await ctx.send(f"Updated `{character_id}`: {field} = {value}")
 
     @commands.command(name="setimage", aliases=["setart", "img"])
@@ -113,13 +125,14 @@ class Admin(commands.Cog):
             return
 
         self.bot.db.update_character(character_id, image_url=url)
+        # Usable in a DM, so guild-specific bits fall back to defaults.
+        preview_guild = ctx.guild.id if ctx.guild else 0
         embed = utils.character_embed(
-            self.bot.db, ctx.guild.id, self.bot.db.get_character(character_id)
+            self.bot.db, preview_guild, self.bot.db.get_character(character_id)
         )
         await ctx.send(f"Art set for **{character['name']}**.", embed=embed)
 
     @commands.command(name="missingart", aliases=["noart"])
-    @commands.guild_only()
     async def missingart(self, ctx, *, series: str = None):
         """Which characters still have no image. Optionally filter by series."""
         db = self.bot.db

@@ -153,6 +153,42 @@
     "anilist_id": 80
   },
   {
+    "name": "Lucy Heartfilia",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5186-izgXf2S86K9u.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 5186
+  },
+  {
+    "name": "Natsu Dragneel",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5187-y1OEdRu9sPN2.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 5187
+  },
+  {
+    "name": "Artoria Pendragon",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b497-Yg5pNmC8kxzs.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 497
+  },
+  {
+    "name": "Frieren",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b176754-PCnpqIOkjhFk.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 176754
+  },
+  {
     "name": "Edward Elric",
     "series": "Fullmetal Alchemist: Brotherhood",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b11-TA5Nuk7EDUZG.jpg",
@@ -160,6 +196,24 @@
     "base_kakera": 99,
     "source": "AniList",
     "anilist_id": 11
+  },
+  {
+    "name": "Shoyo Hinata",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b64769-WoWlCMLLgJ14.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 64769
+  },
+  {
+    "name": "Tobio Kageyama",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b64771-BuCVs7B8bBdh.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 64771
   },
   {
     "name": "Gon Freecss",
@@ -180,6 +234,24 @@
     "anilist_id": 27
   },
   {
+    "name": "Dio Brando",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4004-w0OtWuvjhftG.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 4004
+  },
+  {
+    "name": "Jotaro Kujo",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4003-gWDSEGbeOAll.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 4003
+  },
+  {
     "name": "Satoru Gojo",
     "series": "Jujutsu Kaisen",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b127691-9zqh1xpIubn7.png",
@@ -196,6 +268,24 @@
     "base_kakera": 99,
     "source": "AniList",
     "anilist_id": 127212
+  },
+  {
+    "name": "Kaguya Shinomiya",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b120649-NPaWaIpWy60E.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 120649
+  },
+  {
+    "name": "Miyuki Shirogane",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121101-Q8HzKP15At2d.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 121101
   },
   {
     "name": "Izuku Midoriya",
@@ -234,6 +324,33 @@
     "anilist_id": 89
   },
   {
+    "name": "Saitama",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b73935-ON5d0mAcrItd.jpg",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 73935
+  },
+  {
+    "name": "Ai Hoshino",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b172759-cccVhJ2fQA92.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 172759
+  },
+  {
+    "name": "Aqua Hoshino",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b183885-HOmw8CqcJdv3.jpg",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 183885
+  },
+  {
     "name": "Usagi Tsukino",
     "series": "Sailor Moon",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2030-GQvVYPEYkXCy.jpg",
@@ -270,6 +387,33 @@
     "anilist_id": 138102
   },
   {
+    "name": "Asuna",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b36828-j5ib0adAzGMx.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 36828
+  },
+  {
+    "name": "Kirito",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b36765-BnLbXg0Tzzh9.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 36765
+  },
+  {
+    "name": "Ken Kaneki",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b87275-mb13EWZBdbh3.png",
+    "likes": 0,
+    "base_kakera": 99,
+    "source": "AniList",
+    "anilist_id": 87275
+  },
+  {
     "name": "Armin Arlert",
     "series": "Attack on Titan",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46494-g7xYYuBtYPnO.png",
@@ -279,6 +423,24 @@
     "anilist_id": 46494
   },
   {
+    "name": "Erwin Smith",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46496-Mu86MENd5wNB.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 46496
+  },
+  {
+    "name": "Hange Zoe",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71121-7R7CnQd3lHgt.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 71121
+  },
+  {
     "name": "Levi Ackerman",
     "series": "Attack on Titan",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b45627-CR68RyZmddGG.png",
@@ -286,6 +448,24 @@
     "base_kakera": 98,
     "source": "AniList",
     "anilist_id": 45627
+  },
+  {
+    "name": "Reiner Braun",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46484-P6A2GjNQn49F.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 46484
+  },
+  {
+    "name": "Zeke Yeager",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b125661-FiqFvAtNlL0v.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 125661
   },
   {
     "name": "Giyu Tomioka",
@@ -315,6 +495,15 @@
     "anilist_id": 129133
   },
   {
+    "name": "Muzan Kibutsuji",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b129132-4nIZakUZ1o8W.jpg",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 129132
+  },
+  {
     "name": "Shinobu Kocho",
     "series": "Demon Slayer",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b136070-MC9LLxJsHyHE.png",
@@ -331,6 +520,15 @@
     "base_kakera": 98,
     "source": "AniList",
     "anilist_id": 129131
+  },
+  {
+    "name": "Beerus",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b76348-pGWrznfxgPIV.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 76348
   },
   {
     "name": "Bulma",
@@ -351,6 +549,15 @@
     "anilist_id": 3694
   },
   {
+    "name": "Krillin",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2159-qtEuMYyOUkwY.jpg",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 2159
+  },
+  {
     "name": "Piccolo",
     "series": "Dragon Ball",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b914-KuS8AWjqBrqa.jpg",
@@ -367,6 +574,15 @@
     "base_kakera": 98,
     "source": "AniList",
     "anilist_id": 2093
+  },
+  {
+    "name": "Trunks",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2707-YKWmn4q87oF8.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 2707
   },
   {
     "name": "Hinata Hyuga",
@@ -405,6 +621,15 @@
     "anilist_id": 85
   },
   {
+    "name": "Orochimaru",
+    "series": "Naruto",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n2455-V9tLMS3TIgJW.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 2455
+  },
+  {
     "name": "Sakura Haruno",
     "series": "Naruto",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b145-IorfpI8arxeX.png",
@@ -412,6 +637,33 @@
     "base_kakera": 98,
     "source": "AniList",
     "anilist_id": 145
+  },
+  {
+    "name": "Tsunade",
+    "series": "Naruto",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2767-r61Cj9v8I0wl.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 2767
+  },
+  {
+    "name": "Brook",
+    "series": "One Piece",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5627-av8oD3zhKvDl.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 5627
+  },
+  {
+    "name": "Franky",
+    "series": "One Piece",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n64-ChX6ZzHHjXqA.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 64
   },
   {
     "name": "Nami",
@@ -459,6 +711,15 @@
     "anilist_id": 305
   },
   {
+    "name": "Usopp",
+    "series": "One Piece",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b724-GFGgI9AJQkfy.jpg",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 724
+  },
+  {
     "name": "Brock",
     "series": "Pokemon",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b3854-qMVUF2YmWYoW.png",
@@ -466,6 +727,33 @@
     "base_kakera": 98,
     "source": "AniList",
     "anilist_id": 3854
+  },
+  {
+    "name": "Dawn",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b3966-Kz88gYqc5EcL.jpg",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 3966
+  },
+  {
+    "name": "Gary Oak",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4848-vR9au1dEKjyy.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 4848
+  },
+  {
+    "name": "May",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b6841-vUR3HtNi4WbU.png",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 6841
   },
   {
     "name": "Misty",
@@ -477,6 +765,15 @@
     "anilist_id": 2909
   },
   {
+    "name": "Serena",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b87632-CmNJcY4TdybY.jpg",
+    "likes": 0,
+    "base_kakera": 98,
+    "source": "AniList",
+    "anilist_id": 87632
+  },
+  {
     "name": "Annie Leonhart",
     "series": "Attack on Titan",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46490-tan274Ifc1Jf.jpg",
@@ -486,13 +783,22 @@
     "anilist_id": 46490
   },
   {
-    "name": "Erwin Smith",
+    "name": "Bertholdt Hoover",
     "series": "Attack on Titan",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46496-Mu86MENd5wNB.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46488-wm6HvkdkHoZu.jpg",
     "likes": 0,
     "base_kakera": 86,
     "source": "AniList",
-    "anilist_id": 46496
+    "anilist_id": 46488
+  },
+  {
+    "name": "Connie Springer",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n46486-izhPjzut6WCZ.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 46486
   },
   {
     "name": "Historia Reiss",
@@ -504,6 +810,24 @@
     "anilist_id": 62481
   },
   {
+    "name": "Jean Kirstein",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b46498-ritqAj9FW6jX.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 46498
+  },
+  {
+    "name": "Kenny Ackerman",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/127443-aVMXGOchpsvj.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 127443
+  },
+  {
     "name": "Sasha Blouse",
     "series": "Attack on Titan",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b45887-QPtJH0KwqthW.jpg",
@@ -511,6 +835,42 @@
     "base_kakera": 86,
     "source": "AniList",
     "anilist_id": 45887
+  },
+  {
+    "name": "Ymir",
+    "series": "Attack on Titan",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71479-huCD908XIdqv.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 71479
+  },
+  {
+    "name": "Akaza",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b141694-0COi0GVXPuEn.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 141694
+  },
+  {
+    "name": "Gyomei Himejima",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b137778-H4Uzb9cSCvZ6.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 137778
+  },
+  {
+    "name": "Kanao Tsuyuri",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b139038-OcOoDUyLEsRn.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 139038
   },
   {
     "name": "Mitsuri Kanroji",
@@ -522,22 +882,103 @@
     "anilist_id": 136072
   },
   {
-    "name": "Krillin",
-    "series": "Dragon Ball",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2159-qtEuMYyOUkwY.jpg",
+    "name": "Muichiro Tokito",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b136069-6PLglx4tETUX.png",
     "likes": 0,
     "base_kakera": 86,
     "source": "AniList",
-    "anilist_id": 2159
+    "anilist_id": 136069
   },
   {
-    "name": "Trunks",
-    "series": "Dragon Ball",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2707-YKWmn4q87oF8.png",
+    "name": "Obanai Iguro",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b137777-kGViiNyx0wa7.jpg",
     "likes": 0,
     "base_kakera": 86,
     "source": "AniList",
-    "anilist_id": 2707
+    "anilist_id": 137777
+  },
+  {
+    "name": "Sanemi Shinazugawa",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b137774-O1iYrnGLB71l.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 137774
+  },
+  {
+    "name": "Tengen Uzui",
+    "series": "Demon Slayer",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b136071-99Kexnnn2PiV.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 136071
+  },
+  {
+    "name": "Android 18",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4318-HfIy9rOIOZXM.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 4318
+  },
+  {
+    "name": "Cell",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/3908.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 3908
+  },
+  {
+    "name": "Chi-Chi",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/2102.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 2102
+  },
+  {
+    "name": "Majin Buu",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/1012.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 1012
+  },
+  {
+    "name": "Master Roshi",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b6167-aMPt1bHf5YbV.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 6167
+  },
+  {
+    "name": "Son Goten",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/2551.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 2551
+  },
+  {
+    "name": "Tien Shinhan",
+    "series": "Dragon Ball",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5499-Cn9kTD2J9dU5.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 5499
   },
   {
     "name": "Gaara",
@@ -558,6 +999,33 @@
     "anilist_id": 53901
   },
   {
+    "name": "Minato Namikaze",
+    "series": "Naruto",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2535-Xq9WKNPJQEt3.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 2535
+  },
+  {
+    "name": "Neji Hyuga",
+    "series": "Naruto",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1694-TL4obouDwJ7k.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 1694
+  },
+  {
+    "name": "Obito Uchiha",
+    "series": "Naruto",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b3149-j6cl8A9yup51.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 3149
+  },
+  {
     "name": "Rock Lee",
     "series": "Naruto",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b306-oUTOO45xInXt.png",
@@ -567,6 +1035,15 @@
     "anilist_id": 306
   },
   {
+    "name": "Shikamaru Nara",
+    "series": "Naruto",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2007-QaesJlIZDifj.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 2007
+  },
+  {
     "name": "Boa Hancock",
     "series": "One Piece",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b16342-kVOF6V5Q94go.png",
@@ -574,6 +1051,33 @@
     "base_kakera": 86,
     "source": "AniList",
     "anilist_id": 16342
+  },
+  {
+    "name": "Dracule Mihawk",
+    "series": "One Piece",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n2064-OpnF4nLi6bvL.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 2064
+  },
+  {
+    "name": "Jinbe",
+    "series": "One Piece",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b18938-yZANEfjsVhW4.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 18938
+  },
+  {
+    "name": "Sabo",
+    "series": "One Piece",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b32893-3weZS61cdwLD.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 32893
   },
   {
     "name": "Shanks",
@@ -603,13 +1107,31 @@
     "anilist_id": 13767
   },
   {
-    "name": "Gary Oak",
+    "name": "Charizard",
     "series": "Pokemon",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4848-vR9au1dEKjyy.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b180037-u3b2oiaWdfAm.png",
     "likes": 0,
     "base_kakera": 86,
     "source": "AniList",
-    "anilist_id": 4848
+    "anilist_id": 180037
+  },
+  {
+    "name": "Cynthia",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b17947-snK9qbmCzKdY.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 17947
+  },
+  {
+    "name": "Eevee",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b135979-8fTB1j4rvc9E.jpg",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 135979
   },
   {
     "name": "James",
@@ -630,13 +1152,85 @@
     "anilist_id": 3935
   },
   {
-    "name": "Serena",
+    "name": "Meowth",
     "series": "Pokemon",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b87632-CmNJcY4TdybY.jpg",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b3937-qBtTAn2SZqhB.png",
     "likes": 0,
     "base_kakera": 86,
     "source": "AniList",
-    "anilist_id": 87632
+    "anilist_id": 3937
+  },
+  {
+    "name": "Mewtwo",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5113-hDiwLUwrbz6q.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 5113
+  },
+  {
+    "name": "Red",
+    "series": "Pokemon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b7035-UOomO6GYxALT.png",
+    "likes": 0,
+    "base_kakera": 86,
+    "source": "AniList",
+    "anilist_id": 7035
+  },
+  {
+    "name": "Koro-sensei",
+    "series": "Assassination Classroom",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b65643-jimrOw0RGtoB.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 65643
+  },
+  {
+    "name": "Nagisa Shiota",
+    "series": "Assassination Classroom",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b65645-nWH4mBMW5lYw.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 65645
+  },
+  {
+    "name": "Asta",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b123285-tKijiuQErDS0.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 123285
+  },
+  {
+    "name": "Yuno",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b123284-w6kIFYnTclMd.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 123284
+  },
+  {
+    "name": "Yoichi Isagi",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b140856-wVzKSyvU7R5B.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 140856
+  },
+  {
+    "name": "Hitori Gotou",
+    "series": "Bocchi the Rock!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b257562-Ru35NYPfsqhY.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 257562
   },
   {
     "name": "C.C.",
@@ -664,6 +1258,51 @@
     "base_kakera": 85,
     "source": "AniList",
     "anilist_id": 1
+  },
+  {
+    "name": "Senku Ishigami",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124142-XUO1g7wRqkaT.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 124142
+  },
+  {
+    "name": "Kazuma Satou",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89364-7Th8Tv1XKJtt.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 89364
+  },
+  {
+    "name": "Shigeo Kageyama",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89616-dXmdOc7L6SDi.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 89616
+  },
+  {
+    "name": "Koyomi Araragi",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b22036-Ed3CjwPlDLp4.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 22036
+  },
+  {
+    "name": "Ainz Ooal Gown",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89103-ZsnA0r77GHsR.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 89103
   },
   {
     "name": "Emilia",
@@ -711,6 +1350,42 @@
     "anilist_id": 35252
   },
   {
+    "name": "Emma",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121725-LQciVJOjnMVh.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 121725
+  },
+  {
+    "name": "Ryuuji Takasu",
+    "series": "Toradora!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12295-d45uTNeJHuus.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 12295
+  },
+  {
+    "name": "Taiga Aisaka",
+    "series": "Toradora!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12064-7PDN3ylIeAZn.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 12064
+  },
+  {
+    "name": "Thorfinn",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b172744-HlcZi9Md6N6T.png",
+    "likes": 0,
+    "base_kakera": 85,
+    "source": "AniList",
+    "anilist_id": 172744
+  },
+  {
     "name": "Byakuya Kuchiki",
     "series": "Bleach",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b907-kgnDKeMtEN5y.png",
@@ -756,6 +1431,15 @@
     "anilist_id": 137081
   },
   {
+    "name": "Kishibe",
+    "series": "Chainsaw Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b144593-hdCTT9t54z0s.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 144593
+  },
+  {
     "name": "Power",
     "series": "Chainsaw Man",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b137079-6yLEUYR3bmpr.png",
@@ -763,6 +1447,24 @@
     "base_kakera": 82,
     "source": "AniList",
     "anilist_id": 137079
+  },
+  {
+    "name": "Reze",
+    "series": "Chainsaw Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b148740-ceAibPxLW8rR.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 148740
+  },
+  {
+    "name": "Mello",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b463-QBLeLf6XxVg6.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 463
   },
   {
     "name": "Misa Amane",
@@ -774,6 +1476,15 @@
     "anilist_id": 835
   },
   {
+    "name": "Near",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n464-6KeJpU6g7Hwj.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 464
+  },
+  {
     "name": "Ryuk",
     "series": "Death Note",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b75-IkEpzO21LgFy.jpg",
@@ -781,6 +1492,123 @@
     "base_kakera": 82,
     "source": "AniList",
     "anilist_id": 75
+  },
+  {
+    "name": "Erza Scarlet",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5189-GR1xdok9SFsN.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 5189
+  },
+  {
+    "name": "Gray Fullbuster",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4839-p2SBgjdTxHxk.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 4839
+  },
+  {
+    "name": "Juvia Lockser",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b9719-xh4xqTV6byNl.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 9719
+  },
+  {
+    "name": "Wendy Marvell",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b28886-unO1rEi3zdyF.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 28886
+  },
+  {
+    "name": "Illyasviel von Einzbern",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b503-SmS87yq6l2tD.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 503
+  },
+  {
+    "name": "Rin Tohsaka",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b498-lwawtSpLyATL.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 498
+  },
+  {
+    "name": "Sakura Matou",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b500-NQrLbnBr1sDv.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 500
+  },
+  {
+    "name": "Shirou Emiya",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b496-GI0waavDjyk3.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 496
+  },
+  {
+    "name": "Eisen",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b184312-kxd5H6iOHIq4.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 184312
+  },
+  {
+    "name": "Fern",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b183965-uGFohBjlFoTp.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 183965
+  },
+  {
+    "name": "Heiter",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b184310-tiXvrq4FINXP.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 184310
+  },
+  {
+    "name": "Himmel",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b184311-wQFySqYXEqf1.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 184311
+  },
+  {
+    "name": "Stark",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b184313-CQl6GSt4RSny.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 184313
   },
   {
     "name": "Alphonse Elric",
@@ -810,6 +1638,15 @@
     "anilist_id": 68
   },
   {
+    "name": "Scar",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b66-bLbGWXrmDqfV.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 66
+  },
+  {
     "name": "Winry Rockbell",
     "series": "Fullmetal Alchemist: Brotherhood",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/63-xloedtYxiJ2E.jpg",
@@ -817,6 +1654,51 @@
     "base_kakera": 82,
     "source": "AniList",
     "anilist_id": 63
+  },
+  {
+    "name": "Daichi Sawamura",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b67323-yFbLDAfJ5ysG.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 67323
+  },
+  {
+    "name": "Kei Tsukishima",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b67329-k7mDdqQ6rJ4w.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 67329
+  },
+  {
+    "name": "Koushi Sugawara",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b67321-cxP7NdI0JC3H.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 67321
+  },
+  {
+    "name": "Tooru Oikawa",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71611-cUZwVfzeNXD9.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 71611
+  },
+  {
+    "name": "Chrollo Lucilfer",
+    "series": "Hunter x Hunter",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b58-USOmsz3nursi.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 58
   },
   {
     "name": "Hisoka Morow",
@@ -846,6 +1728,51 @@
     "anilist_id": 29
   },
   {
+    "name": "Giorno Giovanna",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b10529-AloL8jjZwjsg.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 10529
+  },
+  {
+    "name": "Jonathan Joestar",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b8087-GTrObHQvujB5.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 8087
+  },
+  {
+    "name": "Joseph Joestar",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b6356-RImEfUfHpC58.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 6356
+  },
+  {
+    "name": "Josuke Higashikata",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13085-CkmgXL7SSLxL.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 13085
+  },
+  {
+    "name": "Maki Zenin",
+    "series": "Jujutsu Kaisen",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b134167-5TCytk45YByD.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 134167
+  },
+  {
     "name": "Megumi Fushiguro",
     "series": "Jujutsu Kaisen",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b126635-L0y3I92JSUkN.png",
@@ -871,6 +1798,42 @@
     "base_kakera": 82,
     "source": "AniList",
     "anilist_id": 133701
+  },
+  {
+    "name": "Ai Hayasaka",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121104-7TYRl3EEsDYU.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 121104
+  },
+  {
+    "name": "Chika Fujiwara",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121103-UGLxT8utLPnq.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 121103
+  },
+  {
+    "name": "Miko Iino",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b125886-TQbmqAaSgBLS.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 125886
+  },
+  {
+    "name": "Yu Ishigami",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121102-tiQFxnSEIAwm.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 121102
   },
   {
     "name": "All Might",
@@ -909,6 +1872,24 @@
     "anilist_id": 89220
   },
   {
+    "name": "Tenya Iida",
+    "series": "My Hero Academia",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89222-TL8MQM3wJgEB.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 89222
+  },
+  {
+    "name": "Kaworu Nagisa",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1261-HYRv3HpsSL92.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 1261
+  },
+  {
     "name": "Misato Katsuragi",
     "series": "Neon Genesis Evangelion",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1259-afTQkZ5SVMOn.png",
@@ -916,6 +1897,87 @@
     "base_kakera": 82,
     "source": "AniList",
     "anilist_id": 1259
+  },
+  {
+    "name": "Ritsuko Akagi",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/1251-gLa2Arv5E8a9.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 1251
+  },
+  {
+    "name": "Fubuki",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b81931-fmouMoprPVbV.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 81931
+  },
+  {
+    "name": "Garou",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89277-xBGb4B5YISXg.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 89277
+  },
+  {
+    "name": "Genos",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b73979-tVi9maPID881.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 73979
+  },
+  {
+    "name": "King",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n88907-M7QLjYvp2LEp.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 88907
+  },
+  {
+    "name": "Tatsumaki",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b81929-WPVp2LQoWgkc.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 81929
+  },
+  {
+    "name": "Akane Kurokawa",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b203384-YuSppFDMw2wn.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 203384
+  },
+  {
+    "name": "Kana Arima",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b188783-77orwP7vNuNg.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 188783
+  },
+  {
+    "name": "Ruby Hoshino",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b183884-iyo3BmTuhJ0l.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 183884
   },
   {
     "name": "Ami Mizuno",
@@ -963,6 +2025,150 @@
     "anilist_id": 2367
   },
   {
+    "name": "Fiona Frost",
+    "series": "Spy x Family",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b184936-kVn06kjZly6H.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 184936
+  },
+  {
+    "name": "Sylvia Sherwood",
+    "series": "Spy x Family",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b157887-P66pD0ilpmtZ.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 157887
+  },
+  {
+    "name": "Yuri Briar",
+    "series": "Spy x Family",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b150425-mP852peLh9eS.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 150425
+  },
+  {
+    "name": "Alice Zuberg",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b75450-vDO1lQup1pe7.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 75450
+  },
+  {
+    "name": "Leafa",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b36831-JfyFU7gPPVmr.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 36831
+  },
+  {
+    "name": "Sinon",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b55147-1fCU8lONEuZQ.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 55147
+  },
+  {
+    "name": "Yuuki Konno",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b64523-LPeAiw8Yx517.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 64523
+  },
+  {
+    "name": "Juuzou Suzuya",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88412-sIOJUnIkyFRe.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 88412
+  },
+  {
+    "name": "Kishou Arima",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88946-YbTQAGJAdpoH.jpg",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 88946
+  },
+  {
+    "name": "Rize Kamishiro",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88413-FmAvV0hGSljG.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 88413
+  },
+  {
+    "name": "Shuu Tsukiyama",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88424-mFPgcZlCuODC.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 88424
+  },
+  {
+    "name": "Touka Kirishima",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b87277-oUaqrI1iBzu6.png",
+    "likes": 0,
+    "base_kakera": 82,
+    "source": "AniList",
+    "anilist_id": 87277
+  },
+  {
+    "name": "Guts",
+    "series": "Berserk",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b422-XTaiTuvRohsV.png",
+    "likes": 0,
+    "base_kakera": 75,
+    "source": "AniList",
+    "anilist_id": 422
+  },
+  {
+    "name": "Grimmjow Jaegerjaquez",
+    "series": "Bleach",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1080-JUNo2Or0UGZg.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1080
+  },
+  {
+    "name": "Kenpachi Zaraki",
+    "series": "Bleach",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b909-slhoFBon7oiH.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 909
+  },
+  {
+    "name": "Kisuke Urahara",
+    "series": "Bleach",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b210-mw01NrQfRjzT.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 210
+  },
+  {
     "name": "Toshiro Hitsugaya",
     "series": "Bleach",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b245-buy3Cfn6IFSB.jpg",
@@ -972,6 +2178,15 @@
     "anilist_id": 245
   },
   {
+    "name": "Ulquiorra Cifer",
+    "series": "Bleach",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1081-xLTqHfLL2I2W.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1081
+  },
+  {
     "name": "Yoruichi Shihoin",
     "series": "Bleach",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b908-JSYUkJLCw1f0.png",
@@ -979,6 +2194,24 @@
     "base_kakera": 70,
     "source": "AniList",
     "anilist_id": 908
+  },
+  {
+    "name": "Angel Devil",
+    "series": "Chainsaw Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b152231-jiMRx9je7H6y.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 152231
+  },
+  {
+    "name": "Beam",
+    "series": "Chainsaw Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b157232-5GuWeqoFN9Kq.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 157232
   },
   {
     "name": "Himeno",
@@ -999,31 +2232,247 @@
     "anilist_id": 144594
   },
   {
-    "name": "Reze",
+    "name": "Pochita",
     "series": "Chainsaw Man",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b148740-ceAibPxLW8rR.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b170266-bBXPkNJnd3mg.png",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 148740
+    "anilist_id": 170266
   },
   {
-    "name": "Mello",
-    "series": "Death Note",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b463-QBLeLf6XxVg6.png",
+    "name": "Quanxi",
+    "series": "Chainsaw Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b162123-GmQLb9p2iWxQ.jpg",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 463
+    "anilist_id": 162123
   },
   {
-    "name": "Near",
+    "name": "Kiyomi Takada",
     "series": "Death Note",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n464-6KeJpU6g7Hwj.jpg",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n3765-XmrhzN7qO27e.png",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 464
+    "anilist_id": 3765
+  },
+  {
+    "name": "Naomi Misora",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b4959-DKXw1VYrvael.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 4959
+  },
+  {
+    "name": "Soichiro Yagami",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1927-iaIWrFITyeJw.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1927
+  },
+  {
+    "name": "Teru Mikami",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n1904-xKw2NgiE6VbU.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1904
+  },
+  {
+    "name": "Touta Matsuda",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n1906-JCWKEGGook3Z.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1906
+  },
+  {
+    "name": "Watari",
+    "series": "Death Note",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n2179-qF49l5qEurt5.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 2179
+  },
+  {
+    "name": "Gajeel Redfox",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b16893-l9HhHQ8j09H5.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 16893
+  },
+  {
+    "name": "Happy",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5188-1jTaic3aJ7Ds.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 5188
+  },
+  {
+    "name": "Laxus Dreyar",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b8294-24LS3f4VMrfs.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 8294
+  },
+  {
+    "name": "Levy McGarden",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b29493-XcqFX69oipzX.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 29493
+  },
+  {
+    "name": "Mirajane Strauss",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5190-Xql1rGKUv1ql.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 5190
+  },
+  {
+    "name": "Zeref Dragneel",
+    "series": "Fairy Tail",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/37720-WfpaYoeW2OkV.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 37720
+  },
+  {
+    "name": "Gilgamesh",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2514-hnE6LEdqm7Su.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 2514
+  },
+  {
+    "name": "Kirei Kotomine",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b506-qeg0TqitdCMS.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 506
+  },
+  {
+    "name": "Shinji Matou",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b501-yg63fxGVC6cK.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 501
+  },
+  {
+    "name": "Taiga Fujimura",
+    "series": "Fate/stay night",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b505-QL0cNIE6Q0RI.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 505
+  },
+  {
+    "name": "Aura",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b219110-LEB5T4oG0gel.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 219110
+  },
+  {
+    "name": "Denken",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b246058-FOtuSIUBQ4WJ.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 246058
+  },
+  {
+    "name": "Sein",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b205177-hLV4nVQjoBIC.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 205177
+  },
+  {
+    "name": "Serie",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b219734-aS4UMAb16DGd.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 219734
+  },
+  {
+    "name": "Ubel",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b246057-ixvDfpng6I1S.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 246057
+  },
+  {
+    "name": "Wirbel",
+    "series": "Frieren: Beyond Journey's End",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b321716-ORxrJOHaI4H4.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 321716
+  },
+  {
+    "name": "Envy",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b651-S4mzVOTMzej6.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 651
+  },
+  {
+    "name": "Greed",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b351-XMQzTuMy2Xtn.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 351
+  },
+  {
+    "name": "Lan Fan",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b3292-aK72k3syf1qP.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 3292
   },
   {
     "name": "Ling Yao",
@@ -1035,6 +2484,15 @@
     "anilist_id": 3293
   },
   {
+    "name": "Maes Hughes",
+    "series": "Fullmetal Alchemist: Brotherhood",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b69-MRetSG8Qevvu.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 69
+  },
+  {
     "name": "Olivier Mira Armstrong",
     "series": "Fullmetal Alchemist: Brotherhood",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n3934-MKTV6tQeP8T3.png",
@@ -1042,6 +2500,60 @@
     "base_kakera": 70,
     "source": "AniList",
     "anilist_id": 3934
+  },
+  {
+    "name": "Asahi Azumane",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b67333-on5KXeKxZqKs.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 67333
+  },
+  {
+    "name": "Kenma Kozume",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71267-q44J2MXMinXD.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 71267
+  },
+  {
+    "name": "Koutarou Bokuto",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88937-2GSqkX9TIzYy.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 88937
+  },
+  {
+    "name": "Tetsurou Kuroo",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71269-pi9vjyxKPFAu.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 71269
+  },
+  {
+    "name": "Wakatoshi Ushijima",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b76816-sS6LcPRxisQ9.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 76816
+  },
+  {
+    "name": "Yuu Nishinoya",
+    "series": "Haikyuu!!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b67327-zQb1dlC7joPb.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 67327
   },
   {
     "name": "Biscuit Krueger",
@@ -1053,13 +2565,103 @@
     "anilist_id": 13898
   },
   {
-    "name": "Chrollo Lucilfer",
+    "name": "Feitan",
     "series": "Hunter x Hunter",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b58-USOmsz3nursi.jpg",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/3195.jpg",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 58
+    "anilist_id": 3195
+  },
+  {
+    "name": "Illumi Zoldyck",
+    "series": "Hunter x Hunter",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b57-pTFguojSOQZW.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 57
+  },
+  {
+    "name": "Kite",
+    "series": "Hunter x Hunter",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b20594-QQJBR3LYobbv.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 20594
+  },
+  {
+    "name": "Machi",
+    "series": "Hunter x Hunter",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5830-IEl8BCasHZvG.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 5830
+  },
+  {
+    "name": "Meruem",
+    "series": "Hunter x Hunter",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b23277-EYmIxzL64Mji.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 23277
+  },
+  {
+    "name": "Bruno Bucciarati",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13045-TIpIF82cMkG9.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 13045
+  },
+  {
+    "name": "Caesar Zeppeli",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b21959-Cm9Rlh0EFAQw.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 21959
+  },
+  {
+    "name": "Jolyne Cujoh",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b11222-Se9QoJHDSeYY.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 11222
+  },
+  {
+    "name": "Noriaki Kakyoin",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/8945-gyPfrVpCb5CF.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 8945
+  },
+  {
+    "name": "Rohan Kishibe",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12659-hgT3g7q7oHnU.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 12659
+  },
+  {
+    "name": "Yoshikage Kira",
+    "series": "JoJo's Bizarre Adventure",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12055-eCEkIVV4qoCu.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 12055
   },
   {
     "name": "Kento Nanami",
@@ -1071,13 +2673,22 @@
     "anilist_id": 133704
   },
   {
-    "name": "Maki Zenin",
+    "name": "Panda",
     "series": "Jujutsu Kaisen",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b134167-5TCytk45YByD.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b137974-9qnK3DPrvLKh.jpg",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 134167
+    "anilist_id": 137974
+  },
+  {
+    "name": "Suguru Geto",
+    "series": "Jujutsu Kaisen",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b133699-FCnXaISgazAi.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 133699
   },
   {
     "name": "Toge Inumaki",
@@ -1087,6 +2698,69 @@
     "base_kakera": 70,
     "source": "AniList",
     "anilist_id": 157115
+  },
+  {
+    "name": "Toji Fushiguro",
+    "series": "Jujutsu Kaisen",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b162722-btzdghBizxKS.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 162722
+  },
+  {
+    "name": "Yuta Okkotsu",
+    "series": "Jujutsu Kaisen",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b129571-GHJk7gviHOOw.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 129571
+  },
+  {
+    "name": "Kei Shirogane",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b126144-4fc2sYUVFKOJ.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 126144
+  },
+  {
+    "name": "Maki Shijo",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b134328-s3cEgqb5MEbh.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 134328
+  },
+  {
+    "name": "Nagisa Kashiwagi",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b134330-2b7ad7GPw1Wl.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 134330
+  },
+  {
+    "name": "Tsubame Koyasu",
+    "series": "Kaguya-sama: Love is War",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b134326-GOZE06QSlJSb.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 134326
+  },
+  {
+    "name": "Eijiro Kirishima",
+    "series": "My Hero Academia",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89243-R2WJlNuj3aEs.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 89243
   },
   {
     "name": "Himiko Toga",
@@ -1107,6 +2781,24 @@
     "anilist_id": 89241
   },
   {
+    "name": "Shota Aizawa",
+    "series": "My Hero Academia",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89225-XBgvUhI9naVI.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 89225
+  },
+  {
+    "name": "Tomura Shigaraki",
+    "series": "My Hero Academia",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89226-qGXqFthO4SM3.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 89226
+  },
+  {
     "name": "Tsuyu Asui",
     "series": "My Hero Academia",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89223-5762vburxnlz.png",
@@ -1125,13 +2817,13 @@
     "anilist_id": 1257
   },
   {
-    "name": "Kaworu Nagisa",
+    "name": "Kensuke Aida",
     "series": "Neon Genesis Evangelion",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1261-HYRv3HpsSL92.jpg",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1250-GU74dqhQEaUN.png",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 1261
+    "anilist_id": 1250
   },
   {
     "name": "Mari Makinami",
@@ -1143,6 +2835,105 @@
     "anilist_id": 21512
   },
   {
+    "name": "Ryoji Kaji",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1260-QCPCuARGDhqK.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1260
+  },
+  {
+    "name": "Toji Suzuhara",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1262-srj1373Rz8dI.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1262
+  },
+  {
+    "name": "Yui Ikari",
+    "series": "Neon Genesis Evangelion",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/1258-FiCAgSWsP2Xz.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 1258
+  },
+  {
+    "name": "Bang",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n81141-1ml7Q6X2B508.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 81141
+  },
+  {
+    "name": "Boros",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n89263-GPItRQ64F27D.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 89263
+  },
+  {
+    "name": "Child Emperor",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b137661-G30CrZkCLAWx.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 137661
+  },
+  {
+    "name": "Metal Bat",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89156-kGKJyhWnCTHy.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 89156
+  },
+  {
+    "name": "Mumen Rider",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b81935-NGDgB9J4MMlF.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 81935
+  },
+  {
+    "name": "Zombieman",
+    "series": "One Punch Man",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n133835-7dbqvi4YzpRC.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 133835
+  },
+  {
+    "name": "Mem-cho",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b205434-AuBcR4M05f6s.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 205434
+  },
+  {
+    "name": "Miyako Saitou",
+    "series": "Oshi no Ko",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b223870-60FglagpVtHe.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 223870
+  },
+  {
     "name": "Chibiusa",
     "series": "Sailor Moon",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2827-XDpzQoIQSPL8.jpg",
@@ -1152,6 +2943,15 @@
     "anilist_id": 2827
   },
   {
+    "name": "Haruka Tenou",
+    "series": "Sailor Moon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2830-m2n08NMoFPRy.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 2830
+  },
+  {
     "name": "Hotaru Tomoe",
     "series": "Sailor Moon",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2875-kces9U1sPUNm.png",
@@ -1159,6 +2959,42 @@
     "base_kakera": 70,
     "source": "AniList",
     "anilist_id": 2875
+  },
+  {
+    "name": "Luna",
+    "series": "Sailor Moon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/5407.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 5407
+  },
+  {
+    "name": "Michiru Kaiou",
+    "series": "Sailor Moon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2829-UlgVH6pJExiB.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 2829
+  },
+  {
+    "name": "Setsuna Meiou",
+    "series": "Sailor Moon",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2828-1mJZhqN5Tzoo.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 2828
+  },
+  {
+    "name": "Becky Blackbell",
+    "series": "Spy x Family",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b150423-RxXwrHzeLCss.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 150423
   },
   {
     "name": "Bond Forger",
@@ -1179,13 +3015,229 @@
     "anilist_id": 150424
   },
   {
-    "name": "Yuri Briar",
+    "name": "Franky Franklin",
     "series": "Spy x Family",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b150425-mP852peLh9eS.jpg",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b157888-zkSfIT5Z8y2S.png",
     "likes": 0,
     "base_kakera": 70,
     "source": "AniList",
-    "anilist_id": 150425
+    "anilist_id": 157888
+  },
+  {
+    "name": "Henry Henderson",
+    "series": "Spy x Family",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b180190-iQqPtTS182Et.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 180190
+  },
+  {
+    "name": "Melinda Desmond",
+    "series": "Spy x Family",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b283261-9kCWtabrte3z.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 283261
+  },
+  {
+    "name": "Agil",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b54099-fOi8orxVTHt1.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 54099
+  },
+  {
+    "name": "Eugeo",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b70899-TwMq5mtH5ifc.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 70899
+  },
+  {
+    "name": "Klein",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b36830-41SWIDvhqOo4.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 36830
+  },
+  {
+    "name": "Lisbeth",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b43906-15QwTm2ZFDse.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 43906
+  },
+  {
+    "name": "Silica",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b37681-GDtOAN6NiJ9M.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 37681
+  },
+  {
+    "name": "Yui",
+    "series": "Sword Art Online",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b43892-Ig6ZMdUbQDO2.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 43892
+  },
+  {
+    "name": "Ayato Kirishima",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88411-dI6vqLy4pvHK.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 88411
+  },
+  {
+    "name": "Eto Yoshimura",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b90231-7ZeFK1DbrAxw.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 90231
+  },
+  {
+    "name": "Hideyoshi Nagachika",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88421-F8yaeVfHjwYn.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 88421
+  },
+  {
+    "name": "Hinami Fueguchi",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88293-4J36uyflNWvb.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 88293
+  },
+  {
+    "name": "Koutarou Amon",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88407-YwE6D75Xskxl.png",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 88407
+  },
+  {
+    "name": "Uta",
+    "series": "Tokyo Ghoul",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88414-r2Xd7jJeMrvR.jpg",
+    "likes": 0,
+    "base_kakera": 70,
+    "source": "AniList",
+    "anilist_id": 88414
+  },
+  {
+    "name": "Kaede Kayano",
+    "series": "Assassination Classroom",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/85291-io7X60xBW1LK.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 85291
+  },
+  {
+    "name": "Karma Akabane",
+    "series": "Assassination Classroom",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b71933-HQ1TSjlrJ8Hv.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 71933
+  },
+  {
+    "name": "Noelle Silva",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b123283-7nJHtKha0LSm.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 123283
+  },
+  {
+    "name": "Yami Sukehiro",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124440-Lpdo6y8cljV6.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 124440
+  },
+  {
+    "name": "Meguru Bachira",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b162213-4czykzdxmWG6.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 162213
+  },
+  {
+    "name": "Rin Itoshi",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b169395-oYTkJnimI3Eu.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 169395
+  },
+  {
+    "name": "Seishiro Nagi",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b162969-WGnGyVQrFi0X.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 162969
+  },
+  {
+    "name": "Ikuyo Kita",
+    "series": "Bocchi the Rock!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b266041-1HKgjJGP2MmM.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 266041
+  },
+  {
+    "name": "Nijika Ijichi",
+    "series": "Bocchi the Rock!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b261674-a8tJYvtzqWgC.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 261674
+  },
+  {
+    "name": "Ryou Yamada",
+    "series": "Bocchi the Rock!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b264529-BvEusZnJLD2Y.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 264529
   },
   {
     "name": "Kallen Stadtfeld",
@@ -1195,6 +3247,15 @@
     "base_kakera": 68,
     "source": "AniList",
     "anilist_id": 558
+  },
+  {
+    "name": "Nunnally vi Britannia",
+    "series": "Code Geass",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1110-TSlN2WkhDJ1T.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 1110
   },
   {
     "name": "Suzaku Kururugi",
@@ -1233,6 +3294,141 @@
     "anilist_id": 3
   },
   {
+    "name": "Gen Asagiri",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b127445-oUCyS7Tl8l5D.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 127445
+  },
+  {
+    "name": "Kohaku",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124143-DABUFs3cPNrP.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 124143
+  },
+  {
+    "name": "Taiju Ooki",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124146-TeXd4r0upuIX.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 124146
+  },
+  {
+    "name": "Aqua",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89362-ibkc0eoECaW1.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89362
+  },
+  {
+    "name": "Darkness",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89363-mm21Ll4NegUD.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89363
+  },
+  {
+    "name": "Megumin",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89361-tq8PQQ4MmF0M.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89361
+  },
+  {
+    "name": "Arataka Reigen",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89334-OPj1hCzvrt7X.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89334
+  },
+  {
+    "name": "Ritsu Kageyama",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89618-iSTUyCdu1yZ8.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89618
+  },
+  {
+    "name": "Teruki Hanazawa",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89621-3uLnmhFOGYFv.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89621
+  },
+  {
+    "name": "Hitagi Senjougahara",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b22037-sY7GWSKYr2Nl.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 22037
+  },
+  {
+    "name": "Mayoi Hachikuji",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b22052-beyfl4AyMGhn.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 22052
+  },
+  {
+    "name": "Shinobu Oshino",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b23602-Z4MDNYcoAWZu.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 23602
+  },
+  {
+    "name": "Albedo",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89122-Gj7MBs7F5cMJ.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89122
+  },
+  {
+    "name": "Demiurge",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89125-pnLki4r5UyV5.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89125
+  },
+  {
+    "name": "Shalltear Bloodfallen",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89121-N8hzLH4nfWna.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 89121
+  },
+  {
     "name": "Beatrice",
     "series": "Re:Zero",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b90181-wRPm0OEaucmw.png",
@@ -1251,6 +3447,24 @@
     "anilist_id": 88576
   },
   {
+    "name": "Roswaal L Mathers",
+    "series": "Re:Zero",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b90182-Ho0NS06tc6NL.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 90182
+  },
+  {
+    "name": "Itaru Hashida",
+    "series": "Steins;Gate",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b35258-FeTGR4LEUNvt.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 35258
+  },
+  {
     "name": "Mayuri Shiina",
     "series": "Steins;Gate",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b35253-u6QVgLLyHq2W.png",
@@ -1258,6 +3472,222 @@
     "base_kakera": 68,
     "source": "AniList",
     "anilist_id": 35253
+  },
+  {
+    "name": "Suzuha Amane",
+    "series": "Steins;Gate",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b35255-Ra9Aq5Kn9lYq.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 35255
+  },
+  {
+    "name": "Isabella",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121701-hP5hanKRUH9u.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 121701
+  },
+  {
+    "name": "Norman",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121700-CRwKIlcBcjbv.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 121700
+  },
+  {
+    "name": "Ray",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121724-SJTdODjeO7e6.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 121724
+  },
+  {
+    "name": "Ami Kawashima",
+    "series": "Toradora!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13725-Vk30kjvVT82z.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 13725
+  },
+  {
+    "name": "Minori Kushieda",
+    "series": "Toradora!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12305-AdKOcp0az9mq.jpg",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 12305
+  },
+  {
+    "name": "Yusaku Kitamura",
+    "series": "Toradora!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12306-Nb1orOh4UkpT.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 12306
+  },
+  {
+    "name": "Askeladd",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13020-ZdiYlNmpRUNS.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 13020
+  },
+  {
+    "name": "Canute",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b17438-NwyOSMxycmck.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 17438
+  },
+  {
+    "name": "Thors",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b13021-XJAVDHwMWek2.png",
+    "likes": 0,
+    "base_kakera": 68,
+    "source": "AniList",
+    "anilist_id": 13021
+  },
+  {
+    "name": "Casca",
+    "series": "Berserk",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b423-AmVFCaJJOBsc.png",
+    "likes": 0,
+    "base_kakera": 58,
+    "source": "AniList",
+    "anilist_id": 423
+  },
+  {
+    "name": "Griffith",
+    "series": "Berserk",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b424-Jfrsf8I7zBps.png",
+    "likes": 0,
+    "base_kakera": 58,
+    "source": "AniList",
+    "anilist_id": 424
+  },
+  {
+    "name": "Irina Jelavic",
+    "series": "Assassination Classroom",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b73883-ajlj28kkjxlb.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 73883
+  },
+  {
+    "name": "Tadaomi Karasuma",
+    "series": "Assassination Classroom",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/73881-Ukr6cBzK8dsi.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 73881
+  },
+  {
+    "name": "Charmy Pappitson",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124447-2J1PKMgWETNT.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 124447
+  },
+  {
+    "name": "Luck Voltia",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/124449-M67Ex2GcxmYM.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 124449
+  },
+  {
+    "name": "Mimosa Vermillion",
+    "series": "Black Clover",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124438-nTvKfJaMD4d5.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 124438
+  },
+  {
+    "name": "Hyoma Chigiri",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b167444-JTHkkJAX4E3q.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 167444
+  },
+  {
+    "name": "Jinpachi Ego",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b140857-DOTyKBCufon9.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 140857
+  },
+  {
+    "name": "Reo Mikage",
+    "series": "Blue Lock",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b169394-8KDqHUN1VyGC.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 169394
+  },
+  {
+    "name": "Kikuri Hiroi",
+    "series": "Bocchi the Rock!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b291639-VYrixXvuwLqx.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 291639
+  },
+  {
+    "name": "Seika Ijichi",
+    "series": "Bocchi the Rock!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b289054-UnScwd5RkqBk.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 289054
+  },
+  {
+    "name": "Charles zi Britannia",
+    "series": "Code Geass",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5610-TuH7RZiCqQBd.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 5610
+  },
+  {
+    "name": "Cornelia li Britannia",
+    "series": "Code Geass",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b797-lrtrQEESbWVa.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 797
   },
   {
     "name": "Euphemia li Britannia",
@@ -1269,13 +3699,31 @@
     "anilist_id": 1114
   },
   {
-    "name": "Nunnally vi Britannia",
+    "name": "Rolo Lamperouge",
     "series": "Code Geass",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1110-TSlN2WkhDJ1T.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b7771-yhQaoU3IXYk0.png",
     "likes": 0,
     "base_kakera": 56,
     "source": "AniList",
-    "anilist_id": 1110
+    "anilist_id": 7771
+  },
+  {
+    "name": "Schneizel el Britannia",
+    "series": "Code Geass",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1710-GA8qDtSsY4jN.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 1710
+  },
+  {
+    "name": "Shirley Fenette",
+    "series": "Code Geass",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b1120-hjOjinw5j4FE.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 1120
   },
   {
     "name": "Ein",
@@ -1296,6 +3744,186 @@
     "anilist_id": 2735
   },
   {
+    "name": "Vicious",
+    "series": "Cowboy Bebop",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b2734-aglO8RKNVxnn.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 2734
+  },
+  {
+    "name": "Chrome",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124145-EEvQmsj8jku4.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 124145
+  },
+  {
+    "name": "Tsukasa Shishio",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124144-KOjcmhunbvYn.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 124144
+  },
+  {
+    "name": "Yuzuriha Ogawa",
+    "series": "Dr. Stone",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/124147-y3uE9rBepdad.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 124147
+  },
+  {
+    "name": "Chris",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b120658-SJ9YrXEluqaX.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 120658
+  },
+  {
+    "name": "Wiz",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b120655-LfUD7Mb1Mncg.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 120655
+  },
+  {
+    "name": "Yunyun",
+    "series": "KonoSuba",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b120652-YxrBBPbmJno2.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 120652
+  },
+  {
+    "name": "Dimple",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89617-HHZ1kziYxc0q.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 89617
+  },
+  {
+    "name": "Shou Suzuki",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n130683-TxUJVPKmUxrf.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 130683
+  },
+  {
+    "name": "Tome Kurata",
+    "series": "Mob Psycho 100",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89620-C1z1mMLIlO17.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 89620
+  },
+  {
+    "name": "Karen Araragi",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/n24194-SZwAIpP4IDum.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 24194
+  },
+  {
+    "name": "Nadeko Sengoku",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b22050-RUw3vyGYdr9W.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 22050
+  },
+  {
+    "name": "Suruga Kanbaru",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/22054-n6Jsvp80bUhD.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 22054
+  },
+  {
+    "name": "Tsubasa Hanekawa",
+    "series": "Monogatari",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b22055-EaTsy30ihdgb.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 22055
+  },
+  {
+    "name": "Aura Bella Fiora",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89129-2Qrm5TnoKYct.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 89129
+  },
+  {
+    "name": "Cocytus",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89138-HUcvLWduh6Mc.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 89138
+  },
+  {
+    "name": "Mare Bello Fiore",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89126-1WY1bWNYPg44.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 89126
+  },
+  {
+    "name": "Sebas Tian",
+    "series": "Overlord",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b89155-yVyhseUF82s9.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 89155
+  },
+  {
+    "name": "Crusch Karsten",
+    "series": "Re:Zero",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b90185-FR9JHyNe5038.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 90185
+  },
+  {
+    "name": "Echidna",
+    "series": "Re:Zero",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b129330-ZUtYw4n7N0uH.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 129330
+  },
+  {
     "name": "Felt",
     "series": "Re:Zero",
     "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88574-Hau8t0GlMvhp.jpg",
@@ -1305,13 +3933,31 @@
     "anilist_id": 88574
   },
   {
-    "name": "Roswaal L Mathers",
+    "name": "Otto Suwen",
     "series": "Re:Zero",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b90182-Ho0NS06tc6NL.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b124110-Gfr3IYI6FwqE.jpg",
     "likes": 0,
     "base_kakera": 56,
     "source": "AniList",
-    "anilist_id": 90182
+    "anilist_id": 124110
+  },
+  {
+    "name": "Puck",
+    "series": "Re:Zero",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b90187-xJXlD84KXl3t.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 90187
+  },
+  {
+    "name": "Reinhard van Astrea",
+    "series": "Re:Zero",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b88577-oKKnibqGgSSD.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 88577
   },
   {
     "name": "Faris NyanNyan",
@@ -1323,21 +3969,120 @@
     "anilist_id": 35256
   },
   {
-    "name": "Itaru Hashida",
+    "name": "Moeka Kiryu",
     "series": "Steins;Gate",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b35258-FeTGR4LEUNvt.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b35257-uepVZyOvuqhi.png",
     "likes": 0,
     "base_kakera": 56,
     "source": "AniList",
-    "anilist_id": 35258
+    "anilist_id": 35257
   },
   {
-    "name": "Suzuha Amane",
+    "name": "Ruka Urushibara",
     "series": "Steins;Gate",
-    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b35255-Ra9Aq5Kn9lYq.png",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b30919-5PjiA4ucfuuJ.png",
     "likes": 0,
     "base_kakera": 56,
     "source": "AniList",
-    "anilist_id": 35255
+    "anilist_id": 30919
+  },
+  {
+    "name": "Yugo Tennouji",
+    "series": "Steins;Gate",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b38558-E4By0N5JXskJ.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 38558
+  },
+  {
+    "name": "Don",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b126454-TI3LXk2oN7WV.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 126454
+  },
+  {
+    "name": "Gilda",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b126455-ki6wpr5Un4fF.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 126455
+  },
+  {
+    "name": "Krone",
+    "series": "The Promised Neverland",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b121702-yOmK9dyvOvVL.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 121702
+  },
+  {
+    "name": "Yasuko Takasu",
+    "series": "Toradora!",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b12307-MfkPmovIGCm9.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 12307
+  },
+  {
+    "name": "Bjorn",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b19485-GqL2A0NKp3Tf.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 19485
+  },
+  {
+    "name": "Einar",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b28030-APYJLr7FvqtM.jpg",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 28030
+  },
+  {
+    "name": "Thorkell",
+    "series": "Vinland Saga",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b17440-XvYe5JY862ZT.png",
+    "likes": 0,
+    "base_kakera": 56,
+    "source": "AniList",
+    "anilist_id": 17440
+  },
+  {
+    "name": "Judeau",
+    "series": "Berserk",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b454-zAG2pjevq7OO.png",
+    "likes": 0,
+    "base_kakera": 46,
+    "source": "AniList",
+    "anilist_id": 454
+  },
+  {
+    "name": "Puck",
+    "series": "Berserk",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b5060-PWn2hc2nBy9J.jpg",
+    "likes": 0,
+    "base_kakera": 46,
+    "source": "AniList",
+    "anilist_id": 5060
+  },
+  {
+    "name": "Zodd",
+    "series": "Berserk",
+    "image_url": "https://s4.anilist.co/file/anilistcdn/character/large/b600-nLLiWsK0GcVI.png",
+    "likes": 0,
+    "base_kakera": 46,
+    "source": "AniList",
+    "anilist_id": 600
   }
 ]

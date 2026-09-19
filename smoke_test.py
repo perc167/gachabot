@@ -246,6 +246,17 @@ async def main():
         ("Bond Forger", "Loid Forger", False),
         ("Sasuke Uchiha", "Itachi Uchiha", False),
         ("Ram", "Rem", False),
+        # A bare SURNAME may be a relative: Yoshimura is Eto's father.
+        ("Eto Yoshimura", "Yoshimura", False),
+        # A bare GIVEN name is a safe short form, so these must still pass.
+        ("Zeke Yeager", "Zeke", True),
+        ("Zeref Dragneel", "Zeref", True),
+        ("Tsunade", "Tsunade Senju", True),
+        ("Machi", "Machi Komacine", True),
+        ("Aqua Hoshino", "Aquamarine Hoshino", True),
+        ("Eto Yoshimura", "Eto", True),          # via ALIASES
+        ("Obito Uchiha", "Tobi", True),          # via ALIASES
+        ("Chris", "Eris", True),                 # via ALIASES
         ("Levi Ackerman", "Levi", True),
         ("Bond Forger", "Bond", True),
         ("Son Goku", "Gokuu Son", True),            # reversed name order
@@ -292,6 +303,56 @@ async def main():
         for i in shared
     ]
     check("no two characters share an AniList id", not clashes, "; ".join(clashes))
+
+    # 18. Regressions from the code review.
+
+    # (a) Commands that read ctx.guild must either be guild_only or guard for
+    # None, or they raise AttributeError when someone DMs the bot.
+    import inspect
+    import re as _re
+
+    import db as dbmod
+
+    unsafe = []
+    for cmd in b.commands:
+        source = inspect.getsource(cmd.callback)
+        if not _re.search(r"ctx\.guild\b", source):
+            continue
+        guild_only = any(
+            "guild_only" in getattr(chk, "__qualname__", "") for chk in cmd.checks
+        )
+        guarded = "if ctx.guild else" in source
+        if not guild_only and not guarded:
+            unsafe.append(cmd.name)
+    check("no command crashes when used in a DM", not unsafe, ", ".join(unsafe))
+
+    # (b) Renaming onto an existing name+series is reported, not a crash.
+    dup_a = db.add_character("Dupe Test", "QA Series", "", 0, 50)
+    dup_b = db.add_character("Other Name", "QA Series", "", 0, 50)
+    raised = False
+    try:
+        db.update_character(dup_b, name="Dupe Test")
+    except dbmod.DuplicateCharacter:
+        raised = True
+    check("duplicate rename raises DuplicateCharacter", raised)
+    check("failed rename left the character alone",
+          db.get_character(dup_b)["name"] == "Other Name")
+    check("a normal rename still works",
+          db.update_character(dup_b, name="Renamed Fine")
+          and db.get_character(dup_b)["name"] == "Renamed Fine")
+    db.delete_character(dup_a)
+    db.delete_character(dup_b)
+
+    # (c) The DM preview path: guild 0 has no settings, owner or wishers.
+    dm_embed = utils.character_embed(db, 0, db.get_character(top["id"]))
+    check("embed builds outside a guild", dm_embed.title == top["name"])
+
+    # (d) Files that must never be committed.
+    with open(os.path.join(PROJECT, ".gitignore"), encoding="utf-8") as fh:
+        ignored = {line.strip() for line in fh}
+    check("gitignore covers secrets, database and backups",
+          {".env", "*.db", "*.bak"} <= ignored,
+          f"missing {sorted({'.env', '*.db', '*.bak'} - ignored)}")
 
     await b.close()
 

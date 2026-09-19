@@ -28,7 +28,7 @@ API = "https://graphql.anilist.co"
 
 QUERY = """
 query ($search: String) {
-  Page(page: 1, perPage: 10) {
+  Page(page: 1, perPage: 25) {
     characters(search: $search) {
       id
       name { full native alternative }
@@ -51,6 +51,10 @@ NAME_THRESHOLD = 0.72
 # the run reports someone as unmatched.
 ALIASES = {
     "Historia Reiss": ["Krista Lenz"],
+    "Eto Yoshimura": ["Eto"],
+    "Chi-Chi": ["Chichi"],
+    "Obito Uchiha": ["Tobi"],  # AniList files him under his masked alias
+    "Chris": ["Eris"],  # KonoSuba: Chris is Eris in disguise
     "Nunnally vi Britannia": ["Nunnally Lamperouge"],
     "Lelouch vi Britannia": ["Lelouch Lamperouge"],
 }
@@ -75,13 +79,18 @@ def collapse_long_vowels(text: str) -> str:
     return text
 
 
-def name_tokens(name: str) -> frozenset:
-    """Word set of a name, vowel-folded. Lets 'Son Goku' meet 'Gokuu Son',
-    which AniList writes in the opposite order."""
+def name_token_list(name: str) -> list:
+    """Words of a name in order, vowel-folded."""
     cleaned = unicodedata.normalize("NFKD", name or "")
     cleaned = "".join(c for c in cleaned if not unicodedata.combining(c))
     parts = re.split(r"[^A-Za-z0-9]+", cleaned.lower())
-    return frozenset(collapse_long_vowels(p) for p in parts if p)
+    return [collapse_long_vowels(p) for p in parts if p]
+
+
+def name_tokens(name: str) -> frozenset:
+    """Word set of a name, vowel-folded. Lets 'Son Goku' meet 'Gokuu Son',
+    which AniList writes in the opposite order."""
+    return frozenset(name_token_list(name))
 
 
 def series_matches(wanted: str, titles) -> bool:
@@ -118,6 +127,17 @@ def _pair_one(wanted: str, name: str) -> float:
     # "Edward Wong Hau Pepelu Tivrusky IV", or "Luffy Monkey" within
     # "Monkey D. Luffy".
     if want_tokens and (want_tokens <= have_tokens or have_tokens <= want_tokens):
+        if len(want_tokens) == 1 or len(have_tokens) == 1:
+            lone = want_tokens if len(want_tokens) == 1 else have_tokens
+            longer = name_token_list(name if lone is want_tokens else wanted)
+            word = next(iter(lone))
+            # A lone GIVEN name is a safe short form: Zeke for Zeke Yeager.
+            # A lone SURNAME is not - relatives share it, which is how Eto
+            # Yoshimura ended up matched to her father, listed only as
+            # "Yoshimura". Score it below the threshold so it is reported
+            # rather than guessed.
+            if len(longer) > 1 and word == longer[-1] and word != longer[0]:
+                return 0.45
         return 0.88
     if have_folded == want_folded:
         return 0.95

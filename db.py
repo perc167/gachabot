@@ -58,6 +58,10 @@ CREATE INDEX IF NOT EXISTS idx_wishes_character
 """
 
 
+class DuplicateCharacter(Exception):
+    """A write would collide with an existing name + series pair."""
+
+
 class Database:
     def __init__(self, path: str = config.DB_PATH):
         self.conn = sqlite3.connect(path, check_same_thread=False)
@@ -133,10 +137,15 @@ class Database:
         if not fields:
             return False
         assignments = ", ".join(f"{k} = ?" for k in fields)
-        cur = self.conn.execute(
-            f"UPDATE characters SET {assignments} WHERE id = ?",
-            (*fields.values(), character_id),
-        )
+        try:
+            cur = self.conn.execute(
+                f"UPDATE characters SET {assignments} WHERE id = ?",
+                (*fields.values(), character_id),
+            )
+        except sqlite3.IntegrityError as error:
+            # Renaming onto a name + series that already exists. Callers can
+            # report this properly instead of it surfacing as a crash.
+            raise DuplicateCharacter(str(error)) from error
         self.conn.commit()
         return cur.rowcount > 0
 
