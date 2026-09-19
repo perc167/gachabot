@@ -2,7 +2,9 @@
 import discord
 from discord.ext import commands
 
-from views import Confirm
+import config
+import utils
+from views import CharacterPicker, Confirm
 
 
 class Trading(commands.Cog):
@@ -23,18 +25,38 @@ class Trading(commands.Cog):
 
     @commands.command(name="gift", aliases=["give"])
     @commands.guild_only()
-    async def gift(self, ctx, member: discord.Member, *, name: str):
-        """Hand one of your characters to someone else."""
+    async def gift(self, ctx, member: discord.Member, *, name: str = None):
+        """`$gift @user` — pick from a menu, or name the character directly."""
         db = self.bot.db
         gid = ctx.guild.id
         if member.bot or member.id == ctx.author.id:
             await ctx.send("Pick a different person.")
             return
 
-        character, error = self._owned_by(gid, name, ctx.author.id)
-        if error:
-            await ctx.send(error)
-            return
+        if name:
+            character, error = self._owned_by(gid, name, ctx.author.id)
+            if error:
+                await ctx.send(error)
+                return
+        else:
+            rows = db.harem(gid, ctx.author.id)
+            if not rows:
+                await ctx.send("You have not claimed anyone to give away yet.")
+                return
+            character = await self._pick(
+                ctx,
+                rows,
+                ctx.author,
+                "Choose who to give away",
+                discord.Embed(
+                    title=f"Gift to {member.display_name}",
+                    description=f"{ctx.author.mention}, pick a character to hand over.",
+                    colour=config.CARD_COLOUR,
+                ),
+            )
+            if not character:
+                await ctx.send("Gift cancelled.")
+                return
 
         cap = db.get_setting(gid, "max_marriages")
         if cap and db.harem_size(gid, member.id) >= cap:
@@ -66,34 +88,96 @@ class Trading(commands.Cog):
             f"**{character['name']}** now belongs to {member.mention}."
         )
 
+    async def _pick(self, ctx, rows, who, placeholder, embed, ping=None):
+        """Show someone their harem as a dropdown and wait for a choice.
+
+        Returns the chosen row, or None if they cancelled or timed out.
+        """
+        view = CharacterPicker(rows, who.id, placeholder)
+        view.message = await ctx.send(content=ping, embed=embed, view=view)
+        await view.wait()
+        return view.chosen
+
     @commands.command(name="trade", aliases=["tr"])
     @commands.guild_only()
-    async def trade(self, ctx, member: discord.Member, *, args: str):
-        """`$trade @user <your character> | <their character>`"""
+    async def trade(self, ctx, member: discord.Member, *, args: str = None):
+        """`$trade @user` — pick from a menu. Both of you choose in turn.
+
+        The old one-line form still works if you prefer typing:
+        `$trade @user <your character> | <their character>`
+        """
         if member.bot or member.id == ctx.author.id:
             await ctx.send("Pick a different person.")
-            return
-        if "|" not in args:
-            await ctx.send(
-                f"Usage: `{ctx.prefix}trade @user <your character>"
-                " | <their character>`"
-            )
             return
 
         db = self.bot.db
         gid = ctx.guild.id
-        mine_name, _, theirs_name = args.partition("|")
 
-        mine, error = self._owned_by(gid, mine_name.strip(), ctx.author.id)
-        if error:
-            await ctx.send(error)
-            return
-        theirs, error = self._owned_by(gid, theirs_name.strip(), member.id)
-        if error:
-            await ctx.send(error)
-            return
+        if args and "|" in args:
+            # Typed form, kept for anyone who finds it quicker.
+            mine_name, _, theirs_name = args.partition("|")
+            mine, error = self._owned_by(gid, mine_name.strip(), ctx.author.id)
+            if error:
+                await ctx.send(error)
+                return
+            theirs, error = self._owned_by(gid, theirs_name.strip(), member.id)
+            if error:
+                await ctx.send(error)
+                return
+        else:
+            mine_rows = db.harem(gid, ctx.author.id)
+            theirs_rows = db.harem(gid, member.id)
+            if not mine_rows:
+                await ctx.send("You have not claimed anyone to trade yet.")
+                return
+            if not theirs_rows:
+                await ctx.send(f"{member.display_name} has nobody to trade.")
+                return
 
-        embed = discord.Embed(title="Trade offer", colour=0xB388EB)
+            rate = db.get_setting(gid, "karuda_rate")
+            icon = utils.shard_icon(config.SHARD_TYPES[0][0])
+
+            mine = await self._pick(
+                ctx,
+                mine_rows,
+                ctx.author,
+                "Choose what you are offering",
+                discord.Embed(
+                    title=f"Trade with {member.display_name}",
+                    description=(
+                        f"{ctx.author.mention}, pick the character you want to"
+                        " give away."
+                    ),
+                    colour=config.CARD_COLOUR,
+                ),
+            )
+            if not mine:
+                await ctx.send("Trade cancelled.")
+                return
+
+            theirs = await self._pick(
+                ctx,
+                theirs_rows,
+                member,
+                "Choose what you are giving back",
+                discord.Embed(
+                    title="Your turn",
+                    description=(
+                        f"{ctx.author.display_name} is offering"
+                        f" **{mine['name']}** · {mine['series']}"
+                        f"\n{icon} {utils.karuda_value(mine, rate):,}"
+                        f" · like #{mine['like_rank']:,}"
+                        f"\n\n{member.mention}, pick one of yours to trade for it."
+                    ),
+                    colour=config.CARD_COLOUR,
+                ),
+                ping=member.mention,
+            )
+            if not theirs:
+                await ctx.send("Trade cancelled.")
+                return
+
+        embed = discord.Embed(title="Trade offer", colour=config.CARD_COLOUR)
         embed.add_field(
             name=f"{ctx.author.display_name} gives",
             value=f"**{mine['name']}**\n{mine['series']}\n{mine['likes']} ♥",

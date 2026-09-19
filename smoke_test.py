@@ -8,6 +8,8 @@ import os
 import sys
 import tempfile
 
+import discord
+
 PROJECT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT)
 os.chdir(PROJECT)
@@ -265,6 +267,23 @@ async def main():
     check("Paginator labels page", pages.page_label.label == "1/2")
     single = views.Paginator([embed], ALICE)
     check("Paginator hides nav on one page", len(single.children) == 0)
+    # The trade picker: a dropdown of a harem, paged at Discord's 25 limit.
+    many = db.search_characters("", limit=60)
+    picker = views.CharacterPicker(many, ALICE, "pick")
+    selects = [c for c in picker.children if isinstance(c, discord.ui.Select)]
+    check("picker shows a dropdown", len(selects) == 1)
+    check("picker caps a page at 25 options", len(selects[0].options) == 25,
+          str(len(selects[0].options)))
+    check("picker pages a long harem", picker.pages == 3, str(picker.pages))
+    check("picker has nav on a long harem", len(picker.children) >= 5)
+    check("picker starts with nothing chosen", picker.chosen is None)
+    small = views.CharacterPicker(many[:4], ALICE, "pick")
+    check("short harem is one page", small.pages == 1)
+    check("short harem has no nav",
+          len([c for c in small.children if isinstance(c, discord.ui.Button)]) == 1)
+    check("picker option carries the character id",
+          selects[0].options[0].value == str(many[0]["id"]))
+
     conf = views.Confirm({ALICE, BOB})
     check("Confirm builds", len(conf.children) == 2)
 

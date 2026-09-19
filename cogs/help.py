@@ -44,8 +44,8 @@ SECTIONS = [
     (
         "Trading",
         [
-            ("gift @user <name>", "Give a character away"),
-            ("trade @user <yours> | <theirs>", "Swap two characters"),
+            ("gift @user", "Give a character away, pick from a menu"),
+            ("trade @user", "Swap characters, you both pick from a menu"),
         ],
     ),
     (

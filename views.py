@@ -62,6 +62,113 @@ class Paginator(discord.ui.View):
         return self.message
 
 
+class CharacterPicker(discord.ui.View):
+    """A dropdown of somebody's harem, so a trade needs no typing.
+
+    Discord allows 25 options in a select, and a harem can be longer, so the
+    list pages. Only `owner_id` may touch it; everyone else gets told whose
+    turn it is. When it finishes, `chosen` holds the picked row or None.
+    """
+
+    PER_PAGE = 25
+
+    def __init__(self, rows, owner_id: int, placeholder: str, timeout: float = 120):
+        super().__init__(timeout=timeout)
+        self.rows = rows
+        self.owner_id = owner_id
+        self.placeholder = placeholder
+        self.page = 0
+        self.chosen = None
+        self.cancelled = False
+        self.message = None
+        self._build()
+
+    @property
+    def pages(self) -> int:
+        return max(1, -(-len(self.rows) // self.PER_PAGE))
+
+    def _build(self):
+        self.clear_items()
+        start = self.page * self.PER_PAGE
+        window = self.rows[start : start + self.PER_PAGE]
+
+        select = discord.ui.Select(
+            placeholder=f"{self.placeholder} ({len(self.rows)} to choose from)",
+            options=[
+                discord.SelectOption(
+                    label=row["name"][:100],
+                    value=str(row["id"]),
+                    description=f"{row['series']}"[:100],
+                )
+                for row in window
+            ],
+        )
+        select.callback = self._on_select
+        self.add_item(select)
+
+        if self.pages > 1:
+            previous = discord.ui.Button(label="◀", row=1)
+            previous.disabled = self.page == 0
+            previous.callback = self._on_prev
+            self.add_item(previous)
+
+            label = discord.ui.Button(
+                label=f"{self.page + 1}/{self.pages}", row=1, disabled=True
+            )
+            self.add_item(label)
+
+            nxt = discord.ui.Button(label="▶", row=1)
+            nxt.disabled = self.page >= self.pages - 1
+            nxt.callback = self._on_next
+            self.add_item(nxt)
+
+        cancel = discord.ui.Button(
+            label="Cancel", style=discord.ButtonStyle.danger, row=1
+        )
+        cancel.callback = self._on_cancel
+        self.add_item(cancel)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                f"This is <@{self.owner_id}>'s turn to pick.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def _on_select(self, interaction: discord.Interaction):
+        character_id = int(interaction.data["values"][0])
+        self.chosen = next((r for r in self.rows if r["id"] == character_id), None)
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    async def _on_prev(self, interaction: discord.Interaction):
+        self.page = max(0, self.page - 1)
+        self._build()
+        await interaction.response.edit_message(view=self)
+
+    async def _on_next(self, interaction: discord.Interaction):
+        self.page = min(self.pages - 1, self.page + 1)
+        self._build()
+        await interaction.response.edit_message(view=self)
+
+    async def _on_cancel(self, interaction: discord.Interaction):
+        self.cancelled = True
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(view=self)
+        self.stop()
+
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.edit(content="Timed out.", view=None)
+            except discord.HTTPException:
+                pass
+
+
 class Confirm(discord.ui.View):
     """Two-party confirmation, used by trades and gifts.
 

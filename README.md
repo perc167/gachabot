@@ -148,8 +148,8 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$richest` | Karuda leaderboard |
 | `$wish <name>` | Get pinged and a head start when it rolls |
 | `$unwish <name>` / `$wishlist [@user]` / `$wishedby <name>` | Wishlist management |
-| `$gift @user <name>` | Give a character away (they confirm) |
-| `$trade @user <yours> \| <theirs>` | Swap two characters (both confirm) |
+| `$gift @user` | Give a character away — pick from a menu |
+| `$trade @user` | Swap characters — you each pick from a menu |
 | `$settings` / `$set <key> <value>` / `$resetsettings` | Per-server tuning (Manage Server) |
 | `$pool` | Pool size and most-liked characters |
 | `$missingart [series]` | Characters that still need artwork |
