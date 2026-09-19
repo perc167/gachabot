@@ -9,7 +9,7 @@ import utils
 from utils import fmt_duration
 
 DAILY_COOLDOWN = 20 * 60 * 60  # 20 hours, so it drifts earlier each day
-DAILY_MIN, DAILY_MAX = 150, 400
+DAILY_MIN, DAILY_MAX = 100, 240
 
 
 class Karuda(commands.Cog):

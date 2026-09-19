@@ -146,6 +146,10 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$shards` | What each shard pays, and its odds |
 | `$pay @user <amount>` | Send karuda |
 | `$richest` | Karuda leaderboard |
+| `$shop` | What karuda buys |
+| `$buyrolls [n]` | Buy extra rolls for this window |
+| `$resetclaim` | Clear your claim cooldown |
+| `$wishslot` | Buy a permanent wishlist slot |
 | `$wish <name>` | Get pinged and a head start when it rolls |
 | `$unwish <name>` / `$wishlist [@user]` / `$wishedby <name>` | Wishlist management |
 | `$gift @user` | Give a character away — pick from a menu |
@@ -169,9 +173,17 @@ person *per server* — each server has its own independent game state over a
 shared character pool.
 
 **Karuda.** The currency. Rolling a character someone already owns drops a
-Karuda button instead of a Claim button; grabbing pays out that character's
-value scaled by the server's `karuda_rate`, with a ±20% jitter, and 60% if the
-character is not yours. Gated by `karuda_interval_minutes`.
+Karuda button instead of a Claim button; grabbing pays `karuda_grab_percent`
+of that character's value (12% by default), with a ±20% jitter, and 60% of
+that if the character is not yours. Gated by `karuda_interval_minutes`.
+
+**The economy is a loop, not a tap.** An active day earns roughly 900 karuda,
+and the shop is where it goes: extra rolls now, an earlier claim, a wider
+wishlist. Two things are deliberately closed off — a grab pays a slice of a
+character's worth rather than all of it, and divorcing refunds nothing by
+default, because claiming costs nothing and a refund turned the claim
+cooldown into a money printer. Both are settings
+(`karuda_grab_percent`, `divorce_refund_percent`) if you want it looser.
 
 **Shards.** `$daily` pulls one of eight shard types, and which one you get
 decides the payout:

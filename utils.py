@@ -74,13 +74,23 @@ class Cooldowns:
         window = self.db.get_setting(guild_id, "roll_reset_minutes") * 60
         current = now()
 
+        # Bought rolls sit on top of the allowance and expire with the window,
+        # so buying is a top-up rather than a permanent raise.
         if current >= player["rolls_reset_at"]:
             self.db.update_player(
-                guild_id, user_id, rolls_used=0, rolls_reset_at=current + window
+                guild_id,
+                user_id,
+                rolls_used=0,
+                rolls_bought=0,
+                rolls_reset_at=current + window,
             )
             return limit, window
 
-        return max(0, limit - player["rolls_used"]), player["rolls_reset_at"] - current
+        allowance = limit + player["rolls_bought"]
+        return (
+            max(0, allowance - player["rolls_used"]),
+            player["rolls_reset_at"] - current,
+        )
 
     def spend_roll(self, guild_id: int, user_id: int):
         player = self.db.get_player(guild_id, user_id)

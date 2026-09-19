@@ -36,6 +36,19 @@ GUILD_SETTINGS = {
     ),
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
     "wish_limit": (20, 1, 200, "How many characters a user may wish for"),
+    # --- economy ---
+    "karuda_grab_percent": (
+        12, 1, 100,
+        "Percent of a character's value a karuda grab pays out",
+    ),
+    "divorce_refund_percent": (
+        0, 0, 100,
+        "Percent of value refunded on divorce (0 stops claim-divorce farming)",
+    ),
+    "price_rolls": (400, 10, 1000000, "Cost of a bundle of extra rolls"),
+    "rolls_per_purchase": (5, 1, 50, "Rolls you get per bundle bought"),
+    "price_claim_reset": (900, 10, 1000000, "Cost to clear your claim cooldown"),
+    "price_wish_slot": (1200, 10, 1000000, "Cost of one extra wishlist slot"),
 }
 
 # The currency. Karuda are shards; every payout is measured in them.

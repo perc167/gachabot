@@ -21,6 +21,7 @@ COGS = [
     "cogs.karuda",
     "cogs.wishlist",
     "cogs.trading",
+    "cogs.shop",
     "cogs.admin",
     "cogs.settings",
     "cogs.help",

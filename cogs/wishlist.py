@@ -22,7 +22,9 @@ class Wishlist(commands.Cog):
             await ctx.send(f"No character matching `{name}`.")
             return
 
-        limit = db.get_setting(gid, "wish_limit")
+        limit = db.get_setting(gid, "wish_limit") + db.get_player(
+            gid, ctx.author.id
+        )["extra_wish_slots"]
         if db.wish_count(gid, ctx.author.id) >= limit:
             await ctx.send(
                 f"Your wishlist is full ({limit})."
@@ -70,7 +72,9 @@ class Wishlist(commands.Cog):
             await ctx.send(f"{member.display_name} has no wishes.")
             return
 
-        limit = db.get_setting(gid, "wish_limit")
+        limit = db.get_setting(gid, "wish_limit") + db.get_player(
+            gid, member.id
+        )["extra_wish_slots"]
         lines = []
         for i, row in enumerate(rows, 1):
             owner_id = db.owner_of(gid, row["id"])

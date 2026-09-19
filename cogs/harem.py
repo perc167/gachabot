@@ -107,12 +107,19 @@ class Harem(commands.Cog):
         if not db.divorce(gid, character["id"], ctx.author.id):
             await ctx.send(f"You do not own **{character['name']}**.")
             return
-        rate = db.get_setting(gid, "karuda_rate")
-        refund = max(1, utils.karuda_value(character, rate) // 2)
-        total = db.add_karuda(gid, ctx.author.id, refund)
-        await ctx.send(
-            f"Divorced **{character['name']}**. +{refund} karuda (total: {total})."
-        )
+        percent = db.get_setting(gid, "divorce_refund_percent")
+        if percent:
+            rate = db.get_setting(gid, "karuda_rate")
+            refund = max(1, utils.karuda_value(character, rate) * percent // 100)
+            total = db.add_karuda(gid, ctx.author.id, refund)
+            await ctx.send(
+                f"Divorced **{character['name']}**."
+                f" +{refund:,} karuda (total: {total:,})."
+            )
+        else:
+            await ctx.send(
+                f"Divorced **{character['name']}**. They are back in the pool."
+            )
 
     @commands.command(name="note")
     @commands.guild_only()

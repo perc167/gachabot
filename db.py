@@ -48,6 +48,8 @@ CREATE TABLE IF NOT EXISTS players (
     claim_ready_at  INTEGER NOT NULL DEFAULT 0,
     karuda_ready_at INTEGER NOT NULL DEFAULT 0,
     daily_ready_at  INTEGER NOT NULL DEFAULT 0,
+    rolls_bought    INTEGER NOT NULL DEFAULT 0,
+    extra_wish_slots INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
 );
 
@@ -128,7 +130,7 @@ class Database:
             row["name"]
             for row in self.conn.execute("PRAGMA table_info(players)").fetchall()
         }
-        for column in ("daily_ready_at",):
+        for column in ("daily_ready_at", "rolls_bought", "extra_wish_slots"):
             if column not in existing:
                 self.conn.execute(
                     f"ALTER TABLE players ADD COLUMN {column}"
@@ -496,6 +498,8 @@ class Database:
             "claim_ready_at",
             "karuda_ready_at",
             "daily_ready_at",
+            "rolls_bought",
+            "extra_wish_slots",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:

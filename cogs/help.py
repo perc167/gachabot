@@ -30,6 +30,10 @@ SECTIONS = [
             ("shards", "What each shard type pays, and its odds"),
             ("pay @user <amount>", "Send karuda"),
             ("richest", "Karuda leaderboard"),
+            ("shop", "What karuda buys"),
+            ("buyrolls [n]", "Buy extra rolls for this window"),
+            ("resetclaim", "Clear your claim cooldown"),
+            ("wishslot", "Buy a permanent wishlist slot"),
         ],
     ),
     (

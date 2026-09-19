@@ -53,20 +53,10 @@ async def main():
 
     with open(os.path.join(PROJECT, "data", "characters.json"), encoding="utf-8") as fh:
         seed = json.load(fh)
-    for entry in seed:
-        cid_ = db.upsert_character(
-            entry["name"], entry["series"], entry["image_url"],
-            entry.get("likes", 0), entry.get("base_karuda", 50),
-        )
-        db.update_character(cid_, like_rank=entry.get("like_rank"),
-                            claim_rank=entry.get("claim_rank"))
+    db.import_characters(seed)
     check("seed imports", db.character_count() == len(seed), str(db.character_count()))
     # Re-import must update, not duplicate.
-    for entry in seed:
-        db.upsert_character(
-            entry["name"], entry["series"], entry["image_url"],
-            entry.get("likes", 0), entry.get("base_karuda", 50),
-        )
+    db.import_characters(seed)
     check("re-import is idempotent", db.character_count() == len(seed))
 
     # 3. Rarity tiers and karuda math.
@@ -93,9 +83,12 @@ async def main():
           pulls.count(config.SHARD_TYPES[-1][0]) < pulls.count(config.SHARD_TYPES[0][0]) / 10)
     check("shard() falls back for an unknown key",
           config.shard("nonsense") == config.SHARD_TYPES[0])
-    top = db.find_character_by_name("Naruto Uzumaki")
-    check("name lookup exact", top is not None and top["name"] == "Naruto Uzumaki")
-    check("name lookup prefix", db.find_character_by_name("Naruto Uz") is not None)
+    top = sorted(db.search_characters("", limit=5000),
+                 key=lambda r: r["like_rank"] or 99999)[0]
+    check("name lookup exact",
+          db.find_character_by_name(top["name"])["id"] == top["id"])
+    check("name lookup prefix",
+          db.find_character_by_name(top["name"][:5]) is not None)
     check("karuda equals base at 100%",
           utils.karuda_value(top, 100) == top["base_karuda"],
           f"{utils.karuda_value(top, 100)} vs {top['base_karuda']}")
@@ -103,13 +96,13 @@ async def main():
           utils.karuda_value(top, 200) == utils.karuda_value(top, 100) * 2)
 
     # Rarity must not collapse to one tier just because likes are all zero.
-    all_rows = db.search_characters("", limit=1000)
+    all_rows = db.search_characters("", limit=6000)
     check("all seeded likes are zero", all(r["likes"] == 0 for r in all_rows))
-    leads = [r for r in all_rows if r["name"] in ("Naruto Uzumaki", "Monkey D. Luffy")]
-    minor = [r for r in all_rows if r["name"] in ("Ein", "Felt")]
-    check("famous leads outvalue minor characters",
-          leads and minor and min(r["base_karuda"] for r in leads)
-          > max(r["base_karuda"] for r in minor))
+    check("roster is sizeable", len(all_rows) > 4000, str(len(all_rows)))
+    by_rank = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)
+    check("famous characters outvalue obscure ones",
+          by_rank[0]["base_karuda"] > by_rank[-1]["base_karuda"] * 5,
+          f"{by_rank[0]['base_karuda']} vs {by_rank[-1]['base_karuda']}")
 
     # 3b. Ranks: 1 is best, and value tracks them.
     ranked = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)
@@ -162,7 +155,8 @@ async def main():
     check("daily column exists", "daily_ready_at" in db.get_player(GUILD, ALICE).keys())
 
     # 7. Wishes.
-    second = db.find_character_by_name("Rukia Kuchiki")
+    second = sorted(db.search_characters("", limit=5000),
+                    key=lambda r: r["like_rank"] or 99999)[1]
     check("wish added", db.add_wish(GUILD, BOB, second["id"]))
     check("duplicate wish blocked", not db.add_wish(GUILD, BOB, second["id"]))
     check("wishers listed", db.wishers_of(GUILD, second["id"]) == [BOB])
@@ -410,7 +404,7 @@ async def main():
           f"missing {sorted({'.env', '*.db', '*.bak'} - ignored)}")
 
     # 19. Character albums: rolls pick a random image from the album.
-    album_char = db.find_character_by_name("Nami")
+    album_char = by_rank[2]
     cid = album_char["id"]
     seeded = db.image_count(cid)
     check("import seeds the album", seeded >= 1, f"{seeded}")
