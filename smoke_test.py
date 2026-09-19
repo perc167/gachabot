@@ -379,7 +379,14 @@ async def main():
                 cog_guard = "NoPrivateMessage" in inspect.getsource(cog_check)
             except (OSError, TypeError):
                 cog_guard = False
-        guarded = "if ctx.guild else" in source or cog_guard
+        # Any of the honest ways to check before using it.
+        guards = (
+            "if ctx.guild else",
+            "if ctx.guild:",
+            "if ctx.guild is None",
+            "if not ctx.guild",
+        )
+        guarded = any(g in source for g in guards) or cog_guard
         if not guild_only and not guarded:
             unsafe.append(cmd.name)
     check("no command crashes when used in a DM", not unsafe, ", ".join(unsafe))
@@ -701,6 +708,38 @@ async def main():
               for r in db.search_characters("House", guild_id=GUILD)))
     db.delete_character(custom_id)
     check("deleting a custom clears it", db.custom_count(GUILD) == 0)
+
+    # 20j. Help: every section renders, and every command it lists is real.
+    from cogs import help as helpmod
+
+    check("help has sections", len(helpmod.CATEGORIES) >= 10,
+          str(len(helpmod.CATEGORIES)))
+    over = helpmod.overview_embed("$")
+    check("overview fits Discord limits", len(over) < 6000, str(len(over)))
+    check("overview lists every section",
+          len(over.fields) == len(helpmod.CATEGORIES))
+
+    unknown, oversized = [], []
+    for index in range(len(helpmod.CATEGORIES)):
+        page = helpmod.category_embed(index, "$")
+        if len(page) >= 6000 or len(page.description) >= 4096:
+            oversized.append(helpmod.CATEGORIES[index][1])
+    for _icon, _name, _blurb, entries in helpmod.CATEGORIES:
+        for usage, _desc in entries:
+            if not usage:
+                continue
+            # First word, minus any argument decoration, should be a command.
+            word = usage.split()[0].split("|")[0].strip()
+            if word and not b.get_command(word):
+                unknown.append(word)
+    check("every section page fits", not oversized, ", ".join(oversized))
+    check("help lists no command that does not exist",
+          not unknown, ", ".join(sorted(set(unknown))))
+
+    view = helpmod.HelpView("$", ALICE)
+    check("help view has a jump menu and arrows", len(view.children) == 4)
+    check("help opens on the overview", view.index is None)
+    check("help renders a section", helpmod.category_embed(0, "$").title)
 
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)

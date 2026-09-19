@@ -375,7 +375,7 @@ never leaks.
 
 Most Mudae names work: `$w`, `$h`, `$m`, `$mm`, `$im`, `$k`, `$dk`, `$wl`,
 `$dv`, `$tr`, `$lk`, `$ll`, `$s`, `$pr`, `$ru`, `$sl`, `$br` and so on. There
-are 79 commands under about 243 names. `$help` groups them.
+are 79 commands under about 243 names. `$help` sends the list to your DMs, one section at a time.
 
 ## Early players and keys
 
