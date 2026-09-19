@@ -380,7 +380,7 @@ class Admin(commands.Cog):
     async def pool(self, ctx):
         """Pool size and the most popular characters."""
         db = self.bot.db
-        total = db.character_count()
+        total = db.character_count(ctx.guild.id)
         top = db.conn.execute(
             "SELECT name, series, likes FROM characters ORDER BY likes DESC LIMIT 5"
         ).fetchall()

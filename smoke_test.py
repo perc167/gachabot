@@ -665,6 +665,43 @@ async def main():
     check("holder recognised", db.key_holder(ALICE))
     check("non-holder not recognised", not db.key_holder(BOB))
 
+    # 20i. Custom characters belong to one server and never leak.
+    OTHER = 4321
+    pool_before = db.character_count(GUILD)
+    custom_id = db.add_custom(GUILD, "House Mascot", "Inside Jokes",
+                              "https://example.com/m.png", 250)
+    check("custom created", custom_id is not None)
+    check("duplicate custom refused",
+          db.add_custom(GUILD, "House Mascot", "Inside Jokes", "", 250) is None)
+    check("custom belongs to its guild", db.owns_custom(GUILD, custom_id))
+    check("custom is not another guild's", not db.owns_custom(OTHER, custom_id))
+    check("a pool character is nobody's custom",
+          not db.owns_custom(GUILD, by_rank[0]["id"]))
+
+    check("owning guild counts it", db.character_count(GUILD) == pool_before + 1)
+    check("other guild does not", db.character_count(OTHER) == pool_before)
+    check("owning guild can look it up",
+          [r["name"] for r in
+           db.find_characters_by_name("House Mascot", guild_id=GUILD)]
+          == ["House Mascot"])
+    check("other guild cannot",
+          db.find_characters_by_name("House Mascot", guild_id=OTHER) == [])
+    check("custom listed for its guild",
+          [r["id"] for r in db.customs_of(GUILD)] == [custom_id])
+    check("custom not listed elsewhere", db.customs_of(OTHER) == [])
+    check("custom seeded its album", db.image_count(custom_id) == 1)
+
+    # The important one: it must never turn up in another server's rolls.
+    leaked = any(
+        db.random_character(OTHER, True)["id"] == custom_id for _ in range(300)
+    )
+    check("custom never rolls in another server", not leaked)
+    check("custom search is scoped",
+          all(r["guild_id"] in (0, GUILD)
+              for r in db.search_characters("House", guild_id=GUILD)))
+    db.delete_character(custom_id)
+    check("deleting a custom clears it", db.custom_count(GUILD) == 0)
+
     # 21. Shard pulls are recorded per player.
     check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)
     check("shard pull increments", db.record_shard(GUILD, ALICE, "prism") == 2)

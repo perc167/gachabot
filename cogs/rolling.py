@@ -166,7 +166,8 @@ class Rolling(commands.Cog):
         self.bot = bot
 
     @commands.command(
-        name="roll", aliases=["w", "wa", "wg", "ha", "hg", "m", "mx", "rolla"]
+        name="roll", aliases=["w", "wa", "wg", "ha", "hg", "m", "mx", "mg", "a",
+                  "waifu", "husbando", "h", "rolla"]
     )
     @commands.guild_only()
     async def roll(self, ctx):
@@ -220,7 +221,7 @@ class Rolling(commands.Cog):
         message = await ctx.send(content=content, embed=embed, view=view)
         view.message = message
 
-    @commands.command(name="rolls", aliases=["ru", "cooldowns", "cd"])
+    @commands.command(name="rolls", aliases=["ru", "rollsleft", "cooldowns", "cd", "timers"])
     @commands.guild_only()
     async def rolls(self, ctx):
         """Show your rolls left and every cooldown."""

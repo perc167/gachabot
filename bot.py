@@ -28,6 +28,7 @@ COGS = [
     "cogs.profile",
     "cogs.serverconfig",
     "cogs.access",
+    "cogs.custom",
     "cogs.admin",
     "cogs.settings",
     "cogs.help",

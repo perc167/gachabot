@@ -17,7 +17,7 @@ class Profile(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="profile", aliases=["me", "pr"])
+    @commands.command(name="profile", aliases=["me", "pr", "p", "overview"])
     @commands.guild_only()
     async def profile(self, ctx, member: discord.Member = None):
         """Everything about someone in one card."""
@@ -98,13 +98,13 @@ class Profile(commands.Cog):
         """Round trip time to Discord."""
         await ctx.send(f"Pong — {round(ctx.bot.latency * 1000)}ms.")
 
-    @commands.command(name="stats", aliases=["botinfo"])
+    @commands.command(name="stats", aliases=["botinfo", "mudainfo", "poolinfo"])
     @commands.guild_only()
     async def stats(self, ctx):
         """How big the pool is and how much of it this server has claimed."""
         db = self.bot.db
         gid = ctx.guild.id
-        total = db.character_count()
+        total = db.character_count(gid)
         claimed = db.conn.execute(
             "SELECT COUNT(*) AS c FROM marriages WHERE guild_id = ?", (gid,)
         ).fetchone()["c"]

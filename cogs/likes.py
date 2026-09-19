@@ -17,7 +17,7 @@ class Likes(commands.Cog):
         self.bot = bot
 
     async def _resolve(self, ctx, name: str):
-        matches = self.bot.db.find_characters_by_name(name)
+        matches = self.bot.db.find_characters_by_name(name, guild_id=ctx.guild.id)
         if not matches:
             await ctx.send(f"No character matching `{name}`.")
             return None
@@ -25,7 +25,7 @@ class Likes(commands.Cog):
             ctx, matches, "Which character?", config.CARD_COLOUR
         )
 
-    @commands.command(name="like", aliases=["lk"])
+    @commands.command(name="like", aliases=["lk", "likeadd"])
     @commands.guild_only()
     async def like(self, ctx, *, name: str):
         """Like a character. One vote each, take it back with $unlike."""
@@ -57,7 +57,7 @@ class Likes(commands.Cog):
         else:
             await ctx.send(f"You did not like **{character['name']}**.")
 
-    @commands.command(name="likelist", aliases=["ll", "likes"])
+    @commands.command(name="likelist", aliases=["ll", "likes", "likedlist"])
     @commands.guild_only()
     async def likelist(self, ctx, member: discord.Member = None):
         """Everyone you have liked."""
@@ -96,7 +96,7 @@ class Likes(commands.Cog):
         else:
             await ctx.send("You had no likes to clear.")
 
-    @commands.command(name="mostliked", aliases=["topliked", "tl"])
+    @commands.command(name="mostliked", aliases=["topliked", "tl", "topservl", "tsl"])
     @commands.guild_only()
     async def mostliked(self, ctx):
         """The server's favourite characters."""

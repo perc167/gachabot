@@ -12,13 +12,13 @@ class Wishlist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="wish", aliases=["wl"])
+    @commands.command(name="wish", aliases=["wl", "wishadd", "wa2"])
     @commands.guild_only()
     async def wish(self, ctx, *, name: str):
         """Add a character to your wishlist."""
         db = self.bot.db
         gid = ctx.guild.id
-        matches = db.find_characters_by_name(name)
+        matches = db.find_characters_by_name(name, guild_id=gid)
         if not matches:
             await ctx.send(f"No character matching `{name}`.")
             return
@@ -52,13 +52,13 @@ class Wishlist(commands.Cog):
             note = f" (currently owned by <@{owner_id}>)"
         await ctx.send(f"Wished for **{character['name']}**{note}.")
 
-    @commands.command(name="unwish", aliases=["uw"])
+    @commands.command(name="unwish", aliases=["uw", "wishremove", "wr"])
     @commands.guild_only()
     async def unwish(self, ctx, *, name: str = None):
         """`$unwish` — pick from your wishlist, or name someone directly."""
         db = self.bot.db
         if name:
-            matches = db.find_characters_by_name(name)
+            matches = db.find_characters_by_name(name, guild_id=gid)
             character = await choose_character(
                 ctx, matches, "Which one?", config.CARD_COLOUR
             )
@@ -86,7 +86,7 @@ class Wishlist(commands.Cog):
         else:
             await ctx.send(f"**{character['name']}** is not on your wishlist.")
 
-    @commands.command(name="wishlist", aliases=["wishes", "wls"])
+    @commands.command(name="wishlist", aliases=["wishes", "wls", "wishl", "wlist"])
     @commands.guild_only()
     async def wishlist(self, ctx, member: discord.Member = None):
         """Show a wishlist."""
@@ -125,12 +125,15 @@ class Wishlist(commands.Cog):
 
         await Paginator(embeds, ctx.author.id).start(ctx)
 
-    @commands.command(name="wishedby", aliases=["wb"])
+    @commands.command(name="wishedby", aliases=["wb", "wishedbylist"])
     @commands.guild_only()
     async def wishedby(self, ctx, *, name: str):
         """See who is waiting on a character."""
         db = self.bot.db
-        character = db.find_character_by_name(name)
+        matches = db.find_characters_by_name(name, guild_id=ctx.guild.id)
+        character = await choose_character(
+            ctx, matches, "Which one?", config.CARD_COLOUR
+        )
         if not character:
             await ctx.send(f"No character matching `{name}`.")
             return

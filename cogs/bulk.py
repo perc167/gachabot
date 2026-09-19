@@ -24,7 +24,7 @@ class Bulk(commands.Cog):
 
     async def _pick_series(self, ctx, query: str):
         """Turn a typed series name into one actual series."""
-        matches = self.bot.db.search_series(query)
+        matches = self.bot.db.search_series(query, guild_id=ctx.guild.id)
         if not matches:
             await ctx.send(f"No series matching `{query}`.")
             return None
@@ -66,7 +66,7 @@ class Bulk(commands.Cog):
         await view.wait()
         return picked.get("series")
 
-    @commands.command(name="divorceall", aliases=["dva"])
+    @commands.command(name="divorceall", aliases=["dva", "divorceall2"])
     @commands.guild_only()
     async def divorceall(self, ctx):
         """Let go of your entire harem."""
@@ -86,7 +86,7 @@ class Bulk(commands.Cog):
         count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows])
         await ctx.send(f"Divorced **{count}** characters.")
 
-    @commands.command(name="divorceseries", aliases=["dvs"])
+    @commands.command(name="divorceseries", aliases=["dvs", "divorcesl", "dsl"])
     @commands.guild_only()
     async def divorceseries(self, ctx, *, series: str):
         """Let go of everyone you own from one series."""
@@ -149,7 +149,7 @@ class Bulk(commands.Cog):
             await ctx.send(f"Your wishlist is full ({limit}).")
             return
 
-        cast = db.characters_in_series(title)
+        cast = db.characters_in_series(title, guild_id=ctx.guild.id)
         added = 0
         for row in cast:
             if added >= room:
@@ -183,7 +183,7 @@ class Bulk(commands.Cog):
             db.remove_wish(gid, ctx.author.id, row["id"])
         await ctx.send(f"Cleared **{len(rows)}** wishes.")
 
-    @commands.command(name="series", aliases=["sr", "mudanime"])
+    @commands.command(name="series", aliases=["sr", "mudanime", "anime", "sl"])
     @commands.guild_only()
     async def series(self, ctx, *, query: str):
         """Look up a series and who is in it."""
@@ -191,7 +191,7 @@ class Bulk(commands.Cog):
         title = await self._pick_series(ctx, query)
         if not title:
             return
-        cast = db.characters_in_series(title)
+        cast = db.characters_in_series(title, guild_id=ctx.guild.id)
         rate = db.get_setting(ctx.guild.id, "karuda_rate")
         icon = utils.shard_icon(config.SHARD_TYPES[0][0])
 

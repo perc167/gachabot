@@ -100,6 +100,18 @@ SECTIONS = [
         ],
     ),
     (
+        "Custom characters (Manage Server)",
+        [
+            ("addcustom Name | Series | url", "Add a character only this server rolls"),
+            ("customlist", "Every custom this server has made"),
+            ("imgcustom Name | url", "Add an image to one"),
+            ("namecustom Old | New", "Rename one"),
+            ("seriescustom Name | Series", "Refile one"),
+            ("valuecustom <n> <name>", "Set what one is worth"),
+            ("deletecustom <name>", "Remove one"),
+        ],
+    ),
+    (
         "Bot owner",
         [
             ("addchar Name | Series", "Add a character (art and stats optional)"),
@@ -119,7 +131,7 @@ class Help(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="help", aliases=["commands", "h"])
+    @commands.command(name="help", aliases=["commands", "channelhelp", "helpme"])
     async def help(self, ctx):
         prefix = ctx.prefix
         embed = discord.Embed(

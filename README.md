@@ -169,6 +169,8 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 | `$disable` / `$enable` / `$enableall` / `$disablelist` | Switch commands off per server |
 | `$channelallow` / `$channeldeny` / `$channellist` | Limit the bot to certain channels |
 | `$access` / `$redeem <key>` | Access status and key redemption |
+| `$addcustom Name \| Series \| url` | A character only this server rolls |
+| `$customlist` / `$imgcustom` / `$namecustom` / `$valuecustom` / `$deletecustom` | Manage them |
 | `$pool` | Pool size and most-liked characters |
 | `$missingart [series]` | Characters that still need artwork |
 | `$setimage <id> <url>` | Give a character its art (owner-only) |
@@ -357,6 +359,23 @@ about 70 assertions, a few seconds, no Discord connection.
 
 Adding a setting is one line in `GUILD_SETTINGS` — `$settings` and `$set` pick
 it up automatically.
+
+## Custom characters
+
+A server can invent its own with `$addcustom Name | Series | image url`
+(Manage Server). They live in the same table as the shared pool but carry the
+guild's id, so they roll, claim, trade and appear in albums exactly like
+anything else — and **only in the server that created them**. Every lookup is
+scoped, and a test rolls three hundred times in a second server to confirm one
+never leaks.
+
+`custom_limit` caps how many a server may add; the default is 50.
+
+## Command names
+
+Most Mudae names work: `$w`, `$h`, `$m`, `$mm`, `$im`, `$k`, `$dk`, `$wl`,
+`$dv`, `$tr`, `$lk`, `$ll`, `$s`, `$pr`, `$ru`, `$sl`, `$br` and so on. There
+are 79 commands under about 243 names. `$help` groups them.
 
 ## Early players and keys
 

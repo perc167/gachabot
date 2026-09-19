@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS characters (
     -- Popularity ranks, 1 = most popular. Lower is better, as in Mudae.
     like_rank   INTEGER NOT NULL DEFAULT 0,
     claim_rank  INTEGER NOT NULL DEFAULT 0,
+    -- 0 for the shared pool; a guild id for a character that server invented,
+    -- which only rolls there.
+    guild_id    INTEGER NOT NULL DEFAULT 0,
     UNIQUE (name, series)
 );
 
@@ -195,7 +198,7 @@ class Database:
             row["name"]
             for row in self.conn.execute("PRAGMA table_info(characters)").fetchall()
         }
-        for column in ("like_rank", "claim_rank"):
+        for column in ("like_rank", "claim_rank", "guild_id"):
             if column not in character_columns:
                 self.conn.execute(
                     f"ALTER TABLE characters ADD COLUMN {column}"
@@ -384,15 +387,26 @@ class Database:
             "SELECT * FROM characters WHERE id = ?", (character_id,)
         ).fetchone()
 
-    def character_count(self) -> int:
-        return self.conn.execute("SELECT COUNT(*) AS c FROM characters").fetchone()["c"]
-
-    def search_characters(self, query: str, limit: int = 25) -> list:
-        like = f"%{query}%"
+    def character_count(self, guild_id=None) -> int:
+        if guild_id is None:
+            return self.conn.execute(
+                "SELECT COUNT(*) AS c FROM characters"
+            ).fetchone()["c"]
         return self.conn.execute(
-            "SELECT * FROM characters WHERE name LIKE ? OR series LIKE ?"
-            " ORDER BY likes DESC LIMIT ?",
-            (like, like, limit),
+            "SELECT COUNT(*) AS c FROM characters"
+            " WHERE guild_id = 0 OR guild_id = ?",
+            (guild_id,),
+        ).fetchone()["c"]
+
+    def search_characters(self, query: str, limit: int = 25, guild_id=None) -> list:
+        like = f"%{query}%"
+        scope = "" if guild_id is None else " AND (guild_id = 0 OR guild_id = ?)"
+        extra = () if guild_id is None else (guild_id,)
+        return self.conn.execute(
+            "SELECT * FROM characters WHERE (name LIKE ? OR series LIKE ?)"
+            + scope
+            + " ORDER BY likes DESC LIMIT ?",
+            (like, like, *extra, limit),
         ).fetchall()
 
     def find_character_by_name(self, name: str) -> Optional[sqlite3.Row]:
@@ -408,24 +422,29 @@ class Database:
             (f"{name}%",),
         ).fetchone()
 
-    def find_characters_by_name(self, name: str, limit: int = 25) -> list:
+    def find_characters_by_name(self, name: str, limit: int = 25,
+                                guild_id=None) -> list:
         """Every plausible match for a typed name, best known first.
 
         find_character_by_name picks one arbitrarily, which is wrong when two
         characters share a name - there are several Shiros. Callers use this
         and ask which one was meant.
         """
+        scope = "" if guild_id is None else " AND (guild_id = 0 OR guild_id = ?)"
+        extra = () if guild_id is None else (guild_id,)
         exact = self.conn.execute(
             "SELECT * FROM characters WHERE name = ? COLLATE NOCASE"
-            " ORDER BY like_rank LIMIT ?",
-            (name, limit),
+            + scope
+            + " ORDER BY like_rank LIMIT ?",
+            (name, *extra, limit),
         ).fetchall()
         if exact:
             return exact
         return self.conn.execute(
             "SELECT * FROM characters WHERE name LIKE ? COLLATE NOCASE"
-            " ORDER BY like_rank LIMIT ?",
-            (f"{name}%", limit),
+            + scope
+            + " ORDER BY like_rank LIMIT ?",
+            (f"{name}%", *extra, limit),
         ).fetchall()
 
     def random_character(
@@ -433,15 +452,19 @@ class Database:
     ) -> Optional[sqlite3.Row]:
         if include_claimed:
             return self.conn.execute(
-                "SELECT * FROM characters ORDER BY RANDOM() LIMIT 1"
+                "SELECT * FROM characters"
+                " WHERE guild_id = 0 OR guild_id = ?"
+                " ORDER BY RANDOM() LIMIT 1",
+                (guild_id,),
             ).fetchone()
         return self.conn.execute(
             "SELECT c.* FROM characters c"
             " LEFT JOIN marriages m"
             "   ON m.character_id = c.id AND m.guild_id = ?"
             " WHERE m.character_id IS NULL"
+            "   AND (c.guild_id = 0 OR c.guild_id = ?)"
             " ORDER BY RANDOM() LIMIT 1",
-            (guild_id,),
+            (guild_id, guild_id),
         ).fetchone()
 
     # ---------- character images ----------
@@ -705,6 +728,43 @@ class Database:
             (guild_id, limit),
         ).fetchall()
 
+    # ---------- custom characters ----------
+
+    def add_custom(self, guild_id: int, name: str, series: str, image_url: str,
+                   base_karuda: int = 50):
+        """A character only this guild rolls. None if that pair already exists."""
+        try:
+            cur = self.conn.execute(
+                "INSERT INTO characters"
+                " (name, series, image_url, likes, base_karuda, guild_id)"
+                " VALUES (?, ?, ?, 0, ?, ?)",
+                (name, series, image_url, base_karuda, guild_id),
+            )
+            self.conn.commit()
+        except sqlite3.IntegrityError:
+            return None
+        if image_url:
+            self.add_image(cur.lastrowid, image_url, source="custom")
+        return cur.lastrowid
+
+    def customs_of(self, guild_id: int) -> list:
+        return self.conn.execute(
+            "SELECT * FROM characters WHERE guild_id = ? ORDER BY name",
+            (guild_id,),
+        ).fetchall()
+
+    def custom_count(self, guild_id: int) -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters WHERE guild_id = ?", (guild_id,)
+        ).fetchone()["c"]
+
+    def owns_custom(self, guild_id: int, character_id: int) -> bool:
+        """True only for a custom this guild made, never for a pool character."""
+        row = self.conn.execute(
+            "SELECT guild_id FROM characters WHERE id = ?", (character_id,)
+        ).fetchone()
+        return bool(row) and row["guild_id"] == guild_id
+
     # ---------- server configuration ----------
 
     def get_prefix(self, guild_id: int):
@@ -935,20 +995,29 @@ class Database:
             )
         return cur.rowcount
 
-    def search_series(self, query: str, limit: int = 25) -> list:
+    def search_series(self, query: str, limit: int = 25, guild_id=None) -> list:
         # Not "AS cast": CAST is a reserved word in SQLite and the query is a
         # syntax error the moment you order by it.
+        scope = "" if guild_id is None else " AND (guild_id = 0 OR guild_id = ?)"
+        extra = () if guild_id is None else (guild_id,)
         rows = self.conn.execute(
             "SELECT series, COUNT(*) AS cast_size FROM characters"
-            " WHERE series LIKE ? GROUP BY series ORDER BY cast_size DESC LIMIT ?",
-            (f"%{query}%", limit),
+            " WHERE series LIKE ?"
+            + scope
+            + " GROUP BY series ORDER BY cast_size DESC LIMIT ?",
+            (f"%{query}%", *extra, limit),
         ).fetchall()
         return [(r["series"], r["cast_size"]) for r in rows]
 
-    def characters_in_series(self, series: str, limit: int = 200) -> list:
+    def characters_in_series(self, series: str, limit: int = 200,
+                             guild_id=None) -> list:
+        scope = "" if guild_id is None else " AND (guild_id = 0 OR guild_id = ?)"
+        extra = () if guild_id is None else (guild_id,)
         return self.conn.execute(
-            "SELECT * FROM characters WHERE series = ? ORDER BY like_rank LIMIT ?",
-            (series, limit),
+            "SELECT * FROM characters WHERE series = ?"
+            + scope
+            + " ORDER BY like_rank LIMIT ?",
+            (series, *extra, limit),
         ).fetchall()
 
     # ---------- wishes ----------

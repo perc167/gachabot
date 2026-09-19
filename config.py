@@ -36,6 +36,7 @@ GUILD_SETTINGS = {
     ),
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
     "wish_limit": (20, 1, 200, "How many characters a user may wish for"),
+    "custom_limit": (50, 0, 2000, "Custom characters a server may add"),
     # --- economy ---
     "karuda_grab_percent": (
         8, 1, 100,

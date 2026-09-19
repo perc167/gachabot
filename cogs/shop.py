@@ -63,7 +63,7 @@ class Shop(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="buyrolls", aliases=["br"])
+    @commands.command(name="buyrolls", aliases=["br", "rollsup", "buyroll"])
     @commands.guild_only()
     async def buyrolls(self, ctx, bundles: int = 1):
         """Buy extra rolls for the rest of this window."""
@@ -96,7 +96,7 @@ class Shop(commands.Cog):
             f" until the window resets in {fmt_duration(reset_in)}."
         )
 
-    @commands.command(name="resetclaim", aliases=["rc"])
+    @commands.command(name="resetclaim", aliases=["rc", "claimreset", "cdspe"])
     @commands.guild_only()
     async def resetclaim(self, ctx):
         """Clear your claim cooldown."""
@@ -124,7 +124,7 @@ class Shop(commands.Cog):
             " You can claim again now."
         )
 
-    @commands.command(name="wishslot", aliases=["ws"])
+    @commands.command(name="wishslot", aliases=["ws", "wishslotbuy", "wsup"])
     @commands.guild_only()
     async def wishslot(self, ctx):
         """Buy one more wishlist slot, permanently."""

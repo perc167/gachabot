@@ -109,7 +109,7 @@ class Karuda(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="balance", aliases=["k", "karuda", "bal"])
+    @commands.command(name="balance", aliases=["k", "karuda", "kakera", "bal", "wallet"])
     @commands.guild_only()
     async def balance(self, ctx, member: discord.Member = None):
         """Check a karuda balance."""
@@ -181,7 +181,7 @@ class Karuda(commands.Cog):
             content=ctx.author.mention, embed=view.render(), view=view
         )
 
-    @commands.command(name="shards", aliases=["types"])
+    @commands.command(name="shards", aliases=["types", "kakeravalues", "shardlist"])
     async def shards(self, ctx):
         """What each shard type is worth, and how often it turns up."""
         total_weight = sum(s[4] for s in config.SHARD_TYPES)
@@ -205,7 +205,7 @@ class Karuda(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="pay", aliases=["sendkaruda"])
+    @commands.command(name="pay", aliases=["sendkaruda", "givek", "givekaruda", "givekakera"])
     @commands.guild_only()
     async def pay(self, ctx, member: discord.Member, amount: int):
         """Send karuda to someone."""
@@ -228,7 +228,7 @@ class Karuda(commands.Cog):
             f" (their total: {total})."
         )
 
-    @commands.command(name="richest", aliases=["klb", "karudatop"])
+    @commands.command(name="richest", aliases=["klb", "karudatop", "topk", "topservk"])
     @commands.guild_only()
     async def richest(self, ctx):
         """Karuda leaderboard for this server."""

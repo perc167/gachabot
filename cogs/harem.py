@@ -64,7 +64,7 @@ class Harem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="harem", aliases=["mm", "hl"])
+    @commands.command(name="harem", aliases=["mm", "hl", "marry", "mymarry", "ml"])
     @commands.guild_only()
     async def harem(self, ctx, member: discord.Member = None, order: str = "likes"):
         """List a harem. `$mm @user recent` sorts by claim time."""
@@ -109,11 +109,11 @@ class Harem(commands.Cog):
 
         await Paginator(embeds, ctx.author.id).start(ctx)
 
-    @commands.command(name="info", aliases=["im", "char"])
+    @commands.command(name="info", aliases=["im", "char", "ci", "character"])
     @commands.guild_only()
     async def info(self, ctx, *, name: str):
         """Look up a character by name."""
-        matches = self.bot.db.find_characters_by_name(name)
+        matches = self.bot.db.find_characters_by_name(name, guild_id=ctx.guild.id)
         if not matches:
             await ctx.send(f"No character matching `{name}`.")
             return
@@ -127,11 +127,11 @@ class Harem(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="search", aliases=["sc"])
+    @commands.command(name="search", aliases=["sc", "s", "commandsearch"])
     @commands.guild_only()
     async def search(self, ctx, *, query: str):
         """Search the pool by character or series name."""
-        rows = self.bot.db.search_characters(query, limit=25)
+        rows = self.bot.db.search_characters(query, limit=25, guild_id=ctx.guild.id)
         if not rows:
             await ctx.send(f"Nothing matches `{query}`.")
             return
@@ -150,7 +150,7 @@ class Harem(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="divorce", aliases=["dv"])
+    @commands.command(name="divorce", aliases=["dv", "d", "userdivorce"])
     @commands.guild_only()
     async def divorce(self, ctx, *, name: str = None):
         """`$divorce` — pick from your harem, or name someone directly."""
@@ -160,7 +160,7 @@ class Harem(commands.Cog):
         if name:
             owned = [
                 row
-                for row in db.find_characters_by_name(name)
+                for row in db.find_characters_by_name(name, guild_id=gid)
                 if db.owner_of(gid, row["id"]) == ctx.author.id
             ]
             if not owned:
@@ -206,7 +206,7 @@ class Harem(commands.Cog):
                 f"Divorced **{character['name']}**. They are back in the pool."
             )
 
-    @commands.command(name="note")
+    @commands.command(name="note", aliases=["notenote", "n"])
     @commands.guild_only()
     async def note(self, ctx, *, args: str = None):
         """`$note` — pick a character, then write the note in a box.
@@ -252,7 +252,7 @@ class Harem(commands.Cog):
             view=NoteButton(db, gid, ctx.author.id, view.chosen),
         )
 
-    @commands.command(name="top", aliases=["lb", "leaderboard"])
+    @commands.command(name="top", aliases=["lb", "leaderboard", "topserv", "ts"])
     @commands.guild_only()
     async def top(self, ctx):
         """Biggest harems in this server."""

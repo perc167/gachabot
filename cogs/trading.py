@@ -23,7 +23,7 @@ class Trading(commands.Cog):
             return None, f"**{character['name']}** is not owned by <@{user_id}>."
         return character, None
 
-    @commands.command(name="gift", aliases=["give"])
+    @commands.command(name="gift", aliases=["give", "givecustom", "handover"])
     @commands.guild_only()
     async def gift(self, ctx, member: discord.Member, *, name: str = None):
         """`$gift @user` — pick from a menu, or name the character directly."""
@@ -98,7 +98,7 @@ class Trading(commands.Cog):
         await view.wait()
         return view.chosen
 
-    @commands.command(name="trade", aliases=["tr"])
+    @commands.command(name="trade", aliases=["tr", "trad", "swap"])
     @commands.guild_only()
     async def trade(self, ctx, member: discord.Member, *, args: str = None):
         """`$trade @user` — pick from a menu. Both of you choose in turn.
