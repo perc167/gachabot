@@ -13,22 +13,23 @@ SECTIONS = [
     (
         "Your characters",
         [
-            ("mm [@user] [likes|name|recent|kakera]", "Browse a harem"),
+            ("mm [@user] [likes|name|recent|karuda]", "Browse a harem"),
             ("im <name>", "Character card"),
             ("search <text>", "Search the pool by name or series"),
             ("album <name>", "Flip through every image a character has"),
-            ("divorce <name>", "Release a character, refunds half its kakera"),
+            ("divorce <name>", "Release a character, refunds half its karuda"),
             ("note <name> | <text>", "Annotate one of your characters"),
             ("top", "Biggest harems in the server"),
         ],
     ),
     (
-        "Kakera",
+        "Karuda",
         [
             ("k [@user]", "Balance and harem worth"),
-            ("daily", "Free kakera every 20h"),
-            ("pay @user <amount>", "Send kakera"),
-            ("richest", "Kakera leaderboard"),
+            ("daily", "Pull a karuda shard, every 20h"),
+            ("shards", "What each shard type pays, and its odds"),
+            ("pay @user <amount>", "Send karuda"),
+            ("richest", "Karuda leaderboard"),
         ],
     ),
     (

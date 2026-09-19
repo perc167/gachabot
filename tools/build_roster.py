@@ -1,6 +1,6 @@
 """Generates data/characters.json.
 
-Kakera value is worked out from two things, not typed in by hand:
+Karuda value is worked out from two things, not typed in by hand:
 
   1. How famous the SERIES is. Naruto and One Piece are worth more than
      Steins;Gate, not because they are better, but because more people
@@ -8,7 +8,7 @@ Kakera value is worked out from two things, not typed in by hand:
 
   2. How central the CHARACTER is to that series. Luffy outranks Chopper.
 
-    base_kakera = series tier + role bonus
+    base_karuda = series tier + role bonus
 
 Edit the tables or the roster below and re-run this file to regenerate:
 
@@ -843,16 +843,16 @@ ROSTER = {
 }
 
 
-# Kakera range. Mudae-ish: a nobody is worth a pittance, a top-rank character
+# Karuda range. Mudae-ish: a nobody is worth a pittance, a top-rank character
 # is worth a few hundred rolls of grinding.
-KAKERA_MIN, KAKERA_MAX = 20, 1300
+KARUDA_MIN, KARUDA_MAX = 20, 1300
 
 # Ranks run 1 (most popular) to RANK_MAX, as in Mudae.
 RANK_MAX = 10000
 
 # How sharply value falls off with rank. Higher = more top-heavy, so the
 # difference between rank 1 and rank 50 is dramatic and the long tail is flat.
-KAKERA_CURVE = 2.4
+KARUDA_CURVE = 2.4
 
 
 def fame_score(tier: str, role: str) -> int:
@@ -876,10 +876,10 @@ def jitter_rank(rank: int, name: str) -> int:
     return max(1, min(RANK_MAX, round(rank * (1 + offset))))
 
 
-def kakera_for_rank(rank: int) -> int:
-    """Rank -> kakera, front-loaded so the top of the list is genuinely rare."""
+def karuda_for_rank(rank: int) -> int:
+    """Rank -> karuda, front-loaded so the top of the list is genuinely rare."""
     share = 1 - (rank - 1) / (RANK_MAX - 1)
-    return round(KAKERA_MIN + (KAKERA_MAX - KAKERA_MIN) * share**KAKERA_CURVE)
+    return round(KARUDA_MIN + (KARUDA_MAX - KARUDA_MIN) * share**KARUDA_CURVE)
 
 
 def build():
@@ -904,7 +904,7 @@ def build():
         character["like_rank"] = like_rank
         character["claim_rank"] = claim_rank
         # Value reflects both how liked and how claimed they are.
-        character["base_kakera"] = kakera_for_rank((like_rank + claim_rank) // 2)
+        character["base_karuda"] = karuda_for_rank((like_rank + claim_rank) // 2)
         del character["_fame"]
 
     characters.sort(key=lambda c: (c["like_rank"], c["name"]))
@@ -948,9 +948,9 @@ def main():
 
     spread = {}
     for character in characters:
-        spread.setdefault(character["base_kakera"], 0)
-        spread[character["base_kakera"]] += 1
-    print("\nkakera value  characters")
+        spread.setdefault(character["base_karuda"], 0)
+        spread[character["base_karuda"]] += 1
+    print("\nkaruda value  characters")
     for value in sorted(spread, reverse=True):
         print(f"{value:>12}  {'#' * min(spread[value], 60)} ({spread[value]})")
 

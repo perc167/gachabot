@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS characters (
     series      TEXT NOT NULL,
     image_url   TEXT NOT NULL,
     likes       INTEGER NOT NULL DEFAULT 0,
-    base_kakera INTEGER NOT NULL DEFAULT 50,
+    base_karuda INTEGER NOT NULL DEFAULT 50,
     -- Popularity ranks, 1 = most popular. Lower is better, as in Mudae.
     like_rank   INTEGER NOT NULL DEFAULT 0,
     claim_rank  INTEGER NOT NULL DEFAULT 0,
@@ -42,11 +42,11 @@ CREATE TABLE IF NOT EXISTS guild_settings (
 CREATE TABLE IF NOT EXISTS players (
     guild_id        INTEGER NOT NULL,
     user_id         INTEGER NOT NULL,
-    kakera          INTEGER NOT NULL DEFAULT 0,
+    karuda          INTEGER NOT NULL DEFAULT 0,
     rolls_used      INTEGER NOT NULL DEFAULT 0,
     rolls_reset_at  INTEGER NOT NULL DEFAULT 0,
     claim_ready_at  INTEGER NOT NULL DEFAULT 0,
-    kakera_ready_at INTEGER NOT NULL DEFAULT 0,
+    karuda_ready_at INTEGER NOT NULL DEFAULT 0,
     daily_ready_at  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
 );
@@ -71,6 +71,16 @@ CREATE TABLE IF NOT EXISTS wishes (
 );
 CREATE INDEX IF NOT EXISTS idx_wishes_character
     ON wishes (guild_id, character_id);
+
+-- How many of each shard type a player has pulled. Flavour and bragging
+-- rights; the spendable balance is players.karuda.
+CREATE TABLE IF NOT EXISTS shard_pulls (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    shard    TEXT NOT NULL,
+    count    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, shard)
+);
 """
 
 
@@ -88,6 +98,32 @@ class Database:
 
     def _migrate(self):
         """Add columns that landed after someone already had a database."""
+        # kakera was renamed to karuda. Rename in place so existing servers
+        # keep their balances rather than starting over.
+        renames = [
+            ("players", "kakera", "karuda"),
+            ("players", "kakera_ready_at", "karuda_ready_at"),
+            ("characters", "base_kakera", "base_karuda"),
+        ]
+        for table, old, new in renames:
+            columns = {
+                row["name"]
+                for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if old in columns and new not in columns:
+                self.conn.execute(
+                    f"ALTER TABLE {table} RENAME COLUMN {old} TO {new}"
+                )
+        self.conn.execute(
+            "UPDATE OR IGNORE guild_settings SET key = 'karuda_rate'"
+            " WHERE key = 'kakera_rate'"
+        )
+        self.conn.execute(
+            "UPDATE OR IGNORE guild_settings"
+            " SET key = 'karuda_interval_minutes'"
+            " WHERE key = 'kakera_interval_minutes'"
+        )
+
         existing = {
             row["name"]
             for row in self.conn.execute("PRAGMA table_info(players)").fetchall()
@@ -130,14 +166,14 @@ class Database:
     # ---------- characters ----------
 
     def add_character(
-        self, name: str, series: str, image_url: str, likes: int, base_kakera: int
+        self, name: str, series: str, image_url: str, likes: int, base_karuda: int
     ) -> Optional[int]:
         """Insert a character. Returns its id, or None if it already exists."""
         try:
             cur = self.conn.execute(
-                "INSERT INTO characters (name, series, image_url, likes, base_kakera)"
+                "INSERT INTO characters (name, series, image_url, likes, base_karuda)"
                 " VALUES (?, ?, ?, ?, ?)",
-                (name, series, image_url, likes, base_kakera),
+                (name, series, image_url, likes, base_karuda),
             )
             self.conn.commit()
             return cur.lastrowid
@@ -145,17 +181,17 @@ class Database:
             return None
 
     def upsert_character(
-        self, name: str, series: str, image_url: str, likes: int, base_kakera: int
+        self, name: str, series: str, image_url: str, likes: int, base_karuda: int
     ) -> int:
         """Insert or update by (name, series). Used by the seed importer."""
         self.conn.execute(
-            "INSERT INTO characters (name, series, image_url, likes, base_kakera)"
+            "INSERT INTO characters (name, series, image_url, likes, base_karuda)"
             " VALUES (?, ?, ?, ?, ?)"
             " ON CONFLICT (name, series) DO UPDATE SET"
             "   image_url = excluded.image_url,"
             "   likes = excluded.likes,"
-            "   base_kakera = excluded.base_kakera",
-            (name, series, image_url, likes, base_kakera),
+            "   base_karuda = excluded.base_karuda",
+            (name, series, image_url, likes, base_karuda),
         )
         self.conn.commit()
         row = self.conn.execute(
@@ -174,7 +210,7 @@ class Database:
         import did several thousand commits and took minutes. This does one.
 
         `entries` are dicts with name and series, optionally image_url, likes,
-        base_kakera, like_rank, claim_rank and an images list. Returns counts.
+        base_karuda, like_rank, claim_rank and an images list. Returns counts.
         """
         timestamp = int(time.time())
         inserted = updated = images_added = 0
@@ -192,7 +228,7 @@ class Database:
                 values = (
                     entry.get("image_url", ""),
                     int(entry.get("likes", 0)),
-                    int(entry.get("base_kakera", 50)),
+                    int(entry.get("base_karuda", entry.get("base_kakera", 50))),
                     int(entry.get("like_rank", 0)),
                     int(entry.get("claim_rank", 0)),
                 )
@@ -200,7 +236,7 @@ class Database:
                 if character_id is None:
                     cur = self.conn.execute(
                         "INSERT INTO characters"
-                        " (name, series, image_url, likes, base_kakera,"
+                        " (name, series, image_url, likes, base_karuda,"
                         "  like_rank, claim_rank)"
                         " VALUES (?, ?, ?, ?, ?, ?, ?)",
                         (entry["name"], entry["series"], *values),
@@ -211,7 +247,7 @@ class Database:
                 else:
                     self.conn.execute(
                         "UPDATE characters SET image_url = ?, likes = ?,"
-                        " base_kakera = ?, like_rank = ?, claim_rank = ?"
+                        " base_karuda = ?, like_rank = ?, claim_rank = ?"
                         " WHERE id = ?",
                         (*values, character_id),
                     )
@@ -268,7 +304,7 @@ class Database:
 
     def update_character(self, character_id: int, **fields) -> bool:
         allowed = {
-            "name", "series", "image_url", "likes", "base_kakera",
+            "name", "series", "image_url", "likes", "base_karuda",
             "like_rank", "claim_rank",
         }
         fields = {k: v for k, v in fields.items() if k in allowed and v is not None}
@@ -454,11 +490,11 @@ class Database:
 
     def update_player(self, guild_id: int, user_id: int, **fields):
         allowed = {
-            "kakera",
+            "karuda",
             "rolls_used",
             "rolls_reset_at",
             "claim_ready_at",
-            "kakera_ready_at",
+            "karuda_ready_at",
             "daily_ready_at",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
@@ -472,19 +508,42 @@ class Database:
         )
         self.conn.commit()
 
-    def add_kakera(self, guild_id: int, user_id: int, amount: int) -> int:
+    def add_karuda(self, guild_id: int, user_id: int, amount: int) -> int:
         player = self.get_player(guild_id, user_id)
-        new_total = max(0, player["kakera"] + amount)
-        self.update_player(guild_id, user_id, kakera=new_total)
+        new_total = max(0, player["karuda"] + amount)
+        self.update_player(guild_id, user_id, karuda=new_total)
         return new_total
 
-    def top_kakera(self, guild_id: int, limit: int = 10) -> list:
+    def top_karuda(self, guild_id: int, limit: int = 10) -> list:
         return self.conn.execute(
-            "SELECT user_id, kakera FROM players"
-            " WHERE guild_id = ? AND kakera > 0"
-            " ORDER BY kakera DESC LIMIT ?",
+            "SELECT user_id, karuda FROM players"
+            " WHERE guild_id = ? AND karuda > 0"
+            " ORDER BY karuda DESC LIMIT ?",
             (guild_id, limit),
         ).fetchall()
+
+    def record_shard(self, guild_id: int, user_id: int, shard: str) -> int:
+        """Count one shard pull. Returns the new total for that type."""
+        self.conn.execute(
+            "INSERT INTO shard_pulls (guild_id, user_id, shard, count)"
+            " VALUES (?, ?, ?, 1)"
+            " ON CONFLICT (guild_id, user_id, shard)"
+            " DO UPDATE SET count = count + 1",
+            (guild_id, user_id, shard),
+        )
+        self.conn.commit()
+        return self.conn.execute(
+            "SELECT count FROM shard_pulls"
+            " WHERE guild_id = ? AND user_id = ? AND shard = ?",
+            (guild_id, user_id, shard),
+        ).fetchone()["count"]
+
+    def shards_of(self, guild_id: int, user_id: int) -> dict:
+        rows = self.conn.execute(
+            "SELECT shard, count FROM shard_pulls WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        ).fetchall()
+        return {row["shard"]: row["count"] for row in rows}
 
     # ---------- marriages ----------
 
@@ -530,7 +589,7 @@ class Database:
             "likes": "c.likes DESC",
             "name": "c.name COLLATE NOCASE ASC",
             "recent": "m.claimed_at DESC",
-            "kakera": "c.base_kakera DESC",
+            "karuda": "c.base_karuda DESC",
         }.get(order, "c.likes DESC")
         return self.conn.execute(
             "SELECT c.*, m.claimed_at, m.note FROM marriages m"

@@ -1,7 +1,7 @@
 # Gacha bot
 
 A Mudae-style Discord gacha bot: roll random characters, claim them with a
-button, collect kakera, keep a wishlist, trade with other players. Rates and
+button, collect karuda, keep a wishlist, trade with other players. Rates and
 cooldowns are configurable per server.
 
 ## Setup
@@ -135,16 +135,17 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 |---|---|
 | `$w` | Roll a character (aliases: `$wa`, `$m`, `$roll`) |
 | `$rolls` | Rolls left and every cooldown |
-| `$mm [@user] [likes\|name\|recent\|kakera]` | Browse a harem |
+| `$mm [@user] [likes\|name\|recent\|karuda]` | Browse a harem |
 | `$im <name>` | Character card |
 | `$search <text>` | Search by character or series |
-| `$divorce <name>` | Release a character, refunds half its kakera |
+| `$divorce <name>` | Release a character, refunds half its karuda |
 | `$note <name> \| <text>` | Annotate one of your characters |
 | `$top` | Biggest harems in the server |
-| `$k [@user]` | Kakera balance and harem worth |
-| `$daily` | Free kakera every 20h |
-| `$pay @user <amount>` | Send kakera |
-| `$richest` | Kakera leaderboard |
+| `$k [@user]` | Karuda balance and shard collection |
+| `$daily` | Pull a karuda shard, every 20h |
+| `$shards` | What each shard pays, and its odds |
+| `$pay @user <amount>` | Send karuda |
+| `$richest` | Karuda leaderboard |
 | `$wish <name>` | Get pinged and a head start when it rolls |
 | `$unwish <name>` / `$wishlist [@user]` / `$wishedby <name>` | Wishlist management |
 | `$gift @user <name>` | Give a character away (they confirm) |
@@ -167,28 +168,38 @@ your `claim_interval_minutes` cooldown. A character can only be married by one
 person *per server* — each server has its own independent game state over a
 shared character pool.
 
-**Kakera.** Rolling a character someone already owns drops a Kakera button
-instead. Grabbing pays out the character's `base_kakera` scaled by the server's
-`kakera_rate`, with a ±20% jitter — 60% payout if the character is not yours.
-Gated by `kakera_interval_minutes`.
+**Karuda.** The currency. Rolling a character someone already owns drops a
+Karuda button instead of a Claim button; grabbing pays out that character's
+value scaled by the server's `karuda_rate`, with a ±20% jitter, and 60% if the
+character is not yours. Gated by `karuda_interval_minutes`.
+
+**Shards.** `$daily` pulls one of six shard types, and which one you get
+decides the payout:
+
+| Shard | Payout | Chance |
+|---|---|---|
+| 🟣 Karuda Dust | ×1 | 50% |
+| 🟢 Verdite | ×1.6 | 22% |
+| 🟡 Aurum | ×2.4 | 14% |
+| 🟠 Ember | ×3.6 | 8% |
+| 🔵 Azure | ×5.5 | 5% |
+| 🌈 Prism | ×12 | 1% |
+
+One balance, so shards are about the moment of the pull rather than six
+separate wallets. Every type you have pulled is tracked and shown on `$k`.
+`$shards` lists the table above live. The icons are plain Unicode so they work
+with no setup — to use custom server emoji, paste the full `<:name:id>` form
+into `SHARD_TYPES` in `config.py`.
 
 **Ranks and value.** Every character carries two popularity ranks, 1 being the
-most popular, exactly as Mudae does:
+most popular, exactly as Mudae does: a **claim rank** for how sought-after they
+are, and a **like rank** for how many people want them. Both appear on the
+card. Value is derived from the average of the two on a front-loaded curve,
+running from 20 karuda for a rank-10000 nobody to 1300 for rank 1.
 
-- **Claim rank** — how sought-after they are to actually own
-- **Like rank** — how many people want them
-
-Both appear on the card. `base_kakera` is derived from the average of the two
-on a front-loaded curve, so it runs from **20** for a rank-10000 nobody to
-**1300** for rank 1, and the drop-off near the top is steep. Rarity tier is
-then read off that value, so tier, rank and worth are three views of one
-number rather than three unrelated systems.
-
-Rarity does **not** change your odds of rolling someone. Rolls are a flat,
-uniform pick across the pool, which is what Mudae does — rarity expresses
-itself through kakera payouts and through who reaches the Claim button first.
-If you ever want weighted rolls, the change is a weight per tier applied in
-`Database.random_character`.
+**There are no rarity tiers.** A character's worth is its karuda value and its
+ranks — one number, read three ways, rather than a separate tier system laid
+on top. Rolls are a flat, uniform pick across the pool, as in Mudae.
 
 **Albums.** A character can hold any number of images. A roll shows one at
 random, so the same character looks different each time they appear. `$album
@@ -205,13 +216,13 @@ the character is claimed.
 series** (Naruto, One Piece, Dragon Ball, Attack on Titan, Demon Slayer, Jujutsu
 Kaisen, and so on).
 
-### How kakera values were decided
+### How karuda values were decided
 
 Values are not hand-typed. `tools/build_roster.py` computes each one from two
 things:
 
 ```
-base_kakera = how famous the series is + how central the character is
+base_karuda = how famous the series is + how central the character is
 ```
 
 Series sit in fame tiers (`S` = household name, down to `C` = niche), and each
@@ -276,9 +287,9 @@ $addchar Sakura Haruno | Naruto
 $addchar Sakura Haruno | Naruto | https://example.com/art.png | 0 | 98
 ```
 
-Everything after the series is optional (art blank, likes 0, kakera 50). Or edit
+Everything after the series is optional (art blank, likes 0, karuda 50). Or edit
 `data/characters.json` directly — it's a list of objects with `name`, `series`,
-and optional `image_url`, `likes`, `base_kakera` — and run `$import`. You can
+and optional `image_url`, `likes`, `base_karuda`, `images` — and run `$import`. You can
 also attach your own `.json` file to the `$import` message.
 
 ## Layout
@@ -286,15 +297,15 @@ also attach your own `.json` file to the `$import` message.
 ```
 start-bot.bat       double-click launcher, finds Python and starts the bot
 bot.py              entry point, cog loading, error handling
-tools/build_roster.py  regenerates data/characters.json and its kakera values
+tools/build_roster.py  regenerates data/characters.json and its karuda values
 tools/fetch_art.py     fills in image_url from the AniList API
-config.py           settings table, rarity tiers, env vars
+config.py           settings table, shard types, card colours, env vars
 db.py               all SQL; every query lives here
-utils.py            cooldown bookkeeping, kakera math, embed building
+utils.py            cooldown bookkeeping, karuda math, embed building
 views.py            Paginator and Confirm buttons
-cogs/rolling.py     $w, the Claim and Kakera buttons
+cogs/rolling.py     $w, the Claim and Karuda buttons
 cogs/harem.py       browsing, lookup, divorce, leaderboard
-cogs/kakera.py      balance, daily, pay, richest
+cogs/karuda.py      balance, daily shard pulls, pay, richest
 cogs/wishlist.py    wishes
 cogs/trading.py     gift and trade
 cogs/admin.py       pool management, import/export
@@ -309,7 +320,7 @@ Before you touch anything, check it still runs:
 python smoke_test.py
 ```
 
-It loads all eight cogs, then drives claims, races, cooldowns, kakera, wishes,
+It loads all eight cogs, then drives claims, races, cooldowns, karuda, wishes,
 trades, divorces, settings and embed building against a throwaway database —
 about 70 assertions, a few seconds, no Discord connection.
 

@@ -17,7 +17,7 @@ log = logging.getLogger("gacha")
 COGS = [
     "cogs.rolling",
     "cogs.harem",
-    "cogs.kakera",
+    "cogs.karuda",
     "cogs.wishlist",
     "cogs.trading",
     "cogs.admin",

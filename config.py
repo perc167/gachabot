@@ -24,10 +24,10 @@ GUILD_SETTINGS = {
     "roll_limit": (10, 1, 100, "Rolls each user gets per reset period"),
     "roll_reset_minutes": (60, 5, 1440, "Minutes between roll refills"),
     "claim_interval_minutes": (180, 1, 10080, "Minutes between character claims"),
-    "kakera_interval_minutes": (20, 1, 1440, "Minutes between kakera collects"),
+    "karuda_interval_minutes": (20, 1, 1440, "Minutes between karuda collects"),
     "max_marriages": (0, 0, 5000, "Harem size cap (0 = unlimited)"),
     "claim_window_seconds": (45, 5, 600, "How long a roll stays claimable"),
-    "kakera_rate": (100, 10, 500, "Kakera payout multiplier, as a percent"),
+    "karuda_rate": (100, 10, 500, "Karuda payout multiplier, as a percent"),
     "wish_protect_seconds": (
         15,
         0,
@@ -38,24 +38,39 @@ GUILD_SETTINGS = {
     "wish_limit": (20, 1, 200, "How many characters a user may wish for"),
 }
 
-# Rarity is read off base_kakera, which is how famous the character is
-# (see tools/build_roster.py). Likes are earned by players over time and do
-# not decide the tier, so a brand new pool still has a full rarity spread.
-#
-# base_kakera threshold -> (tier name, embed colour).
-# Ordered high to low; the first threshold a character clears wins.
-RARITY_TIERS = [
-    (1150, "Mythic", 0xFF4D6D),
-    (835, "Legendary", 0xF4A261),
-    (370, "Epic", 0xB388EB),
-    (66, "Rare", 0x4EA8DE),
-    (0, "Common", 0x8D99AE),
+# The currency. Karuda are shards; every payout is measured in them.
+CURRENCY = "karuda"
+CURRENCY_TITLE = "Karuda"
+
+# Card accent. One colour for every character - there are no rarity tiers,
+# a character's worth is its karuda value and its ranks.
+CARD_COLOUR = 0x7C6BF0
+CLAIMED_COLOUR = 0x43B581
+
+# The six kinds of shard a $daily can turn up.
+#   key, display name, icon, payout multiplier, weight, embed colour
+# Weights are relative: Dust lands about half the time, Prism about 1 in 100.
+# Icons are plain Unicode so they work with no setup. To use custom server
+# emoji instead, paste the full form - "<:prism:1234567890>" - in place of one.
+SHARD_TYPES = [
+    ("dust",    "Karuda Dust", "\U0001f7e3",  1.0, 50, 0x9B8AFB),
+    ("verdite", "Verdite",     "\U0001f7e2",  1.6, 22, 0x43B581),
+    ("aurum",   "Aurum",       "\U0001f7e1",  2.4, 14, 0xF1C40F),
+    ("ember",   "Ember",       "\U0001f7e0",  3.6,  8, 0xE67E22),
+    ("azure",   "Azure",       "\U0001f535",  5.5,  5, 0x3498DB),
+    ("prism",   "Prism",       "\U0001f308", 12.0,  1, 0xFF4D6D),
 ]
 
+SHARDS_BY_KEY = {key: (key, name, icon, mult, weight, colour)
+                 for key, name, icon, mult, weight, colour in SHARD_TYPES}
 
-def rarity_for(base_kakera: int):
-    """Return (tier name, embed colour) for a character's kakera value."""
-    for threshold, name, colour in RARITY_TIERS:
-        if base_kakera >= threshold:
-            return name, colour
-    return RARITY_TIERS[-1][1], RARITY_TIERS[-1][2]
+
+def shard(key: str):
+    """Look up one shard type, falling back to the basic one."""
+    return SHARDS_BY_KEY.get(key, SHARD_TYPES[0])
+
+
+def roll_shard(random_module):
+    """Pick a shard type by weight. Returns the whole tuple."""
+    weights = [entry[4] for entry in SHARD_TYPES]
+    return random_module.choices(SHARD_TYPES, weights=weights, k=1)[0]

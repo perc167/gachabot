@@ -2,10 +2,11 @@
 import discord
 from discord.ext import commands
 
+import config
 import utils
 from views import Paginator
 
-ORDERS = ("likes", "name", "recent", "kakera")
+ORDERS = ("likes", "name", "recent", "karuda")
 
 
 class Harem(commands.Cog):
@@ -27,30 +28,31 @@ class Harem(commands.Cog):
             await ctx.send(f"{member.display_name} has not claimed anyone yet.")
             return
 
-        rate = db.get_setting(gid, "kakera_rate")
+        rate = db.get_setting(gid, "karuda_rate")
         total_likes = sum(r["likes"] for r in rows)
-        total_kakera = sum(utils.kakera_value(r, rate) for r in rows)
+        total_karuda = sum(utils.karuda_value(r, rate) for r in rows)
 
         lines = []
+        icon = config.SHARD_TYPES[0][2]
         for i, row in enumerate(rows, 1):
-            tier, _ = utils.rarity_of(row)
             note = f" — _{row['note']}_" if row["note"] else ""
             lines.append(
-                f"`{i:>3}.` **{row['name']}** • {row['series']}"
-                f" • {row['likes']} ♥ • {tier}{note}"
+                f"`{i:>3}.` **{row['name']}** · {row['series']}\n"
+                f"       {icon} {utils.karuda_value(row, rate):,}"
+                f" · #{row['like_rank']:,}{note}"
             )
 
         embeds = []
-        pages = utils.paginate(lines, 10)
+        pages = utils.paginate(lines, 8)
         for page_no, page in enumerate(pages, 1):
             embed = discord.Embed(
                 title=f"{member.display_name}'s harem — {len(rows)} characters",
                 description="\n".join(page),
-                colour=0xB388EB,
+                colour=config.CARD_COLOUR,
             )
             embed.set_footer(
                 text=f"Page {page_no}/{len(pages)} • {total_likes} likes"
-                f" • {total_kakera} kakera • sorted by {order}"
+                f" • {total_karuda} karuda • sorted by {order}"
             )
             embeds.append(embed)
 
@@ -82,20 +84,20 @@ class Harem(commands.Cog):
             owner = self.bot.db.owner_of(ctx.guild.id, row["id"])
             tag = f" — <@{owner}>" if owner else ""
             lines.append(
-                f"`{row['id']:>4}` **{row['name']}** • {row['series']}"
-                f" • {row['likes']} ♥{tag}"
+                f"`{row['id']:>4}` **{row['name']}** · {row['series']}"
+                f" · #{row['like_rank']:,}{tag}"
             )
         embed = discord.Embed(
             title=f"Results for {query}",
             description="\n".join(lines),
-            colour=0x4EA8DE,
+            colour=config.CARD_COLOUR,
         )
         await ctx.send(embed=embed)
 
     @commands.command(name="divorce", aliases=["dv"])
     @commands.guild_only()
     async def divorce(self, ctx, *, name: str):
-        """Release a character back into the pool. Refunds half their kakera."""
+        """Release a character back into the pool. Refunds half their karuda."""
         db = self.bot.db
         gid = ctx.guild.id
         character = db.find_character_by_name(name)
@@ -105,11 +107,11 @@ class Harem(commands.Cog):
         if not db.divorce(gid, character["id"], ctx.author.id):
             await ctx.send(f"You do not own **{character['name']}**.")
             return
-        rate = db.get_setting(gid, "kakera_rate")
-        refund = max(1, utils.kakera_value(character, rate) // 2)
-        total = db.add_kakera(gid, ctx.author.id, refund)
+        rate = db.get_setting(gid, "karuda_rate")
+        refund = max(1, utils.karuda_value(character, rate) // 2)
+        total = db.add_karuda(gid, ctx.author.id, refund)
         await ctx.send(
-            f"Divorced **{character['name']}**. +{refund} kakera (total: {total})."
+            f"Divorced **{character['name']}**. +{refund} karuda (total: {total})."
         )
 
     @commands.command(name="note")
@@ -151,7 +153,7 @@ class Harem(commands.Cog):
         embed = discord.Embed(
             title=f"Top harems in {ctx.guild.name}",
             description="\n".join(lines),
-            colour=0xF4A261,
+            colour=config.CARD_COLOUR,
         )
         await ctx.send(embed=embed)
 

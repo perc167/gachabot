@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 
 import utils
-from utils import fmt_duration, kakera_value
+from utils import fmt_duration, karuda_value
 
 
 class ClaimView(discord.ui.View):
@@ -97,8 +97,8 @@ class ClaimView(discord.ui.View):
         self.stop()
 
 
-class KakeraView(discord.ui.View):
-    """Attached to a roll of an already-claimed character: free kakera."""
+class KarudaView(discord.ui.View):
+    """Attached to a roll of an already-claimed character: free karuda."""
 
     def __init__(self, cog, guild_id: int, character):
         super().__init__(timeout=cog.bot.db.get_setting(guild_id, "claim_window_seconds"))
@@ -118,7 +118,7 @@ class KakeraView(discord.ui.View):
                 pass
 
     @discord.ui.button(
-        label="Kakera", style=discord.ButtonStyle.primary, emoji="\U0001f48e"
+        label="Karuda", style=discord.ButtonStyle.primary, emoji="\U0001f48e"
     )
     async def grab(self, interaction: discord.Interaction, button: discord.ui.Button):
         db = self.cog.bot.db
@@ -129,30 +129,30 @@ class KakeraView(discord.ui.View):
             await interaction.response.send_message("Already taken.", ephemeral=True)
             return
 
-        ready, remaining = cooldowns.kakera_ready(self.guild_id, user.id)
+        ready, remaining = cooldowns.karuda_ready(self.guild_id, user.id)
         if not ready:
             await interaction.response.send_message(
-                f"Your next kakera grab is in {fmt_duration(remaining)}.",
+                f"Your next karuda grab is in {fmt_duration(remaining)}.",
                 ephemeral=True,
             )
             return
 
-        rate = db.get_setting(self.guild_id, "kakera_rate")
+        rate = db.get_setting(self.guild_id, "karuda_rate")
         # Grabbing someone else's character pays less than grabbing your own.
         owner_id = db.owner_of(self.guild_id, self.character["id"])
-        base = kakera_value(self.character, rate)
+        base = karuda_value(self.character, rate)
         amount = base if owner_id == user.id else max(1, int(base * 0.6))
         amount = int(amount * random.uniform(0.8, 1.2))
 
-        total = db.add_kakera(self.guild_id, user.id, amount)
-        cooldowns.start_kakera_cooldown(self.guild_id, user.id)
+        total = db.add_karuda(self.guild_id, user.id, amount)
+        cooldowns.start_karuda_cooldown(self.guild_id, user.id)
         self.taken = True
 
         for child in self.children:
             child.disabled = True
         await interaction.response.edit_message(view=self)
         await interaction.followup.send(
-            f"{user.mention} collected **{amount}** kakera (total: {total})."
+            f"{user.mention} collected **{amount}** karuda (total: {total})."
         )
         self.stop()
 
@@ -213,7 +213,7 @@ class Rolling(commands.Cog):
         if owner_id is None:
             view = ClaimView(self, gid, character, ctx.author.id, wishers)
         else:
-            view = KakeraView(self, gid, character)
+            view = KarudaView(self, gid, character)
 
         message = await ctx.send(content=content, embed=embed, view=view)
         view.message = message
@@ -226,7 +226,7 @@ class Rolling(commands.Cog):
         uid = ctx.author.id
         left, reset_in = self.bot.cooldowns.rolls_left(gid, uid)
         claim_ready, claim_in = self.bot.cooldowns.claim_ready(gid, uid)
-        kak_ready, kak_in = self.bot.cooldowns.kakera_ready(gid, uid)
+        kak_ready, kak_in = self.bot.cooldowns.karuda_ready(gid, uid)
         player = self.bot.db.get_player(gid, uid)
 
         embed = discord.Embed(
@@ -243,11 +243,11 @@ class Rolling(commands.Cog):
             inline=True,
         )
         embed.add_field(
-            name="Kakera",
+            name="Karuda",
             value="ready now" if kak_ready else f"in {fmt_duration(kak_in)}",
             inline=True,
         )
-        embed.add_field(name="Balance", value=f"{player['kakera']} kakera", inline=True)
+        embed.add_field(name="Balance", value=f"{player['karuda']} karuda", inline=True)
         embed.add_field(
             name="Harem",
             value=f"{self.bot.db.harem_size(gid, uid)} characters",

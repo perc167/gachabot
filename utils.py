@@ -1,4 +1,4 @@
-"""Shared helpers: cooldown bookkeeping, kakera math, embed building."""
+"""Shared helpers: cooldown bookkeeping, karuda math, embed building."""
 import time
 
 import discord
@@ -24,22 +24,17 @@ def fmt_duration(seconds: int) -> str:
     return f"{minutes}m"
 
 
-def kakera_value(character, rate_percent: int) -> int:
-    """base_kakera already encodes how famous the character is, so the only
+def karuda_value(character, rate_percent: int) -> int:
+    """base_karuda already encodes how famous the character is, so the only
     adjustment is the server's own rate."""
-    return max(1, int(character["base_kakera"] * rate_percent / 100))
-
-
-def rarity_of(character):
-    """Returns (tier name, embed colour)."""
-    return config.rarity_for(character["base_kakera"])
+    return max(1, int(character["base_karuda"] * rate_percent / 100))
 
 
 class Cooldowns:
     """Reads and writes the four timers every player has.
 
     Rolls refill in blocks: when the reset time passes, the counter goes back
-    to zero and the next window starts. Claims and kakera are simple
+    to zero and the next window starts. Claims and karuda are simple
     ready-at timestamps.
     """
 
@@ -75,14 +70,14 @@ class Cooldowns:
         minutes = self.db.get_setting(guild_id, "claim_interval_minutes")
         self.db.update_player(guild_id, user_id, claim_ready_at=now() + minutes * 60)
 
-    def kakera_ready(self, guild_id: int, user_id: int) -> tuple:
+    def karuda_ready(self, guild_id: int, user_id: int) -> tuple:
         player = self.db.get_player(guild_id, user_id)
-        remaining = player["kakera_ready_at"] - now()
+        remaining = player["karuda_ready_at"] - now()
         return remaining <= 0, max(0, remaining)
 
-    def start_kakera_cooldown(self, guild_id: int, user_id: int):
-        minutes = self.db.get_setting(guild_id, "kakera_interval_minutes")
-        self.db.update_player(guild_id, user_id, kakera_ready_at=now() + minutes * 60)
+    def start_karuda_cooldown(self, guild_id: int, user_id: int):
+        minutes = self.db.get_setting(guild_id, "karuda_interval_minutes")
+        self.db.update_player(guild_id, user_id, karuda_ready_at=now() + minutes * 60)
 
 
 def character_embed(
@@ -101,50 +96,61 @@ def character_embed(
     is what a roll does: the same character can show up wearing a different
     picture each time.
     """
-    tier, colour = rarity_of(character)
-    rate = db.get_setting(guild_id, "kakera_rate")
+    rate = db.get_setting(guild_id, "karuda_rate")
+    owner_id = db.owner_of(guild_id, character["id"]) if show_owner else None
+    wishers = db.wishers_of(guild_id, character["id"])
 
+    # One accent colour for everyone; a claimed character goes green so you
+    # can tell at a glance whether the button is worth racing for.
+    colour = config.CLAIMED_COLOUR if owner_id else config.CARD_COLOUR
     embed = discord.Embed(title=character["name"], colour=colour)
-    embed.description = character["series"]
+
+    # Series on its own line, quoted, so the name is what your eye lands on.
+    embed.description = f"> {character['series']}"
 
     if image_url is None:
         image_url = (
             db.random_image(character["id"]) if random_art else character["image_url"]
         )
-
-    # Characters can exist before anyone has added art for them.
     if image_url:
         embed.set_image(url=image_url)
     else:
-        embed.description += f"\n*no image yet — `$setimage {character['id']} <url>`*"
+        embed.description += (
+            f"\n\n*no image yet — `$setimage {character['id']} <url>`*"
+        )
 
-    lines = [f"**{kakera_value(character, rate)}** kakera", tier]
+    # Three short inline fields read as columns rather than a wall of bullets.
+    icon = config.SHARD_TYPES[0][2]
+    embed.add_field(
+        name="Value",
+        value=f"{icon} **{karuda_value(character, rate):,}**",
+        inline=True,
+    )
+    if character["claim_rank"] or character["like_rank"]:
+        embed.add_field(
+            name="Rank",
+            value=(
+                f"claim **#{character['claim_rank']:,}**\n"
+                f"like **#{character['like_rank']:,}**"
+            ),
+            inline=True,
+        )
+
+    extras = []
     album = db.image_count(character["id"])
     if album > 1:
-        lines.append(f"{album} images")
-    embed.add_field(name="​", value=" • ".join(lines), inline=False)
-
-    # Popularity ranks, Mudae style: lower is better. Claim rank is how often
-    # people actually take them; like rank is how many want them.
-    ranks = []
-    if character["claim_rank"]:
-        ranks.append(f"Claims **#{character['claim_rank']}**")
-    if character["like_rank"]:
-        ranks.append(f"Likes **#{character['like_rank']}**")
+        extras.append(f"{album} images")
     if character["likes"]:
-        ranks.append(f"{character['likes']} ♥ here")
-    if ranks:
-        embed.add_field(name="​", value=" • ".join(ranks), inline=False)
-
-    if show_owner:
-        owner_id = db.owner_of(guild_id, character["id"])
-        if owner_id:
-            embed.add_field(name="Belongs to", value=f"<@{owner_id}>", inline=False)
-
-    wishers = db.wishers_of(guild_id, character["id"])
+        extras.append(f"{character['likes']} ♥ here")
     if wishers:
-        embed.set_footer(text=f"{footer + ' • ' if footer else ''}Wished by {len(wishers)}")
-    elif footer:
+        extras.append(f"wished by {len(wishers)}")
+    if extras:
+        embed.add_field(name="​", value="\n".join(extras), inline=True)
+
+    if owner_id:
+        embed.add_field(name="Belongs to", value=f"<@{owner_id}>", inline=False)
+
+    if footer:
         embed.set_footer(text=footer)
 
     return embed

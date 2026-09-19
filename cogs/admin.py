@@ -18,7 +18,7 @@ from db import DuplicateCharacter
 from views import Paginator
 
 SEED_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "characters.json")
-FIELDS = ("name", "series", "image_url", "likes", "base_kakera")
+FIELDS = ("name", "series", "image_url", "likes", "base_karuda")
 
 
 def is_bot_owner():
@@ -39,15 +39,15 @@ class Admin(commands.Cog):
     @commands.command(name="addchar")
     @is_bot_owner()
     async def addchar(self, ctx, *, args: str):
-        """`$addchar Name | Series | image_url | likes | base_kakera`
+        """`$addchar Name | Series | image_url | likes | base_karuda`
 
-        likes and base_kakera are optional (default 0 / 50).
+        likes and base_karuda are optional (default 0 / 50).
         """
         parts = [p.strip() for p in args.split("|")]
         if len(parts) < 2:
             await ctx.send(
                 f"Usage: `{ctx.prefix}addchar Name | Series | image_url"
-                " | likes | base_kakera`\nEverything after Series is optional."
+                " | likes | base_karuda`\nEverything after Series is optional."
             )
             return
         name, series = parts[0], parts[1]
@@ -56,15 +56,15 @@ class Admin(commands.Cog):
             image_url = ""
         try:
             likes = int(parts[3]) if len(parts) > 3 and parts[3] else 0
-            base_kakera = int(parts[4]) if len(parts) > 4 and parts[4] else 50
+            base_karuda = int(parts[4]) if len(parts) > 4 and parts[4] else 50
         except ValueError:
-            await ctx.send("likes and base_kakera must be whole numbers.")
+            await ctx.send("likes and base_karuda must be whole numbers.")
             return
         if image_url and not image_url.startswith(("http://", "https://")):
             await ctx.send("image_url must be an http(s) link, or left out.")
             return
 
-        char_id = self.bot.db.add_character(name, series, image_url, likes, base_kakera)
+        char_id = self.bot.db.add_character(name, series, image_url, likes, base_karuda)
         if char_id is None:
             await ctx.send(f"**{name}** ({series}) is already in the pool.")
             return
@@ -74,7 +74,7 @@ class Admin(commands.Cog):
     @is_bot_owner()
     async def editchar(self, ctx, character_id: int, field: str, *, value: str):
         """`$editchar <id> <field> <value>` — field is one of name, series,
-        image_url, likes, base_kakera."""
+        image_url, likes, base_karuda."""
         field = field.lower()
         if field not in FIELDS:
             await ctx.send(f"Field must be one of: {', '.join(FIELDS)}.")
@@ -82,7 +82,7 @@ class Admin(commands.Cog):
         if not self.bot.db.get_character(character_id):
             await ctx.send(f"No character with ID `{character_id}`.")
             return
-        if field in ("likes", "base_kakera"):
+        if field in ("likes", "base_karuda"):
             try:
                 value = int(value)
             except ValueError:
@@ -222,13 +222,13 @@ class Admin(commands.Cog):
         if series:
             rows = db.conn.execute(
                 "SELECT * FROM characters WHERE image_url = ''"
-                " AND series LIKE ? ORDER BY base_kakera DESC LIMIT 40",
+                " AND series LIKE ? ORDER BY base_karuda DESC LIMIT 40",
                 (f"%{series}%",),
             ).fetchall()
         else:
             rows = db.conn.execute(
                 "SELECT * FROM characters WHERE image_url = ''"
-                " ORDER BY base_kakera DESC LIMIT 40"
+                " ORDER BY base_karuda DESC LIMIT 40"
             ).fetchall()
 
         total = db.conn.execute(
@@ -314,7 +314,7 @@ class Admin(commands.Cog):
                 "series": series,
                 "image_url": image_url,
                 "likes": int(entry.get("likes", 0) or 0),
-                "base_kakera": int(entry.get("base_kakera", 50) or 50),
+                "base_karuda": int(entry.get("base_karuda", 50) or 50),
                 "like_rank": int(entry.get("like_rank", 0) or 0),
                 "claim_rank": int(entry.get("claim_rank", 0) or 0),
                 "images": [
@@ -362,7 +362,7 @@ class Admin(commands.Cog):
                 "series": row["series"],
                 "image_url": row["image_url"],
                 "likes": row["likes"],
-                "base_kakera": row["base_kakera"],
+                "base_karuda": row["base_karuda"],
                 "like_rank": row["like_rank"],
                 "claim_rank": row["claim_rank"],
                 "images": self.bot.db.images_for(row["id"]),

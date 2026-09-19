@@ -54,7 +54,7 @@ async def main():
     for entry in seed:
         cid_ = db.upsert_character(
             entry["name"], entry["series"], entry["image_url"],
-            entry.get("likes", 0), entry.get("base_kakera", 50),
+            entry.get("likes", 0), entry.get("base_karuda", 50),
         )
         db.update_character(cid_, like_rank=entry.get("like_rank"),
                             claim_rank=entry.get("claim_rank"))
@@ -63,37 +63,51 @@ async def main():
     for entry in seed:
         db.upsert_character(
             entry["name"], entry["series"], entry["image_url"],
-            entry.get("likes", 0), entry.get("base_kakera", 50),
+            entry.get("likes", 0), entry.get("base_karuda", 50),
         )
     check("re-import is idempotent", db.character_count() == len(seed))
 
-    # 3. Rarity tiers and kakera math.
+    # 3. Rarity tiers and karuda math.
     import config, utils
 
-    check("mythic tier", config.rarity_for(1300)[0] == "Mythic")
-    check("common tier", config.rarity_for(20)[0] == "Common")
-    check("tiers ordered high to low",
-          [t[0] for t in config.RARITY_TIERS]
-          == sorted((t[0] for t in config.RARITY_TIERS), reverse=True))
+    check("rarity tiers are gone", not hasattr(config, "RARITY_TIERS"))
+    check("six shard types", len(config.SHARD_TYPES) == 6,
+          str(len(config.SHARD_TYPES)))
+    check("shard keys unique",
+          len({s[0] for s in config.SHARD_TYPES}) == len(config.SHARD_TYPES))
+    check("shards get rarer as they get richer",
+          [s[3] for s in config.SHARD_TYPES]
+          == sorted(s[3] for s in config.SHARD_TYPES)
+          and [s[4] for s in config.SHARD_TYPES]
+          == sorted((s[4] for s in config.SHARD_TYPES), reverse=True))
+    check("every shard has an icon", all(s[2].strip() for s in config.SHARD_TYPES))
+    import random as _random
+    pulls = [config.roll_shard(_random)[0] for _ in range(4000)]
+    check("roll_shard only returns known shards",
+          set(pulls) <= {s[0] for s in config.SHARD_TYPES})
+    check("the basic shard is the most common",
+          max(set(pulls), key=pulls.count) == config.SHARD_TYPES[0][0])
+    check("the rarest shard is actually rare",
+          pulls.count(config.SHARD_TYPES[-1][0]) < pulls.count(config.SHARD_TYPES[0][0]) / 10)
+    check("shard() falls back for an unknown key",
+          config.shard("nonsense") == config.SHARD_TYPES[0])
     top = db.find_character_by_name("Naruto Uzumaki")
     check("name lookup exact", top is not None and top["name"] == "Naruto Uzumaki")
     check("name lookup prefix", db.find_character_by_name("Naruto Uz") is not None)
-    check("kakera equals base at 100%",
-          utils.kakera_value(top, 100) == top["base_kakera"],
-          f"{utils.kakera_value(top, 100)} vs {top['base_kakera']}")
-    check("kakera_rate applies",
-          utils.kakera_value(top, 200) == utils.kakera_value(top, 100) * 2)
+    check("karuda equals base at 100%",
+          utils.karuda_value(top, 100) == top["base_karuda"],
+          f"{utils.karuda_value(top, 100)} vs {top['base_karuda']}")
+    check("karuda_rate applies",
+          utils.karuda_value(top, 200) == utils.karuda_value(top, 100) * 2)
 
     # Rarity must not collapse to one tier just because likes are all zero.
     all_rows = db.search_characters("", limit=1000)
     check("all seeded likes are zero", all(r["likes"] == 0 for r in all_rows))
-    tiers = {utils.rarity_of(r)[0] for r in all_rows}
-    check("rarity spread survives zero likes", len(tiers) >= 4, f"tiers: {sorted(tiers)}")
     leads = [r for r in all_rows if r["name"] in ("Naruto Uzumaki", "Monkey D. Luffy")]
     minor = [r for r in all_rows if r["name"] in ("Ein", "Felt")]
     check("famous leads outvalue minor characters",
-          leads and minor and min(r["base_kakera"] for r in leads)
-          > max(r["base_kakera"] for r in minor))
+          leads and minor and min(r["base_karuda"] for r in leads)
+          > max(r["base_karuda"] for r in minor))
 
     # 3b. Ranks: 1 is best, and value tracks them.
     ranked = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)
@@ -104,16 +118,16 @@ async def main():
               for r in all_rows))
     check("claim rank differs from like rank for most",
           sum(1 for r in all_rows if r["claim_rank"] != r["like_rank"]) > len(all_rows) // 2)
-    check("kakera spans the intended 20..1300 range",
-          min(r["base_kakera"] for r in all_rows) == 20
-          and max(r["base_kakera"] for r in all_rows) == 1300,
-          f"{min(r['base_kakera'] for r in all_rows)}..{max(r['base_kakera'] for r in all_rows)}")
-    check("better rank is worth more kakera",
-          ranked[0]["base_kakera"] > ranked[-1]["base_kakera"])
+    check("karuda spans the intended 20..1300 range",
+          min(r["base_karuda"] for r in all_rows) == 20
+          and max(r["base_karuda"] for r in all_rows) == 1300,
+          f"{min(r['base_karuda'] for r in all_rows)}..{max(r['base_karuda'] for r in all_rows)}")
+    check("better rank is worth more karuda",
+          ranked[0]["base_karuda"] > ranked[-1]["base_karuda"])
     rank_embed = utils.character_embed(db, GUILD, ranked[0])
     blob = " ".join(f.value for f in rank_embed.fields)
     check("card shows claim and like rank",
-          "Claims **#" in blob and "Likes **#" in blob, blob[:80])
+          "claim **#" in blob and "like **#" in blob, blob[:120])
 
     # 4. Roll budget.
     limit = db.get_setting(GUILD, "roll_limit")
@@ -137,12 +151,12 @@ async def main():
     check("claim cooldown starts", not ready and remaining > 0, f"{remaining}s")
     check("bob can still claim", cd.claim_ready(GUILD, BOB)[0])
 
-    # 6. Kakera economy.
-    db.add_kakera(GUILD, ALICE, 500)
-    check("kakera added", db.get_player(GUILD, ALICE)["kakera"] == 500)
-    db.add_kakera(GUILD, ALICE, -9999)
-    check("balance floors at zero", db.get_player(GUILD, ALICE)["kakera"] == 0)
-    db.add_kakera(GUILD, ALICE, 300)
+    # 6. Karuda economy.
+    db.add_karuda(GUILD, ALICE, 500)
+    check("karuda added", db.get_player(GUILD, ALICE)["karuda"] == 500)
+    db.add_karuda(GUILD, ALICE, -9999)
+    check("balance floors at zero", db.get_player(GUILD, ALICE)["karuda"] == 0)
+    db.add_karuda(GUILD, ALICE, 300)
     check("daily column exists", "daily_ready_at" in db.get_player(GUILD, ALICE).keys())
 
     # 7. Wishes.
@@ -167,13 +181,13 @@ async def main():
     check("character freed", db.owner_of(GUILD, top["id"]) is None)
 
     # 10. Harem ordering + notes + leaderboards.
-    for order in ("likes", "name", "recent", "kakera"):
+    for order in ("likes", "name", "recent", "karuda"):
         rows = db.harem(GUILD, BOB, order)
         check(f"harem order '{order}'", isinstance(rows, list) and len(rows) == 1)
     check("note set", db.set_note(GUILD, second["id"], BOB, "best girl"))
     check("note stored", db.harem(GUILD, BOB)[0]["note"] == "best girl")
     check("harem leaderboard", db.top_harems(GUILD)[0]["user_id"] == BOB)
-    check("kakera leaderboard", db.top_kakera(GUILD)[0]["user_id"] == ALICE)
+    check("karuda leaderboard", db.top_karuda(GUILD)[0]["user_id"] == ALICE)
 
     # 11. Settings round-trip and rejection of unknown keys.
     db.set_setting(GUILD, "roll_limit", 42)
@@ -236,7 +250,7 @@ async def main():
 
     # 16. Views construct without a live connection.
     import views
-    from cogs.rolling import ClaimView, KakeraView
+    from cogs.rolling import ClaimView, KarudaView
 
     rolling_cog = b.get_cog("Rolling")
     cv = ClaimView(rolling_cog, GUILD, top, ALICE, [BOB])
@@ -244,8 +258,8 @@ async def main():
     check("wish protection armed", cv.protect_until > utils.now())
     cv_nowish = ClaimView(rolling_cog, GUILD, top, ALICE, [])
     check("no protection without wishers", cv_nowish.protect_until <= utils.now())
-    kv = KakeraView(rolling_cog, GUILD, top)
-    check("KakeraView builds", len(kv.children) == 1)
+    kv = KarudaView(rolling_cog, GUILD, top)
+    check("KarudaView builds", len(kv.children) == 1)
     pages = views.Paginator([embed, embed], ALICE)
     check("Paginator builds", len(pages.children) == 3)
     check("Paginator labels page", pages.page_label.label == "1/2")
@@ -415,16 +429,18 @@ async def main():
     roll_embed = utils.character_embed(db, GUILD, db.get_character(cid), random_art=True)
     check("roll embed uses an album image",
           roll_embed.image.url in db.images_for(cid))
-    check("embed shows album size", "images" in str(roll_embed.fields[0].value))
+    check("embed shows album size",
+          any("images" in str(f.value) for f in roll_embed.fields),
+          " | ".join(str(f.value) for f in roll_embed.fields))
 
     # 20. Batched import: one transaction, idempotent, all-or-nothing.
     before_count = db.character_count()
     batch = [
         {"name": "Batch One", "series": "Batch QA", "image_url":
-         "https://example.com/1.png", "base_kakera": 700,
+         "https://example.com/1.png", "base_karuda": 700,
          "like_rank": 42, "claim_rank": 51,
          "images": ["https://example.com/2.png", "https://example.com/3.png"]},
-        {"name": "Batch Two", "series": "Batch QA", "base_kakera": 90},
+        {"name": "Batch Two", "series": "Batch QA", "base_karuda": 90},
     ]
     result = db.import_characters(batch)
     check("batched import inserts", result["inserted"] == 2, str(result))
@@ -444,8 +460,8 @@ async def main():
 
     # A bad row must roll the whole batch back, not half-apply it.
     poisoned = [
-        {"name": "Batch Three", "series": "Batch QA", "base_kakera": 100},
-        {"series": "Batch QA", "base_kakera": 100},  # no name -> KeyError
+        {"name": "Batch Three", "series": "Batch QA", "base_karuda": 100},
+        {"series": "Batch QA", "base_karuda": 100},  # no name -> KeyError
     ]
     count_before_failure = db.character_count()
     blew_up = False
@@ -464,6 +480,63 @@ async def main():
         row = db.find_character_by_name(name)
         if row:
             db.delete_character(row["id"])
+
+    # 21. Shard pulls are recorded per player.
+    check("shard pull records", db.record_shard(GUILD, ALICE, "prism") == 1)
+    check("shard pull increments", db.record_shard(GUILD, ALICE, "prism") == 2)
+    db.record_shard(GUILD, ALICE, "dust")
+    check("shards_of reports the collection",
+          db.shards_of(GUILD, ALICE) == {"prism": 2, "dust": 1},
+          str(db.shards_of(GUILD, ALICE)))
+    check("shards are per player", db.shards_of(GUILD, BOB) == {})
+
+    # 22. A database from before the rename keeps its balances.
+    import sqlite3 as _sqlite3
+    legacy_path = os.path.join(tempfile.mkdtemp(), "legacy.db")
+    legacy = _sqlite3.connect(legacy_path)
+    legacy.executescript("""
+        CREATE TABLE characters (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL,
+            series TEXT NOT NULL, image_url TEXT NOT NULL,
+            likes INTEGER NOT NULL DEFAULT 0,
+            base_kakera INTEGER NOT NULL DEFAULT 50,
+            UNIQUE (name, series));
+        CREATE TABLE players (
+            guild_id INTEGER NOT NULL, user_id INTEGER NOT NULL,
+            kakera INTEGER NOT NULL DEFAULT 0,
+            rolls_used INTEGER NOT NULL DEFAULT 0,
+            rolls_reset_at INTEGER NOT NULL DEFAULT 0,
+            claim_ready_at INTEGER NOT NULL DEFAULT 0,
+            kakera_ready_at INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (guild_id, user_id));
+        CREATE TABLE guild_settings (
+            guild_id INTEGER NOT NULL, key TEXT NOT NULL,
+            value INTEGER NOT NULL, PRIMARY KEY (guild_id, key));
+        INSERT INTO characters (name, series, image_url, likes, base_kakera)
+            VALUES ('Legacy Hero', 'Old Show', 'https://example.com/x.png', 7, 321);
+        INSERT INTO players (guild_id, user_id, kakera) VALUES (1, 100, 4242);
+        INSERT INTO guild_settings VALUES (1, 'kakera_rate', 150);
+    """)
+    legacy.commit()
+    legacy.close()
+
+    migrated = dbmod.Database(legacy_path)
+    player_columns = {
+        r["name"] for r in migrated.conn.execute("PRAGMA table_info(players)")
+    }
+    check("legacy kakera column renamed",
+          "karuda" in player_columns and "kakera" not in player_columns,
+          str(sorted(player_columns)))
+    check("legacy balance survived the rename",
+          migrated.get_player(1, 100)["karuda"] == 4242)
+    check("legacy base_kakera renamed",
+          migrated.find_character_by_name("Legacy Hero")["base_karuda"] == 321)
+    check("legacy setting key renamed",
+          migrated.get_setting(1, "karuda_rate") == 150,
+          str(migrated.get_setting(1, "karuda_rate")))
+    check("legacy image seeded an album",
+          migrated.image_count(migrated.find_character_by_name("Legacy Hero")["id"]) == 1)
+    migrated.close()
 
     await b.close()
 
