@@ -210,8 +210,10 @@ def character_embed(
     wishers = db.wishers_of(guild_id, character["id"])
 
     # One accent colour for everyone; a claimed character goes green so you
-    # can tell at a glance whether the button is worth racing for.
-    colour = config.CLAIMED_COLOUR if owner_id else config.CARD_COLOUR
+    # can tell at a glance whether the button is worth racing for. The
+    # unclaimed colour is the server's to choose.
+    colour = (config.CLAIMED_COLOUR if owner_id
+              else db.get_pref(guild_id, "cardcolour", config.CARD_COLOUR))
     embed = discord.Embed(title=character["name"], colour=colour)
 
     # Series on its own line, quoted, so the name is what your eye lands on.

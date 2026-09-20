@@ -36,6 +36,8 @@ COGS = [
     "cogs.settings",
     "cogs.toggles",
     "cogs.fun",
+    "cogs.notes",
+    "cogs.moderation",
     "cogs.help",
 ]
 

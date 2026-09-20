@@ -78,6 +78,9 @@ CREATE TABLE IF NOT EXISTS marriages (
     user_id      INTEGER NOT NULL,
     claimed_at   INTEGER NOT NULL,
     note         TEXT,
+    -- A picture pinned to the note, shown on the card instead of the
+    -- character's own art when it is set.
+    note_image   TEXT,
     PRIMARY KEY (guild_id, character_id)
 );
 CREATE INDEX IF NOT EXISTS idx_marriages_owner
@@ -204,6 +207,7 @@ class Database:
         # table without it, and CREATE TABLE IF NOT EXISTS will not add it.
         for table, column, spec in (
             ("characters", "source", "TEXT NOT NULL DEFAULT ''"),
+            ("marriages", "note_image", "TEXT"),
         ):
             existing = {
                 row["name"]
@@ -750,6 +754,144 @@ class Database:
         )
         self.conn.commit()
 
+    # ---------- preferences ----------
+    #
+    # Integer odds and ends a server can set - embed colours, mostly. Same
+    # table, its own "pref:" keys, same reason as the toggles: $settings
+    # renders one field per entry and Discord allows twenty-five.
+
+    PREF_PREFIX = "pref:"
+
+    def get_pref(self, guild_id: int, key: str, default: int) -> int:
+        row = self.conn.execute(
+            "SELECT value FROM guild_settings WHERE guild_id = ? AND key = ?",
+            (guild_id, self.PREF_PREFIX + key),
+        ).fetchone()
+        return row["value"] if row else default
+
+    def set_pref(self, guild_id: int, key: str, value: int):
+        self.conn.execute(
+            "INSERT INTO guild_settings (guild_id, key, value) VALUES (?, ?, ?)"
+            " ON CONFLICT (guild_id, key) DO UPDATE SET value = excluded.value",
+            (guild_id, self.PREF_PREFIX + key, int(value)),
+        )
+        self.conn.commit()
+
+    def clear_prefs(self, guild_id: int):
+        self.conn.execute(
+            "DELETE FROM guild_settings WHERE guild_id = ? AND key LIKE ?",
+            (guild_id, self.PREF_PREFIX + "%"),
+        )
+        self.conn.commit()
+
+    # ---------- wholesale resets ----------
+    #
+    # Each returns how many rows went, so the command can say what it did
+    # rather than claiming success and leaving you to check.
+
+    def clear_wishes(self, guild_id: int, user_id: int = None) -> int:
+        if user_id is None:
+            cur = self.conn.execute(
+                "DELETE FROM wishes WHERE guild_id = ?", (guild_id,))
+        else:
+            cur = self.conn.execute(
+                "DELETE FROM wishes WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id))
+        self.conn.commit()
+        return cur.rowcount
+
+    def clear_disabled(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM disabled_commands WHERE guild_id = ?", (guild_id,))
+        self.conn.commit()
+        return cur.rowcount
+
+    def clear_character_keys(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM character_keys WHERE guild_id = ?", (guild_id,))
+        self.conn.commit()
+        return cur.rowcount
+
+    def clear_custom_characters(self, guild_id: int) -> int:
+        """Only ever this guild's own inventions - guild_id 0 is the shared
+        pool and is not a server's to delete."""
+        if not guild_id:
+            return 0
+        rows = self.conn.execute(
+            "SELECT id FROM characters WHERE guild_id = ?", (guild_id,)
+        ).fetchall()
+        ids = [row["id"] for row in rows]
+        for character_id in ids:
+            self.delete_character(character_id)
+        return len(ids)
+
+    def clear_notes_everywhere(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "UPDATE marriages SET note = NULL, note_image = NULL"
+            " WHERE guild_id = ? AND (note IS NOT NULL OR note_image IS NOT NULL)",
+            (guild_id,))
+        self.conn.commit()
+        return cur.rowcount
+
+    def clear_note_images(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "UPDATE marriages SET note_image = NULL"
+            " WHERE guild_id = ? AND note_image IS NOT NULL", (guild_id,))
+        self.conn.commit()
+        return cur.rowcount
+
+    def reset_player(self, guild_id: int, user_id: int) -> dict:
+        """Everything one player has here: claims, wishes, likes, notes,
+        balance and timers."""
+        counts = {}
+        with self.conn:
+            for label, statement, args in (
+                ("characters",
+                 "DELETE FROM marriages WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
+                ("wishes",
+                 "DELETE FROM wishes WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
+                ("likes",
+                 "DELETE FROM character_likes WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
+                ("shards",
+                 "DELETE FROM shard_pulls WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
+                ("badges",
+                 "DELETE FROM badges WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
+                ("player",
+                 "DELETE FROM players WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
+            ):
+                counts[label] = self.conn.execute(statement, args).rowcount
+        return counts
+
+    def reset_guild(self, guild_id: int) -> dict:
+        """Everything this server has done. The shared character pool is not
+        touched - it is not this server's to delete."""
+        counts = {}
+        with self.conn:
+            for label, table in (
+                ("claims", "marriages"),
+                ("wishes", "wishes"),
+                ("likes", "character_likes"),
+                ("shards", "shard_pulls"),
+                ("badges", "badges"),
+                ("keys", "character_keys"),
+                ("players", "players"),
+                ("settings", "guild_settings"),
+                ("disabled commands", "disabled_commands"),
+                ("channels", "allowed_channels"),
+                ("prefixes", "guild_prefixes"),
+            ):
+                counts[label] = self.conn.execute(
+                    f"DELETE FROM {table} WHERE guild_id = ?", (guild_id,)
+                ).rowcount
+        counts["custom characters"] = self.clear_custom_characters(guild_id)
+        return counts
+
     def reset_settings(self, guild_id: int):
         self.conn.execute("DELETE FROM guild_settings WHERE guild_id = ?", (guild_id,))
         self.conn.commit()
@@ -1275,6 +1417,58 @@ class Database:
         return 0
 
     # ---------- harem in bulk ----------
+
+    # ---------- notes ----------
+
+    def notes_of(self, guild_id: int, user_id: int) -> list:
+        """Every character this player has written a note on."""
+        return self.conn.execute(
+            "SELECT c.*, m.note, m.note_image, m.claimed_at FROM marriages m"
+            " JOIN characters c ON c.id = m.character_id"
+            " WHERE m.guild_id = ? AND m.user_id = ?"
+            "   AND m.note IS NOT NULL AND m.note != ''"
+            " ORDER BY c.name",
+            (guild_id, user_id),
+        ).fetchall()
+
+    def clear_notes(self, guild_id: int, user_id: int) -> int:
+        """Wipe every note. Returns how many went."""
+        cur = self.conn.execute(
+            "UPDATE marriages SET note = NULL, note_image = NULL"
+            " WHERE guild_id = ? AND user_id = ?"
+            "   AND (note IS NOT NULL OR note_image IS NOT NULL)",
+            (guild_id, user_id),
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def set_note_image(self, guild_id: int, character_id: int, user_id: int,
+                       url: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE marriages SET note_image = ?"
+            " WHERE guild_id = ? AND character_id = ? AND user_id = ?",
+            (url or None, guild_id, character_id, user_id),
+        )
+        self.conn.commit()
+        return bool(cur.rowcount)
+
+    def note_of(self, guild_id: int, character_id: int):
+        return self.conn.execute(
+            "SELECT note, note_image, user_id FROM marriages"
+            " WHERE guild_id = ? AND character_id = ?",
+            (guild_id, character_id),
+        ).fetchone()
+
+    def matching_notes(self, guild_id: int, user_id: int, text: str) -> list:
+        """Characters whose note contains this text."""
+        return self.conn.execute(
+            "SELECT c.*, m.note FROM marriages m"
+            " JOIN characters c ON c.id = m.character_id"
+            " WHERE m.guild_id = ? AND m.user_id = ?"
+            "   AND m.note LIKE ? COLLATE NOCASE"
+            " ORDER BY c.name",
+            (guild_id, user_id, f"%{text}%"),
+        ).fetchall()
 
     def harem_by_series(self, guild_id: int, user_id: int, series: str) -> list:
         return self.conn.execute(
