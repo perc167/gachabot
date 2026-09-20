@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS characters (
     -- AniList favourites, kept so a series added later can be ranked against
     -- everyone already here rather than guessed at.
     favourites  INTEGER NOT NULL DEFAULT 0,
+    -- Which API this character came from. AniList means anime or manga;
+    -- anything else is a game or a cartoon, which is what lets a server
+    -- switch those off without switching off the whole roster.
+    source      TEXT NOT NULL DEFAULT '',
     UNIQUE (name, series)
 );
 
@@ -196,6 +200,19 @@ class Database:
 
     def _migrate(self):
         """Add columns that landed after someone already had a database."""
+        # Added after the roster grew past AniList. Older databases have the
+        # table without it, and CREATE TABLE IF NOT EXISTS will not add it.
+        for table, column, spec in (
+            ("characters", "source", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            existing = {
+                row["name"]
+                for row in self.conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if existing and column not in existing:
+                self.conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN {column} {spec}"
+                )
         # kakera was renamed to karuda. Rename in place so existing servers
         # keep their balances rather than starting over.
         renames = [
@@ -333,14 +350,15 @@ class Database:
                     int(entry.get("like_rank", 0)),
                     int(entry.get("claim_rank", 0)),
                     int(entry.get("favourites", 0)),
+                    str(entry.get("source", "") or ""),
                 )
                 character_id = existing.get(key)
                 if character_id is None:
                     cur = self.conn.execute(
                         "INSERT INTO characters"
                         " (name, series, image_url, likes, base_karuda,"
-                        "  like_rank, claim_rank, favourites)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "  like_rank, claim_rank, favourites, source)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (entry["name"], entry["series"], *values),
                     )
                     character_id = cur.lastrowid
@@ -350,7 +368,7 @@ class Database:
                     self.conn.execute(
                         "UPDATE characters SET image_url = ?, likes = ?,"
                         " base_karuda = ?, like_rank = ?, claim_rank = ?,"
-                        " favourites = ?"
+                        " favourites = ?, source = ?"
                         " WHERE id = ?",
                         (*values, character_id),
                     )
@@ -491,22 +509,45 @@ class Database:
             (f"{name}%", *extra, limit),
         ).fetchall()
 
+    def excluded_sources(self, guild_id: int) -> list:
+        """Which sources this server has switched off.
+
+        Imported here rather than at module scope because cogs import db, and
+        db importing a cog back would close the loop.
+        """
+        from cogs import toggles as toggle_table
+
+        off = []
+        if not toggle_table.state(self, guild_id, "western"):
+            off += list(toggle_table.WESTERN_SOURCES)
+        if not toggle_table.state(self, guild_id, "games"):
+            off += list(toggle_table.GAME_SOURCES)
+        return off
+
     def _roll_scope(self, guild_id: int, include_claimed: bool) -> tuple:
         """The FROM and WHERE every roll shares: this guild's view of the pool,
-        optionally minus everyone already claimed here."""
+        optionally minus everyone already claimed here, minus any source the
+        server has switched off."""
+        blocked = self.excluded_sources(guild_id)
+        clause = ""
+        extra = ()
+        if blocked:
+            clause = (" AND c.source NOT IN ("
+                      + ",".join("?" * len(blocked)) + ")")
+            extra = tuple(blocked)
         if include_claimed:
             return (
                 "FROM characters c",
-                "WHERE (c.guild_id = 0 OR c.guild_id = ?)",
-                (guild_id,),
+                "WHERE (c.guild_id = 0 OR c.guild_id = ?)" + clause,
+                (guild_id, *extra),
             )
         return (
             "FROM characters c"
             " LEFT JOIN marriages m"
             "   ON m.character_id = c.id AND m.guild_id = ?",
             "WHERE m.character_id IS NULL"
-            "  AND (c.guild_id = 0 OR c.guild_id = ?)",
-            (guild_id, guild_id),
+            "  AND (c.guild_id = 0 OR c.guild_id = ?)" + clause,
+            (guild_id, guild_id, *extra),
         )
 
     def random_character(
@@ -669,6 +710,43 @@ class Database:
             "INSERT INTO guild_settings (guild_id, key, value) VALUES (?, ?, ?)"
             " ON CONFLICT (guild_id, key) DO UPDATE SET value = excluded.value",
             (guild_id, key, value),
+        )
+        self.conn.commit()
+
+    # ---------- toggles ----------
+    #
+    # Stored in the same table but under their own "toggle:" keys, and
+    # deliberately not in config.GUILD_SETTINGS: there are two dozen of them,
+    # and $settings renders one embed field per entry against a hard limit of
+    # twenty-five. They get their own listing instead.
+
+    TOGGLE_PREFIX = "toggle:"
+
+    def get_toggle(self, guild_id: int, key: str, default: int = 1) -> int:
+        row = self.conn.execute(
+            "SELECT value FROM guild_settings WHERE guild_id = ? AND key = ?",
+            (guild_id, self.TOGGLE_PREFIX + key),
+        ).fetchone()
+        return row["value"] if row else default
+
+    def set_toggle(self, guild_id: int, key: str, value: int):
+        self.conn.execute(
+            "INSERT INTO guild_settings (guild_id, key, value) VALUES (?, ?, ?)"
+            " ON CONFLICT (guild_id, key) DO UPDATE SET value = excluded.value",
+            (guild_id, self.TOGGLE_PREFIX + key, 1 if value else 0),
+        )
+        self.conn.commit()
+
+    def flip_toggle(self, guild_id: int, key: str, default: int = 1) -> int:
+        """Flip one and return what it is now."""
+        new = 0 if self.get_toggle(guild_id, key, default) else 1
+        self.set_toggle(guild_id, key, new)
+        return new
+
+    def clear_toggles(self, guild_id: int):
+        self.conn.execute(
+            "DELETE FROM guild_settings WHERE guild_id = ? AND key LIKE ?",
+            (guild_id, self.TOGGLE_PREFIX + "%"),
         )
         self.conn.commit()
 

@@ -187,13 +187,9 @@ class Admin(commands.Cog):
             return
 
         guild_id = ctx.guild.id if ctx.guild else 0
-        embeds = []
-        for index, url in enumerate(urls, 1):
-            embed = utils.character_embed(
-                ctx.bot.db, guild_id, character, image_url=url,
-                footer=f"Image {index} of {len(urls)} • ID {character['id']}",
-            )
-            embeds.append(embed)
+        embeds, urls = utils.character_pages(
+            ctx.bot.db, guild_id, character, footer=f"ID {character['id']}"
+        )
         await Paginator(embeds, ctx.author.id, art=urls).start(ctx)
 
     @commands.command(name="delimage", aliases=["rmimage"])
@@ -348,6 +344,9 @@ class Admin(commands.Cog):
                 # Carried through deliberately: this is what places a series
                 # added later at the right rank instead of guessing.
                 "favourites": int(entry.get("favourites", 0) or 0),
+                # And this is what lets a server switch games or cartoons off
+                # without switching off the roster.
+                "source": str(entry.get("source", "") or "")[:64],
                 "images": [
                     str(u).strip()
                     for u in (entry.get("images") or [])

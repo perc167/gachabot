@@ -132,6 +132,75 @@ CATEGORIES = [
         ("channellist", "which channels"),
         ("channelclear", "allow everywhere"),
     ]),
+    ("\U0001f3ad", "Toy box", [
+        ("lol", "laugh"),
+        ("lmfao", "laugh harder"),
+        ("omg", "be appalled"),
+        ("pervert", "judge someone"),
+        ("beam", "beam away"),
+        ("bear", "a bear hug"),
+        ("bitesthedust", "another one gone"),
+        ("chocoshark", "chocolate shark"),
+        ("kirby", "poyo"),
+        ("kirchoco", "kirby, with chocolate"),
+        ("nanachi", "nanaa~"),
+        ("takach", "taka"),
+        ("takawai", "too cute"),
+        ("eater", "eat it"),
+        ("destroy", "destroy something"),
+    ]),
+    ("\u270d\ufe0f", "Word games", [
+        ("noun", "a random noun"),
+        ("adject", "a random adjective"),
+        ("adverb", "a random adverb"),
+        ("vrb", "a random verb"),
+        ("phrase", "a random sentence"),
+        ("poem", "four lines"),
+        ("quote", "fake wisdom"),
+        ("invent", "invent something"),
+        ("build", "build something"),
+        ("date", "how the date goes"),
+        ("fate", "ask fate"),
+        ("say", "repeat it back"),
+        ("secret", "told by DM"),
+        ("rdmcountry", "a random country"),
+        ("avatar", "someone's avatar"),
+    ]),
+    ("\U0001f39a\ufe0f", "Switches \u2014 pool", [
+        ("toggles", "every switch"),
+        ("resettoggles", "back to defaults"),
+        ("togglewestern", "western cartoons"),
+        ("togglegames", "game characters"),
+        ("togglehentai", "adult characters"),
+        ("togglehorror", "horror series"),
+        ("toggledisturbing", "disturbing series"),
+        ("toggleirl", "real people"),
+    ]),
+    ("\U0001f5bc\ufe0f", "Switches \u2014 cards", [
+        ("togglerank", "ranks on cards"),
+        ("togglelikerank", "the like rank"),
+        ("toggleclaimrank", "the claim rank"),
+        ("togglerolls", "rolls left"),
+        ("togglelikerolls", "like rank on rolls"),
+        ("toggleclaimrolls", "claim rank on rolls"),
+        ("togglebutton", "claim by button"),
+        ("togglereact", "claim by reaction"),
+        ("togglesilent", "less chatter"),
+        ("toggleslash", "slash commands"),
+    ]),
+    ("\U0001f4b0", "Switches \u2014 karuda", [
+        ("togglekakera", "karuda at all"),
+        ("togglekakeraclaim", "karuda for claiming"),
+        ("togglekakeradaily", "the daily drop"),
+        ("togglekakeradivorce", "karuda on divorce"),
+        ("togglekakeralike", "karuda from likes"),
+        ("togglekakerareact", "karuda from reacting"),
+        ("togglekakerarolls", "grabs off rolls"),
+        ("togglekakeraserver", "server events"),
+        ("togglekakerasnipe", "sniping a drop"),
+        ("togglekakeratrade", "karuda in trades"),
+        ("togglesnipe", "sniping in general"),
+    ]),
     ("\U0001f527", "Bot owner", [
         ("import", "load the roster"),
         ("export", "dump the roster"),
@@ -152,34 +221,68 @@ CATEGORIES = [
 TOTAL = sum(len(entries) for *_, entries in CATEGORIES)
 
 
-def help_embed(prefix: str) -> discord.Embed:
-    """Every command, on one page.
+# Discord refuses an embed over 6000 characters and more than 25 fields, and
+# caps a whole message at 6000 across its embeds. Rather than thin the list
+# out when it outgrows that, help sends a second message. The budget is set
+# below the true limit so a long section can never straddle it.
+PAGE_BUDGET = 5200
+PAGE_FIELDS = 24
 
-    Sections are inline fields so Discord lays them out three across instead
-    of as one long column - the whole thing fits in about a screen, which is
-    the entire point.
-    """
-    embed = discord.Embed(
-        title="Every command",
-        description=(
-            f"Type the command after `{prefix}` — so `{prefix}w` to roll.\n"
-            f"**New here?** `{prefix}w`, press **Claim**, then `{prefix}dk`"
-            f" for your daily.\n"
-            f"Want detail on one? `{prefix}help <command>`."
-        ),
-        colour=config.CARD_COLOUR,
+
+def _section(prefix: str, icon: str, name: str, entries) -> tuple:
+    """One rendered section: (field name, field value)."""
+    return (
+        f"{icon}  {name}",
+        "\n".join(f"`{prefix}{command}` {description}"
+                   for command, description in entries),
     )
+
+
+def help_pages(prefix: str) -> list:
+    """Every command, across as few messages as it fits in.
+
+    Sections are inline fields, so Discord lays them out three across rather
+    than as one long column. Sections are packed greedily and a new page
+    starts before the limit rather than after it, which means adding commands
+    never silently truncates the list - it just spills onto another message.
+    """
+    pages, fields, size = [], [], 0
     for icon, name, entries in CATEGORIES:
-        embed.add_field(
-            name=f"{icon}  {name}",
-            value="\n".join(
-                f"`{prefix}{command}` {description}"
-                for command, description in entries
-            ),
-            inline=True,
+        field = _section(prefix, icon, name, entries)
+        cost = len(field[0]) + len(field[1])
+        if fields and (size + cost > PAGE_BUDGET or len(fields) >= PAGE_FIELDS):
+            pages.append(fields)
+            fields, size = [], 0
+        fields.append(field)
+        size += cost
+    if fields:
+        pages.append(fields)
+
+    embeds = []
+    for number, page in enumerate(pages, 1):
+        embed = discord.Embed(
+            title="Every command" + (f"  ·  {number}/{len(pages)}"
+                                     if len(pages) > 1 else ""),
+            colour=config.CARD_COLOUR,
         )
-    embed.set_footer(text=f"{TOTAL} commands")
-    return embed
+        if number == 1:
+            embed.description = (
+                f"Type the command after `{prefix}` — so `{prefix}w` to roll.\n"
+                f"**New here?** `{prefix}w`, press **Claim**, then `{prefix}dk`"
+                f" for your daily.\n"
+                f"Want detail on one? `{prefix}help <command>`."
+            )
+        for field_name, value in page:
+            embed.add_field(name=field_name, value=value, inline=True)
+        if number == len(pages):
+            embed.set_footer(text=f"{TOTAL} commands")
+        embeds.append(embed)
+    return embeds
+
+
+def help_embed(prefix: str) -> discord.Embed:
+    """The first page. Kept for callers that only want one."""
+    return help_pages(prefix)[0]
 
 
 class Help(commands.Cog):
@@ -195,19 +298,25 @@ class Help(commands.Cog):
             await self._one_command(ctx, command.strip().lstrip(prefix), prefix)
             return
 
-        embed = help_embed(prefix)
+        pages = help_pages(prefix)
         try:
-            await ctx.author.send(embed=embed)
+            for embed in pages:
+                await ctx.author.send(embed=embed)
         except discord.Forbidden:
             # DMs closed. Post it here rather than failing silently, which
             # would look like the command is broken.
             await ctx.send(
                 content=f"{ctx.author.mention} your DMs are closed, so here it is.",
-                embed=embed,
+                embed=pages[0],
             )
+            for embed in pages[1:]:
+                await ctx.send(embed=embed)
             return
         if ctx.guild:
-            await ctx.send(f"{ctx.author.mention} sent you a DM \U0001f4ec")
+            note = "sent you a DM \U0001f4ec"
+            if len(pages) > 1:
+                note = f"sent you {len(pages)} DMs \U0001f4ec"
+            await ctx.send(f"{ctx.author.mention} {note}")
 
     async def _one_command(self, ctx, name: str, prefix: str):
         found = self.bot.get_command(name.lower())

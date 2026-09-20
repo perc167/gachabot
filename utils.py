@@ -340,3 +340,28 @@ def character_card(db, guild_id: int, character, *, random_art: bool = False,
                             **kwargs)
     attachment = art_file(image_url)
     return embed, ({"file": attachment} if attachment else {})
+
+
+def character_pages(db, guild_id: int, character, *, footer: str = None,
+                    show_owner: bool = True):
+    """One card per image the character has: (embeds, image sources).
+
+    Hand both to views.Paginator and the card flips through the album the way
+    Mudae's does. A character with a single picture still gets a list of one,
+    and the paginator drops its arrows for that case on its own.
+    """
+    urls = db.images_for(character["id"]) or []
+    if not urls:
+        urls = [character["image_url"]] if character["image_url"] else [""]
+
+    embeds = []
+    for index, url in enumerate(urls, 1):
+        tail = footer or ""
+        if len(urls) > 1:
+            page = f"Image {index}/{len(urls)}"
+            tail = f"{page} • {tail}" if tail else page
+        embeds.append(
+            character_embed(db, guild_id, character, image_url=url,
+                            footer=tail or None, show_owner=show_owner)
+        )
+    return embeds, urls

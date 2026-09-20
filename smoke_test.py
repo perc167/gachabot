@@ -797,16 +797,23 @@ async def main():
 
     check("help has sections", len(helpmod.CATEGORIES) >= 10,
           str(len(helpmod.CATEGORIES)))
-    page = helpmod.help_embed("$")
+    pages = helpmod.help_pages("$")
 
-    # The whole point is that it is one message, so it has to fit in one.
-    check("help fits in a single embed", len(page) < 6000, str(len(page)))
-    check("help fits Discord's field limit", len(page.fields) <= 25,
-          str(len(page.fields)))
-    fat = [f.name for f in page.fields if len(f.value) > 1024]
+    # Every page has to be a message Discord will actually accept, and the
+    # sections have to all be somewhere across them.
+    oversized = [i for i, p in enumerate(pages, 1) if len(p) >= 6000]
+    check("every help page fits in a message", not oversized,
+          str([len(p) for p in pages]))
+    crowded = [i for i, p in enumerate(pages, 1) if len(p.fields) > 25]
+    check("every help page fits Discord's field limit", not crowded,
+          str([len(p.fields) for p in pages]))
+    fat = [f.name for p in pages for f in p.fields if len(f.value) > 1024]
     check("no help section overflows its field", not fat, ", ".join(fat))
     check("help shows every section",
-          len(page.fields) == len(helpmod.CATEGORIES))
+          sum(len(p.fields) for p in pages) == len(helpmod.CATEGORIES),
+          str(sum(len(p.fields) for p in pages)))
+    check("help pages are numbered when there is more than one",
+          len(pages) == 1 or all("/" in p.title for p in pages))
     check("help needs no clicking", not hasattr(helpmod, "HelpView"))
 
     listed = [command for _icon, _name, entries in helpmod.CATEGORIES
@@ -828,6 +835,65 @@ async def main():
     )
     check("every command appears on the help page", not unlisted,
           ", ".join(unlisted))
+
+    # 20j2. Switches: they store, they flip, they reset, and the ones that
+    # claim to filter the pool actually filter the pool.
+    from cogs import toggles as toggmod
+
+    check("switches are grouped", set(toggmod.GROUPS)
+          == {g for _d, g, _desc, _live in toggmod.TOGGLES.values()})
+    check("every switch is described",
+          all(desc.strip() for _d, _g, desc, _live in toggmod.TOGGLES.values()))
+    check("every switch has a command",
+          all(b.get_command("toggle" + key) for key in toggmod.TOGGLES),
+          ", ".join(k for k in toggmod.TOGGLES if not b.get_command("toggle" + k)))
+
+    TG = 4242
+    default = toggmod.TOGGLES["western"][0]
+    check("a switch starts at its default",
+          db.get_toggle(TG, "western", default) == default)
+    db.flip_toggle(TG, "western", default)
+    check("a switch flips",
+          db.get_toggle(TG, "western", default) != default)
+    db.clear_toggles(TG)
+    check("switches reset",
+          db.get_toggle(TG, "western", default) == default)
+    check("switches stay out of $settings",
+          not any(k.startswith("toggle") for k in config.GUILD_SETTINGS))
+
+    # The pool filter, end to end: turning games off must remove exactly the
+    # game characters and leave the anime roster alone.
+    toggledb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "toggles.db"))
+    toggledb.import_characters([
+        {"name": "Anime One", "series": "A Show", "image_url": "https://e.invalid/a.png",
+         "likes": 0, "like_rank": 1, "claim_rank": 1, "base_karuda": 50,
+         "source": "AniList"},
+        {"name": "Game One", "series": "Fortnite", "image_url": "https://e.invalid/g.png",
+         "likes": 0, "like_rank": 2, "claim_rank": 2, "base_karuda": 50,
+         "source": "fortnite-api"},
+        {"name": "Toon One", "series": "Avatar", "image_url": "https://e.invalid/t.png",
+         "likes": 0, "like_rank": 3, "claim_rank": 3, "base_karuda": 50,
+         "source": "last-airbender-api"},
+    ])
+    check("source survives an import",
+          toggledb.find_character_by_name("Game One")["source"] == "fortnite-api")
+
+    def rolled(gid):
+        return {toggledb.random_character(gid, True, 0)["name"] for _ in range(120)}
+
+    check("everything rolls by default", len(rolled(TG)) == 3, str(rolled(TG)))
+    toggledb.set_toggle(TG, "games", 0)
+    after_games = rolled(TG)
+    check("switching games off drops the game characters",
+          "Game One" not in after_games and "Anime One" in after_games,
+          str(after_games))
+    toggledb.set_toggle(TG, "western", 0)
+    after_both = rolled(TG)
+    check("switching western off drops the cartoons",
+          after_both == {"Anime One"}, str(after_both))
+    toggledb.clear_toggles(TG)
+    check("resetting brings them back", len(rolled(TG)) == 3)
+    toggledb.close()
 
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod

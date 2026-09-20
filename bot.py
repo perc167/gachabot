@@ -34,6 +34,8 @@ COGS = [
     "cogs.games",
     "cogs.admin",
     "cogs.settings",
+    "cogs.toggles",
+    "cogs.fun",
     "cogs.help",
 ]
 

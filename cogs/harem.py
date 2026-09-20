@@ -122,10 +122,13 @@ class Harem(commands.Cog):
         )
         if not character:
             return
-        embed, art = utils.character_card(
-            self.bot.db, ctx.guild.id, character, footer=f"ID {character['id']}"
+        # One page per image, so the card flips rather than showing one
+        # picture and hiding the rest behind $album.
+        embeds, urls = utils.character_pages(
+            self.bot.db, ctx.guild.id, character,
+            footer=f"ID {character['id']}",
         )
-        await ctx.send(embed=embed, **art)
+        await Paginator(embeds, ctx.author.id, art=urls).start(ctx)
 
     @commands.command(name="search", aliases=["sc", "s", "commandsearch"])
     @commands.guild_only()
