@@ -17,7 +17,8 @@ class Likes(commands.Cog):
         self.bot = bot
 
     async def _resolve(self, ctx, name: str):
-        matches = self.bot.db.find_characters_by_name(name, guild_id=ctx.guild.id)
+        matches = self.bot.db.find_by_name_or_alias(
+            ctx.guild.id, ctx.author.id, name)
         if not matches:
             await ctx.send(f"No character matching `{name}`.")
             return None

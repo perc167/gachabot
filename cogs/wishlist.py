@@ -19,7 +19,7 @@ class Wishlist(commands.Cog):
         """Add a character to your wishlist."""
         db = self.bot.db
         gid = ctx.guild.id
-        matches = db.find_characters_by_name(name, guild_id=gid)
+        matches = db.find_by_name_or_alias(gid, ctx.author.id, name)
         if not matches:
             await ctx.send(f"No character matching `{name}`.")
             return

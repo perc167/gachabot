@@ -44,6 +44,20 @@ CREATE INDEX IF NOT EXISTS idx_images_character
     ON character_images (character_id);
 
 
+-- Nicknames. A server can teach the bot that "Gojo" means Satoru Gojou, and
+-- a player can keep private ones of their own: user_id 0 is the server's,
+-- anything else belongs to that person.
+CREATE TABLE IF NOT EXISTS character_aliases (
+    guild_id     INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL DEFAULT 0,
+    alias        TEXT NOT NULL,
+    character_id INTEGER NOT NULL,
+    added_at     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, alias)
+);
+CREATE INDEX IF NOT EXISTS idx_aliases_character
+    ON character_aliases (character_id);
+
 CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id INTEGER NOT NULL,
     key      TEXT NOT NULL,
@@ -1469,6 +1483,93 @@ class Database:
             " ORDER BY c.name",
             (guild_id, user_id, f"%{text}%"),
         ).fetchall()
+
+    # ---------- aliases ----------
+
+    def add_alias(self, guild_id: int, alias: str, character_id: int,
+                  user_id: int = 0) -> bool:
+        """Teach one nickname. False if that nickname is already taken."""
+        alias = (alias or "").strip().lower()
+        if not alias:
+            return False
+        try:
+            self.conn.execute(
+                "INSERT INTO character_aliases"
+                " (guild_id, user_id, alias, character_id, added_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (guild_id, user_id, alias, character_id, int(time.time())),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
+
+    def remove_alias(self, guild_id: int, alias: str, user_id: int = 0) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM character_aliases"
+            " WHERE guild_id = ? AND user_id = ? AND alias = ?",
+            (guild_id, user_id, (alias or "").strip().lower()),
+        )
+        self.conn.commit()
+        return bool(cur.rowcount)
+
+    def resolve_alias(self, guild_id: int, alias: str, user_id: int = 0):
+        """The character a nickname points at.
+
+        A player's own nickname wins over the server's, so somebody can call
+        their favourite whatever they like without arguing with everyone else.
+        """
+        alias = (alias or "").strip().lower()
+        row = self.conn.execute(
+            "SELECT c.* FROM character_aliases a"
+            " JOIN characters c ON c.id = a.character_id"
+            " WHERE a.guild_id = ? AND a.alias = ? AND a.user_id IN (?, 0)"
+            " ORDER BY a.user_id DESC LIMIT 1",
+            (guild_id, alias, user_id),
+        ).fetchone()
+        return row
+
+    def aliases_of(self, guild_id: int, user_id: int = 0) -> list:
+        return self.conn.execute(
+            "SELECT a.alias, a.user_id, c.name, c.series FROM character_aliases a"
+            " JOIN characters c ON c.id = a.character_id"
+            " WHERE a.guild_id = ? AND a.user_id = ?"
+            " ORDER BY a.alias",
+            (guild_id, user_id),
+        ).fetchall()
+
+    def aliases_for_character(self, guild_id: int, character_id: int) -> list:
+        return [
+            row["alias"] for row in self.conn.execute(
+                "SELECT alias FROM character_aliases"
+                " WHERE guild_id = ? AND character_id = ? ORDER BY alias",
+                (guild_id, character_id),
+            ).fetchall()
+        ]
+
+    def clear_aliases(self, guild_id: int, user_id: int = None) -> int:
+        if user_id is None:
+            cur = self.conn.execute(
+                "DELETE FROM character_aliases WHERE guild_id = ?", (guild_id,))
+        else:
+            cur = self.conn.execute(
+                "DELETE FROM character_aliases WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id))
+        self.conn.commit()
+        return cur.rowcount
+
+    def find_by_name_or_alias(self, guild_id: int, user_id: int, name: str,
+                              limit: int = 25) -> list:
+        """Name lookup, but a nickname counts as a name.
+
+        The nickname is tried first and returned on its own when it hits:
+        somebody who taught the bot that "best girl" means one character does
+        not want a list of everyone whose name happens to contain it.
+        """
+        hit = self.resolve_alias(guild_id, name, user_id)
+        if hit is not None:
+            return [hit]
+        return self.find_characters_by_name(name, limit=limit, guild_id=guild_id)
 
     def harem_by_series(self, guild_id: int, user_id: int, series: str) -> list:
         return self.conn.execute(

@@ -64,22 +64,68 @@ class Harem(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="harem", aliases=["mm", "hl", "marry", "mymarry", "ml"])
+    def _harem_rows(self, ctx, member, order):
+        """Shared by every harem view: the rows, the rate and the totals."""
+        db = self.bot.db
+        gid = ctx.guild.id
+        rows = db.harem(gid, member.id, order if order in ORDERS else "likes")
+        rate = db.get_setting(gid, "karuda_rate")
+        return rows, rate
+
+    @commands.command(name="harem", aliases=["mm", "hl", "marry", "mymarry",
+                                             "ml", "mmi"])
     @commands.guild_only()
     async def harem(self, ctx, member: discord.Member = None, order: str = "likes"):
-        """List a harem. `$mm @user recent` sorts by claim time."""
+        """Flip through a harem, one card at a time, art and all.
+
+        `$mm @user recent` sorts by claim time. `$haremlist` is the same
+        harem as a plain list if you would rather read it all at once.
+        """
         member = member or ctx.author
         if order not in ORDERS:
             order = "likes"
-
-        db = self.bot.db
-        gid = ctx.guild.id
-        rows = db.harem(gid, member.id, order)
+        rows, rate = self._harem_rows(ctx, member, order)
         if not rows:
             await ctx.send(f"{member.display_name} has not claimed anyone yet.")
             return
 
-        rate = db.get_setting(gid, "karuda_rate")
+        db = self.bot.db
+        gid = ctx.guild.id
+        total_karuda = sum(utils.karuda_value(r, rate) for r in rows)
+
+        # One card per character, so the art actually shows. A plain list of
+        # names is faster to scan but the whole point of a gacha is the
+        # picture, and $haremlist is one command away for anyone who
+        # disagrees.
+        embeds, art = [], []
+        for position, row in enumerate(rows, 1):
+            note = row["note"] if "note" in row.keys() else None
+            footer = (f"{position}/{len(rows)} in {member.display_name}'s harem"
+                      f" • {total_karuda:,} karuda total • by {order}")
+            if note:
+                footer = f"“{note}” • {footer}"
+            image = db.random_image(row["id"]) or row["image_url"]
+            embeds.append(
+                utils.character_embed(db, gid, row, image_url=image,
+                                      footer=footer[:2048])
+            )
+            art.append(image)
+
+        await Paginator(embeds, ctx.author.id, art=art).start(ctx)
+
+    @commands.command(name="haremlist", aliases=["mml", "mmt", "haremtext"])
+    @commands.guild_only()
+    async def haremlist(self, ctx, member: discord.Member = None,
+                        order: str = "likes"):
+        """The same harem as a plain list, eight to a page."""
+        member = member or ctx.author
+        if order not in ORDERS:
+            order = "likes"
+        rows, rate = self._harem_rows(ctx, member, order)
+        if not rows:
+            await ctx.send(f"{member.display_name} has not claimed anyone yet.")
+            return
+
         total_likes = sum(r["likes"] for r in rows)
         total_karuda = sum(utils.karuda_value(r, rate) for r in rows)
 
@@ -99,8 +145,15 @@ class Harem(commands.Cog):
             embed = discord.Embed(
                 title=f"{member.display_name}'s harem — {len(rows)} characters",
                 description="\n".join(page),
-                colour=config.CARD_COLOUR,
+                colour=self.bot.db.get_pref(ctx.guild.id, "cardcolour",
+                                            config.CARD_COLOUR),
             )
+            # The first character on the page, so a list still has a face on
+            # it rather than being a wall of text.
+            top = rows[(page_no - 1) * 8]
+            if top["image_url"] and not str(top["image_url"]).startswith(
+                    utils.LOCAL_ART):
+                embed.set_thumbnail(url=top["image_url"])
             embed.set_footer(
                 text=f"Page {page_no}/{len(pages)} • {total_likes} likes"
                 f" • {total_karuda} karuda • sorted by {order}"
@@ -113,7 +166,10 @@ class Harem(commands.Cog):
     @commands.guild_only()
     async def info(self, ctx, *, name: str):
         """Look up a character by name."""
-        matches = self.bot.db.find_characters_by_name(name, guild_id=ctx.guild.id)
+        # A nickname counts as a name here, which is the whole point of
+        # teaching the bot one.
+        matches = self.bot.db.find_by_name_or_alias(
+            ctx.guild.id, ctx.author.id, name)
         if not matches:
             await ctx.send(f"No character matching `{name}`.")
             return

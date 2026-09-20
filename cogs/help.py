@@ -27,7 +27,8 @@ CATEGORIES = [
         ("rolls", "what you have left"),
     ]),
     ("\U0001f48d", "Your harem", [
-        ("harem", "everyone you own"),
+        ("harem", "flip through yours"),
+        ("haremlist", "the same as a list"),
         ("info", "one character's card"),
         ("album", "all of their art"),
         ("search", "find by name"),
@@ -131,6 +132,23 @@ CATEGORIES = [
         ("channeldeny", "block a channel"),
         ("channellist", "which channels"),
         ("channelclear", "allow everywhere"),
+    ]),
+    ("\U0001f3f7\ufe0f", "Nicknames", [
+        ("alias", "teach one for everyone"),
+        ("myalias", "one only you see"),
+        ("alist", "the server's nicknames"),
+        ("myalist", "yours"),
+        ("aliasdel", "forget one"),
+        ("myaliasdel", "forget one of yours"),
+        ("resetalias", "forget them all"),
+        ("selfresetalias", "forget all of yours"),
+    ]),
+    ("\U0001f5bc\ufe0f", "Artwork", [
+        ("imglist", "every picture, as links"),
+        ("imglink", "link to the main one"),
+        ("randomimg", "one at random"),
+        ("addimg", "add one to the pool"),
+        ("changeimg", "pick which one leads"),
     ]),
     ("\U0001f4dd", "Notes", [
         ("note", "scribble on one"),

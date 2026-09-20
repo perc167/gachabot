@@ -895,6 +895,56 @@ async def main():
     check("resetting brings them back", len(rolled(TG)) == 3)
     toggledb.close()
 
+    # 20j3. Nicknames, and the resets.
+    aliasdb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "alias.db"))
+    aliasdb.import_characters([
+        {"name": "Satoru Gojou", "series": "JJK",
+         "image_url": "https://e.invalid/a.png", "likes": 0,
+         "like_rank": 1, "claim_rank": 1, "base_karuda": 500},
+        {"name": "Someone Else", "series": "Other",
+         "image_url": "https://e.invalid/b.png", "likes": 0,
+         "like_rank": 2, "claim_rank": 2, "base_karuda": 50},
+    ])
+    gojo = aliasdb.find_character_by_name("Satoru Gojou")["id"]
+    other = aliasdb.find_character_by_name("Someone Else")["id"]
+
+    check("a nickname can be taught", aliasdb.add_alias(GUILD, "Gojo", gojo))
+    check("nicknames ignore case",
+          aliasdb.resolve_alias(GUILD, "GOJO")["id"] == gojo)
+    check("a nickname cannot be taken twice",
+          not aliasdb.add_alias(GUILD, "gojo", other))
+    check("a nickname is scoped to its server",
+          aliasdb.resolve_alias(OTHER, "gojo") is None)
+
+    aliasdb.add_alias(GUILD, "best", other, user_id=ALICE)
+    check("a private nickname beats the server's",
+          aliasdb.resolve_alias(GUILD, "best", ALICE)["id"] == other)
+    check("a private nickname is private",
+          aliasdb.resolve_alias(GUILD, "best", BOB) is None)
+    check("a nickname short-circuits the name search",
+          [r["id"] for r in aliasdb.find_by_name_or_alias(GUILD, ALICE, "best")]
+          == [other])
+    check("a real name still searches normally",
+          aliasdb.find_by_name_or_alias(GUILD, ALICE, "Satoru")[0]["id"] == gojo)
+    check("forgetting one works",
+          aliasdb.remove_alias(GUILD, "gojo")
+          and aliasdb.resolve_alias(GUILD, "gojo") is None)
+    check("clearing takes the private ones too",
+          aliasdb.clear_aliases(GUILD) >= 1
+          and aliasdb.resolve_alias(GUILD, "best", ALICE) is None)
+
+    # A server reset must never reach the shared pool.
+    before = aliasdb.character_count()
+    aliasdb.claim(GUILD, gojo, ALICE)
+    aliasdb.add_karuda(GUILD, ALICE, 1000)
+    counts = aliasdb.reset_guild(GUILD)
+    check("a server reset clears that server", counts["claims"] == 1)
+    check("a server reset leaves the pool alone",
+          aliasdb.character_count() == before, str(aliasdb.character_count()))
+    check("a server reset leaves other servers alone",
+          aliasdb.reset_guild(OTHER)["claims"] == 0)
+    aliasdb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

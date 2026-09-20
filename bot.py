@@ -38,6 +38,7 @@ COGS = [
     "cogs.fun",
     "cogs.notes",
     "cogs.moderation",
+    "cogs.aliases",
     "cogs.help",
 ]
 
