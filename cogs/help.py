@@ -133,6 +133,16 @@ CATEGORIES = [
         ("channellist", "which channels"),
         ("channelclear", "allow everywhere"),
     ]),
+    ("\U0001f375", "Tea", [
+        ("tea", "what you are holding"),
+        ("greentea", "three more rolls"),
+        ("blacktea", "clear your claim wait"),
+        ("redtea", "a little karuda"),
+        ("yellowtea", "a character key"),
+        ("mixtea", "one of them at random"),
+        ("buytea", "buy one"),
+        ("givetea", "hand one over"),
+    ]),
     ("\U0001f3f7\ufe0f", "Nicknames", [
         ("alias", "teach one for everyone"),
         ("myalias", "one only you see"),

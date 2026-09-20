@@ -945,6 +945,41 @@ async def main():
           aliasdb.reset_guild(OTHER)["claims"] == 0)
     aliasdb.close()
 
+    # 20j4. Tea: an item you hold, and never a way to make money.
+    from cogs import tea as teamod
+
+    check("every tea is described and priced",
+          all(name and icon and what and price > 0
+              for name, icon, what, price in teamod.TEAS.values()))
+    check("a red tea cannot pay for itself",
+          teamod.RED_TEA_KARUDA[1] < teamod.TEAS["redtea"][3],
+          f"pays up to {teamod.RED_TEA_KARUDA[1]}, costs"
+          f" {teamod.TEAS['redtea'][3]}")
+    check("every tea has a command",
+          all(b.get_command(key) for key in teamod.TEAS),
+          ", ".join(k for k in teamod.TEAS if not b.get_command(k)))
+    check("the daily tea is occasional, not guaranteed",
+          0 < teamod.DAILY_TEA_CHANCE < 0.5, str(teamod.DAILY_TEA_CHANCE))
+
+    teadb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "tea.db"))
+    check("a tea is held", teadb.add_item(GUILD, ALICE, "greentea", 2) == 2)
+    check("a tea is spent", teadb.spend_item(GUILD, ALICE, "greentea"))
+    check("you cannot spend tea you do not have",
+          not teadb.spend_item(GUILD, ALICE, "blacktea"))
+    check("tea cannot go negative",
+          teadb.add_item(GUILD, ALICE, "greentea", -50) == 0)
+    check("tea is per server",
+          teadb.item_count(OTHER, ALICE, "greentea") == 0)
+    check("tea is per player",
+          teadb.item_count(GUILD, BOB, "greentea") == 0)
+
+    # Buying every tea and drinking it must cost more than it returns, or the
+    # shop becomes a mint.
+    spend = sum(price for *_rest, price in teamod.TEAS.values())
+    payout = teamod.RED_TEA_KARUDA[1]
+    check("buying tea never turns a profit", payout < spend, f"{payout} vs {spend}")
+    teadb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS character_aliases (
 CREATE INDEX IF NOT EXISTS idx_aliases_character
     ON character_aliases (character_id);
 
+-- Things a player holds that are not karuda: teas, mostly. Counted rather
+-- than listed, because holding six of the same tea is six of one row.
+CREATE TABLE IF NOT EXISTS player_items (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    item     TEXT NOT NULL,
+    count    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, item)
+);
+
 CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id INTEGER NOT NULL,
     key      TEXT NOT NULL,
@@ -875,6 +885,9 @@ class Database:
                 ("badges",
                  "DELETE FROM badges WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
+                ("items",
+                 "DELETE FROM player_items WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
                 ("player",
                  "DELETE FROM players WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
@@ -893,6 +906,7 @@ class Database:
                 ("likes", "character_likes"),
                 ("shards", "shard_pulls"),
                 ("badges", "badges"),
+                ("items", "player_items"),
                 ("keys", "character_keys"),
                 ("players", "players"),
                 ("settings", "guild_settings"),
@@ -1483,6 +1497,55 @@ class Database:
             " ORDER BY c.name",
             (guild_id, user_id, f"%{text}%"),
         ).fetchall()
+
+    # ---------- items ----------
+
+    def add_item(self, guild_id: int, user_id: int, item: str,
+                 amount: int = 1) -> int:
+        """Give or take. Returns how many they hold afterwards, never below
+        zero - a bug that hands somebody minus two teas is worse than one
+        that hands them none."""
+        self.conn.execute(
+            "INSERT INTO player_items (guild_id, user_id, item, count)"
+            " VALUES (?, ?, ?, 0) ON CONFLICT DO NOTHING",
+            (guild_id, user_id, item),
+        )
+        self.conn.execute(
+            "UPDATE player_items SET count = MAX(0, count + ?)"
+            " WHERE guild_id = ? AND user_id = ? AND item = ?",
+            (amount, guild_id, user_id, item),
+        )
+        self.conn.commit()
+        return self.item_count(guild_id, user_id, item)
+
+    def item_count(self, guild_id: int, user_id: int, item: str) -> int:
+        row = self.conn.execute(
+            "SELECT count FROM player_items"
+            " WHERE guild_id = ? AND user_id = ? AND item = ?",
+            (guild_id, user_id, item),
+        ).fetchone()
+        return row["count"] if row else 0
+
+    def spend_item(self, guild_id: int, user_id: int, item: str,
+                   amount: int = 1) -> bool:
+        """Take one only if they have one. False means they did not."""
+        with self.conn:
+            cur = self.conn.execute(
+                "UPDATE player_items SET count = count - ?"
+                " WHERE guild_id = ? AND user_id = ? AND item = ? AND count >= ?",
+                (amount, guild_id, user_id, item, amount),
+            )
+        return bool(cur.rowcount)
+
+    def items_of(self, guild_id: int, user_id: int) -> dict:
+        return {
+            row["item"]: row["count"]
+            for row in self.conn.execute(
+                "SELECT item, count FROM player_items"
+                " WHERE guild_id = ? AND user_id = ? AND count > 0",
+                (guild_id, user_id),
+            ).fetchall()
+        }
 
     # ---------- aliases ----------
 

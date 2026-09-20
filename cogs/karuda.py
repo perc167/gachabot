@@ -7,6 +7,7 @@ from discord.ext import commands
 import config
 import perks
 import utils
+from cogs import tea
 from utils import fmt_duration
 
 DAILY_COOLDOWN = 20 * 60 * 60  # 20 hours, so it drifts earlier each day
@@ -137,6 +138,14 @@ class ShardDrops(discord.ui.View):
             total = self.bot.db.add_karuda(self.guild_id, user.id, payout)
             self.bot.db.record_shard(self.guild_id, user.id, key)
 
+            # Sometimes the drop has a tea in it as well. Only for whoever
+            # the drop belongs to - sniping somebody's shard should not also
+            # hand you their tea.
+            brewed = None
+            if is_owner and random.random() < tea.DAILY_TEA_CHANCE:
+                brewed = random.choice(list(tea.TEAS))
+                self.bot.db.add_item(self.guild_id, user.id, brewed, 1)
+
             self.children[index].disabled = True
             self.children[index].style = discord.ButtonStyle.success
             # The owner taking one opens the rest immediately.
@@ -146,6 +155,14 @@ class ShardDrops(discord.ui.View):
                 self.stop()
 
             embed = self.render()
+            if brewed:
+                name, icon, what, _price = tea.TEAS[brewed]
+                embed.add_field(
+                    name="And a tea",
+                    value=f"{icon} **{name}** — {what}\n"
+                          f"`{config.PREFIX}{brewed}` drinks it.",
+                    inline=False,
+                )
             embed.add_field(
                 name="Kept" if is_owner else "Sniped",
                 value=f"{user.mention} +{payout:,} → {total:,}",

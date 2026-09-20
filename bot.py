@@ -39,6 +39,7 @@ COGS = [
     "cogs.notes",
     "cogs.moderation",
     "cogs.aliases",
+    "cogs.tea",
     "cogs.help",
 ]
 
