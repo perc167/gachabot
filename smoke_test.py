@@ -96,7 +96,12 @@ async def main():
           utils.karuda_value(top, 200) == utils.karuda_value(top, 100) * 2)
 
     # Rarity must not collapse to one tier just because likes are all zero.
-    all_rows = db.search_characters("", limit=100000)  # the whole pool
+    # Sized from the pool rather than a constant: a hard-coded limit silently
+    # truncates the moment the roster outgrows it, and then every check below
+    # is quietly measuring a slice instead of the whole thing.
+    all_rows = db.search_characters("", limit=db.character_count())
+    check("the whole pool was read", len(all_rows) == db.character_count(),
+          str(len(all_rows)) + " of " + str(db.character_count()))
     check("all seeded likes are zero", all(r["likes"] == 0 for r in all_rows))
     check("roster is sizeable", len(all_rows) > 4000, str(len(all_rows)))
     by_rank = sorted(all_rows, key=lambda r: r["like_rank"] or 99999)

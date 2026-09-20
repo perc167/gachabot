@@ -260,8 +260,8 @@ the character is claimed.
 
 ## The character pool
 
-`$import` loads `data/characters.json` — **100,000 characters across
-13,257 series**, every one with artwork, built by `tools/fetch_roster.py`
+`$import` loads `data/characters.json` — **102,040 characters across
+13,263 series**, every one with artwork, built by `tools/fetch_roster.py`
 from AniList.
 
 ### How the sweep reaches six figures
@@ -311,12 +311,12 @@ count, the whole set is sorted by it, and value is mapped from **rank on a log
 scale**:
 
 ```
-rank 1 → 1300 karuda        rank 300 → 300        rank 100,000 → 20
+rank 1 → 1300 karuda        rank 300 → 300        rank 102,040 → 20
 ```
 
 The curve is pinned so it crosses 300 karuda at rank 300 exactly. That pin is
 computed from the pool size rather than fixed, which is why growing the roster
-from 30,000 to 100,000 left **295 characters** above 300 karuda
+from 30,000 to 102,040 left **295 characters** above 300 karuda
 instead of tripling them. Being worth something means being genuinely
 well-known, whatever the roster's size. Satoru Gojou tops it.
 
@@ -325,7 +325,7 @@ on `name` + `series`, so nobody loses a character they already claimed.
 
 ### Rolling out of a pool this big
 
-A flat roll punishes size: over 100,000 characters, a uniform draw shows
+A flat roll punishes size: over 102,040 characters, a uniform draw shows
 someone from the top thousand about **once in a hundred rolls**. That is a
 lottery, not a game.
 
@@ -338,7 +338,7 @@ ranking. It is a percent rather than a curve so that it means something:
 | 35 (default) | 3.4% |
 | 100 | 11.1% |
 
-The default of **35** is chosen so a 100,000-character pool rolls exactly
+The default of **35** is chosen so a 102,040-character pool rolls exactly
 the way a flat 30,000-character one did — the roster tripled, the feel did
 not. Nobody is ever excluded: the whole tail still rolls, just not with equal
 weight, and characters your own server invented keep precisely their share.
@@ -366,7 +366,7 @@ python tools/add_series.py "MILGRAM" --dry-run
 
 Every character stores their favourites count, so a newcomer is placed by
 counting how many existing characters have more — exact, and without
-renumbering 100,000 rows.
+renumbering 102,040 rows.
 
 ### Artwork
 
