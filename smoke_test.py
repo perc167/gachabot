@@ -1230,6 +1230,80 @@ async def main():
           after_buy == base + 5, f"{after_buy} vs {base + 5}")
     windb.close()
 
+    # 20j10. Name lookup. Every one of these was a real miss.
+    namedb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "names.db"))
+    namedb.import_characters([
+        # AniList romanises given-name-first, so the famous one is stored
+        # back to front from how people type it.
+        {"name": "Miku Hatsune", "series": "Vocaloid", "gender": "Female",
+         "image_url": "https://e.invalid/1.png", "likes": 0,
+         "like_rank": 458, "claim_rank": 458, "base_karuda": 261},
+        {"name": "Miku Nakano", "series": "Quintuplets", "gender": "Female",
+         "image_url": "https://e.invalid/2.png", "likes": 0,
+         "like_rank": 94, "claim_rank": 94, "base_karuda": 437},
+        # Obscure, and named exactly what people type when they mean the
+        # famous one.
+        {"name": "Miku", "series": "Akikan!", "gender": "Female",
+         "image_url": "https://e.invalid/3.png", "likes": 0,
+         "like_rank": 31039, "claim_rank": 31039, "base_karuda": 28},
+        # "rin" appears inside this name but does not begin a word of it.
+        {"name": "Marin Kitagawa", "series": "Dress-Up Darling",
+         "gender": "Female", "image_url": "https://e.invalid/4.png",
+         "likes": 0, "like_rank": 36, "claim_rank": 36, "base_karuda": 520},
+        {"name": "Rin Toosaka", "series": "Fate", "gender": "Female",
+         "image_url": "https://e.invalid/5.png", "likes": 0,
+         "like_rank": 86, "claim_rank": 86, "base_karuda": 450},
+        # Spelled Gojou, so "gojo" only begins his name.
+        {"name": "Satoru Gojou", "series": "Jujutsu Kaisen", "gender": "Male",
+         "image_url": "https://e.invalid/6.png", "likes": 0,
+         "like_rank": 1, "claim_rank": 1, "base_karuda": 1300},
+        {"name": "Gojo Shiouji", "series": "Excel Saga", "gender": "Male",
+         "image_url": "https://e.invalid/7.png", "likes": 0,
+         "like_rank": 61662, "claim_rank": 61662, "base_karuda": 21},
+        # A whole-word match that must beat a more famous prefix match.
+        {"name": "Sans", "series": "Undertale", "gender": "Male",
+         "image_url": "https://e.invalid/8.png", "likes": 0,
+         "like_rank": 2050, "claim_rank": 2050, "base_karuda": 133},
+        {"name": "Sumireko Sanshokuin", "series": "ORESUKI",
+         "gender": "Female", "image_url": "https://e.invalid/9.png",
+         "likes": 0, "like_rank": 1257, "claim_rank": 1257,
+         "base_karuda": 170},
+    ])
+
+    def top(query, count=1):
+        return [r["name"] for r in
+                namedb.find_characters_by_name(query, limit=count)]
+
+    check("a name typed in the other order is found",
+          top("hatsune miku") == ["Miku Hatsune"], str(top("hatsune miku", 3)))
+    check("and in the stored order too",
+          top("miku hatsune") == ["Miku Hatsune"])
+    check("a surname-first full name is found",
+          top("kitagawa marin") == ["Marin Kitagawa"])
+
+    check("an exact match no longer hides everyone else",
+          "Miku Hatsune" in top("miku", 5), str(top("miku", 5)))
+    check("half a name finds the famous bearer of it",
+          top("miku") == ["Miku Nakano"], str(top("miku", 3)))
+
+    check("a query word must begin a word of the name",
+          "Marin Kitagawa" not in top("rin", 5), str(top("rin", 5)))
+    check("so the right Rin comes back", top("rin") == ["Rin Toosaka"])
+
+    check("a whole word beats a more famous prefix",
+          top("sans") == ["Sans"], str(top("sans", 3)))
+    check("but a prefix match is not buried either",
+          top("gojo") == ["Satoru Gojou"], str(top("gojo", 3)))
+
+    check("an empty query finds nothing", namedb.find_characters_by_name("") == [])
+    check("whitespace is not a query",
+          namedb.find_characters_by_name("   ") == [])
+    check("the single-match helper agrees with the list",
+          namedb.find_character_by_name("gojo")["name"] == "Satoru Gojou")
+    check("nothing matching still returns nothing",
+          namedb.find_characters_by_name("zzzznobody") == [])
+    namedb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

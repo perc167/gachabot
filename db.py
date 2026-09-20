@@ -520,42 +520,75 @@ class Database:
             (like, like, *extra, limit),
         ).fetchall()
 
+    # What a word-prefix match costs, measured in rank. Roughly two percent
+    # of the pool: enough that Sans outranks Sanshokuin, small enough that
+    # the best-known character in the game still wins on a near-miss spelling.
+    PREFIX_HANDICAP = 2000
+
     def find_character_by_name(self, name: str) -> Optional[sqlite3.Row]:
-        """Exact match first, then the most-liked name that starts with it."""
-        row = self.conn.execute(
-            "SELECT * FROM characters WHERE name = ? COLLATE NOCASE", (name,)
-        ).fetchone()
-        if row:
-            return row
-        return self.conn.execute(
-            "SELECT * FROM characters WHERE name LIKE ? COLLATE NOCASE"
-            " ORDER BY likes DESC LIMIT 1",
-            (f"{name}%",),
-        ).fetchone()
+        """The single best match for a typed name."""
+        rows = self.find_characters_by_name(name, limit=1)
+        return rows[0] if rows else None
 
     def find_characters_by_name(self, name: str, limit: int = 25,
                                 guild_id=None) -> list:
-        """Every plausible match for a typed name, best known first.
+        """Every plausible match for a typed name, closest first.
 
-        find_character_by_name picks one arbitrarily, which is wrong when two
-        characters share a name - there are several Shiros. Callers use this
-        and ask which one was meant.
+        Three things this has to get right, all of which it used to get
+        wrong.
+
+        Word order. AniList romanises Japanese names given-name-first, so
+        Hatsune Miku is stored as "Miku Hatsune" - and a prefix search for
+        "hatsune miku" found nothing at all. Every word of the query must
+        appear, but in any order.
+
+        Exact matches must not hide the rest. Ten obscure characters are
+        called exactly "Miku" - one from Akikan!, one from a 1994 OVA - and
+        returning only those meant "$im miku" never once showed Miku Hatsune.
+
+        Words, not substrings. Matching "rin" anywhere in the text also finds
+        Ma-rin Kitagawa, and "sans" finds Sumireko San-shokuin. A query word
+        has to begin a word of the name.
+
+        What is left is ranked by fame, and a match that only begins a longer
+        word is charged a fixed amount of it. A hard "whole words first" rule
+        is too blunt: Satoru Gojou is spelled Gojou, so "gojo" only begins his
+        name, and two characters nobody has heard of called "Gojo Shiouji"
+        and "Shihesu Gojo" beat the most famous character in the pool. Costing
+        a prefix match some fame instead keeps Sans above Sanshokuin without
+        burying Gojou.
         """
+        query = (name or "").strip()
+        words = [word for word in query.lower().split() if word]
+        if not words:
+            return []
+
+        # A query word begins a word of the name: either the name starts
+        # with it, or it follows a space.
+        begins, begins_args = [], []
+        # A query word IS a word of the name, rather than merely starting a
+        # longer one.
+        whole, whole_args = [], []
+        for word in words:
+            begins.append("(name LIKE ? COLLATE NOCASE"
+                          " OR name LIKE ? COLLATE NOCASE)")
+            begins_args += [f"{word}%", f"% {word}%"]
+            whole.append("(name = ? COLLATE NOCASE"
+                         " OR name LIKE ? COLLATE NOCASE"
+                         " OR name LIKE ? COLLATE NOCASE"
+                         " OR name LIKE ? COLLATE NOCASE)")
+            whole_args += [word, f"{word} %", f"% {word}", f"% {word} %"]
+
         scope = "" if guild_id is None else " AND (guild_id = 0 OR guild_id = ?)"
-        extra = () if guild_id is None else (guild_id,)
-        exact = self.conn.execute(
-            "SELECT * FROM characters WHERE name = ? COLLATE NOCASE"
-            + scope
-            + " ORDER BY like_rank LIMIT ?",
-            (name, *extra, limit),
-        ).fetchall()
-        if exact:
-            return exact
+        scope_args = () if guild_id is None else (guild_id,)
+
         return self.conn.execute(
-            "SELECT * FROM characters WHERE name LIKE ? COLLATE NOCASE"
-            + scope
-            + " ORDER BY like_rank LIMIT ?",
-            (f"{name}%", *extra, limit),
+            "SELECT *, CASE WHEN (" + " AND ".join(whole) + ")"
+            " THEN 0 ELSE ? END AS handicap"
+            " FROM characters"
+            " WHERE (" + " AND ".join(begins) + ")" + scope
+            + " ORDER BY handicap + like_rank, like_rank LIMIT ?",
+            (*whole_args, self.PREFIX_HANDICAP, *begins_args, *scope_args, limit),
         ).fetchall()
 
     def excluded_sources(self, guild_id: int) -> list:
