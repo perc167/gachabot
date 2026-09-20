@@ -1182,6 +1182,54 @@ async def main():
                   for sub in tutomod.substeps_for(n)))
     tdb.close()
 
+    # 20j9. Rolls reset for everybody at once.
+    windb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "window.db"))
+    wincd = utils.Cooldowns(windb)
+
+    ends_at, length = wincd.roll_window(GUILD)
+    check("the window is read off the clock", ends_at % length == 0,
+          f"{ends_at} is not a multiple of {length}")
+    check("the window is the configured length",
+          length == config.GUILD_SETTINGS["roll_reset_minutes"][0] * 60,
+          str(length))
+
+    deadlines, remaining = set(), set()
+    for who in (101, 202, 303):
+        _left, reset_in = wincd.rolls_left(GUILD, who)
+        deadlines.add(windb.get_player(GUILD, who)["rolls_reset_at"])
+        remaining.add(reset_in)
+    check("every player shares one deadline", len(deadlines) == 1,
+          str(deadlines))
+    check("and is told the same time remaining", len(remaining) == 1,
+          str(remaining))
+    check("the shared deadline is the window's",
+          deadlines == {ends_at})
+
+    # Spending a roll must not move anybody's deadline.
+    wincd.spend_roll(GUILD, 101)
+    _left, after = wincd.rolls_left(GUILD, 101)
+    check("rolling does not restart your own window",
+          windb.get_player(GUILD, 101)["rolls_reset_at"] == ends_at)
+    check("a spent roll is counted",
+          wincd.rolls_left(GUILD, 101)[0]
+          < wincd.rolls_left(GUILD, 202)[0])
+
+    # A player stranded in an old window gets a clean slate, not a penalty.
+    windb.update_player(GUILD, 404, rolls_reset_at=1, rolls_used=99)
+    fresh, _reset = wincd.rolls_left(GUILD, 404)
+    check("an old window is forgiven",
+          fresh == config.GUILD_SETTINGS["roll_limit"][0], str(fresh))
+
+    # And buying while stranded must not be eaten by that forgiveness.
+    windb.update_player(GUILD, 505, rolls_reset_at=1, rolls_used=0,
+                        rolls_bought=0)
+    base = wincd.rolls_left(GUILD, 505)[0]
+    windb.update_player(GUILD, 505, rolls_reset_at=1)  # strand them again
+    after_buy = wincd.grant_rolls(GUILD, 505, 5)
+    check("bought rolls survive a window turning over",
+          after_buy == base + 5, f"{after_buy} vs {base + 5}")
+    windb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

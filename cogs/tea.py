@@ -87,11 +87,7 @@ class Tea(commands.Cog):
             chosen = random.choice([k for k in TEAS if k != "mixtea"])
 
         if chosen == "greentea":
-            player = db.get_player(gid, user)
-            db.update_player(
-                gid, user,
-                rolls_bought=player["rolls_bought"] + GREEN_TEA_ROLLS)
-            left, _reset = self.bot.cooldowns.rolls_left(gid, user)
+            left = self.bot.cooldowns.grant_rolls(gid, user, GREEN_TEA_ROLLS)
             outcome = (f"**+{GREEN_TEA_ROLLS} rolls** — you have **{left}**"
                        f" this window.")
         elif chosen == "blacktea":

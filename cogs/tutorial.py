@@ -46,9 +46,7 @@ class Tutorial(commands.Cog):
                 guild_id, user_id,
                 extra_wish_slots=player["extra_wish_slots"] + reward["wish_slot"])
         if reward.get("rolls"):
-            player = db.get_player(guild_id, user_id)
-            db.update_player(guild_id, user_id,
-                             rolls_bought=player["rolls_bought"] + reward["rolls"])
+            self.bot.cooldowns.grant_rolls(guild_id, user_id, reward["rolls"])
 
     async def _advance(self, channel, guild_id: int, user_id: int, step: int):
         """Finish a step if every substep is done, and pay for it."""

@@ -84,12 +84,11 @@ class Shop(commands.Cog):
             )
             return
 
-        player = db.get_player(gid, ctx.author.id)
         db.add_karuda(gid, ctx.author.id, -cost)
-        db.update_player(
-            gid, ctx.author.id, rolls_bought=player["rolls_bought"] + rolls
-        )
-        left, reset_in = self.bot.cooldowns.rolls_left(gid, ctx.author.id)
+        # Through grant_rolls, so a window turning over between paying and
+        # counting cannot swallow what they just bought.
+        left = self.bot.cooldowns.grant_rolls(gid, ctx.author.id, rolls)
+        _left, reset_in = self.bot.cooldowns.rolls_left(gid, ctx.author.id)
         await ctx.send(
             f"{ctx.author.mention} bought **{rolls}** rolls for {cost:,}"
             f" {config.CURRENCY}. You now have **{left}** left,"

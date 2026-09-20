@@ -136,31 +136,65 @@ class Cooldowns:
     def __init__(self, db):
         self.db = db
 
+    def roll_window(self, guild_id: int) -> tuple:
+        """The window everyone on this server shares: (ends_at, length).
+
+        Read off the clock rather than off each player, so rolls come back
+        for everybody at the same moment. With the default hour that is the
+        top of every hour. The alternative - a window that starts when you
+        personally first rolled - means two people sitting in the same
+        channel are told different numbers of minutes, which is what this
+        used to do.
+        """
+        window = self.db.get_setting(guild_id, "roll_reset_minutes") * 60
+        window = max(60, window)
+        current = now()
+        return (current // window) * window + window, window
+
     def rolls_left(self, guild_id: int, user_id: int) -> tuple:
         """Returns (rolls_left, seconds_until_reset)."""
         player = self.db.get_player(guild_id, user_id)
         earned = perks.effective(self.db, guild_id, user_id)
         limit = self.db.get_setting(guild_id, "roll_limit") + earned["rolls"]
-        window = self.db.get_setting(guild_id, "roll_reset_minutes") * 60
+        ends_at, window = self.roll_window(guild_id)
         current = now()
 
+        # A player carrying any window but the current one has not rolled yet
+        # this window, whether that is because the window turned over or
+        # because the server changed how long it is.
+        #
         # Bought rolls sit on top of the allowance and expire with the window,
         # so buying is a top-up rather than a permanent raise.
-        if current >= player["rolls_reset_at"]:
+        if player["rolls_reset_at"] != ends_at:
             self.db.update_player(
                 guild_id,
                 user_id,
                 rolls_used=0,
                 rolls_bought=0,
-                rolls_reset_at=current + window,
+                rolls_reset_at=ends_at,
             )
-            return limit, window
+            return limit, ends_at - current
 
         allowance = limit + player["rolls_bought"]
         return (
             max(0, allowance - player["rolls_used"]),
-            player["rolls_reset_at"] - current,
+            ends_at - current,
         )
+
+    def grant_rolls(self, guild_id: int, user_id: int, amount: int) -> int:
+        """Add bought rolls safely. Returns how many they have now.
+
+        The window is settled first. Adding to rolls_bought and only then
+        asking how many are left would wipe the purchase whenever the player
+        had not yet rolled this window - they would pay and get nothing.
+        """
+        self.rolls_left(guild_id, user_id)
+        player = self.db.get_player(guild_id, user_id)
+        self.db.update_player(
+            guild_id, user_id,
+            rolls_bought=player["rolls_bought"] + amount,
+        )
+        return self.rolls_left(guild_id, user_id)[0]
 
     def spend_roll(self, guild_id: int, user_id: int):
         player = self.db.get_player(guild_id, user_id)
