@@ -168,13 +168,68 @@ class Rolling(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(
-        name="roll", aliases=["w", "wa", "wg", "ha", "hg", "m", "mx", "mg", "a",
-                  "waifu", "husbando", "h", "rolla"]
-    )
+    @commands.command(name="roll", aliases=["m", "mx", "a", "mudae", "rolla"])
     @commands.guild_only()
     async def roll(self, ctx):
-        """Roll a random character."""
+        """Roll anybody at all."""
+        await self._do_roll(ctx)
+
+    @commands.command(name="waifu", aliases=["w"])
+    @commands.guild_only()
+    async def waifu(self, ctx):
+        """Roll a female character."""
+        await self._do_roll(ctx, gender="Female")
+
+    @commands.command(name="husbando", aliases=["h"])
+    @commands.guild_only()
+    async def husbando(self, ctx):
+        """Roll a male character."""
+        await self._do_roll(ctx, gender="Male")
+
+    @commands.command(name="wa")
+    @commands.guild_only()
+    async def wa(self, ctx):
+        """Roll a female character from anime or manga."""
+        await self._do_roll(ctx, gender="Female", kind="anime")
+
+    @commands.command(name="wg")
+    @commands.guild_only()
+    async def wg(self, ctx):
+        """Roll a female character from a game or a cartoon."""
+        await self._do_roll(ctx, gender="Female", kind="game")
+
+    @commands.command(name="ha")
+    @commands.guild_only()
+    async def ha(self, ctx):
+        """Roll a male character from anime or manga."""
+        await self._do_roll(ctx, gender="Male", kind="anime")
+
+    @commands.command(name="hg")
+    @commands.guild_only()
+    async def hg(self, ctx):
+        """Roll a male character from a game or a cartoon."""
+        await self._do_roll(ctx, gender="Male", kind="game")
+
+    @commands.command(name="ma")
+    @commands.guild_only()
+    async def ma(self, ctx):
+        """Roll anybody from anime or manga."""
+        await self._do_roll(ctx, kind="anime")
+
+    @commands.command(name="mg")
+    @commands.guild_only()
+    async def mg(self, ctx):
+        """Roll anybody from a game or a cartoon."""
+        await self._do_roll(ctx, kind="game")
+
+    async def _do_roll(self, ctx, gender: str = None, kind: str = None):
+        """Every roll goes through here.
+
+        `gender` and `kind` are what separate $w from $h from $mg. AniList
+        records no gender for roughly half the roster, so a narrowed roll
+        draws from a smaller pool than $m does - which is why an empty result
+        says so rather than looking broken.
+        """
         db = self.bot.db
         gid = ctx.guild.id
 
@@ -195,12 +250,17 @@ class Rolling(commands.Cog):
 
         include_claimed = bool(db.get_setting(gid, "show_claimed"))
         character = db.random_character(
-            gid, include_claimed, db.get_setting(gid, "roll_bias")
+            gid, include_claimed, db.get_setting(gid, "roll_bias"),
+            gender=gender, kind=kind,
         )
         if character is None:
+            narrowed = " matching that" if (gender or kind) else ""
             await ctx.send(
-                "Every character in the pool is already claimed here."
-                " Add more, or turn on `show_claimed`."
+                f"Nobody{narrowed} is left to roll here."
+                + ("\nTry `" + ctx.prefix + "m` — about half the roster has no"
+                   " gender recorded, so it only rolls under the plain one."
+                   if gender else
+                   " Add more, or turn on `show_claimed`.")
             )
             return
 

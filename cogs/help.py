@@ -21,9 +21,15 @@ import config
 # two or three words: the point of this page is scanning, not reading.
 CATEGORIES = [
     ("\U0001f3b2", "Rolling", [
-        ("w", "roll someone"),
+        ("w", "roll a girl"),
         ("h", "roll a guy"),
         ("m", "roll anyone"),
+        ("wa", "girl, anime only"),
+        ("wg", "girl, games only"),
+        ("ha", "guy, anime only"),
+        ("hg", "guy, games only"),
+        ("ma", "anyone, anime only"),
+        ("mg", "anyone, games only"),
         ("rolls", "what you have left"),
     ]),
     ("\U0001f48d", "Your harem", [

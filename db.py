@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS characters (
     -- anything else is a game or a cartoon, which is what lets a server
     -- switch those off without switching off the whole roster.
     source      TEXT NOT NULL DEFAULT '',
+    -- What $w and $h sort on. Blank means AniList does not record one, and
+    -- roughly half of them do not - those roll under $m only.
+    gender      TEXT NOT NULL DEFAULT '',
     UNIQUE (name, series)
 );
 
@@ -231,6 +234,7 @@ class Database:
         # table without it, and CREATE TABLE IF NOT EXISTS will not add it.
         for table, column, spec in (
             ("characters", "source", "TEXT NOT NULL DEFAULT ''"),
+            ("characters", "gender", "TEXT NOT NULL DEFAULT ''"),
             ("marriages", "note_image", "TEXT"),
         ):
             existing = {
@@ -379,14 +383,15 @@ class Database:
                     int(entry.get("claim_rank", 0)),
                     int(entry.get("favourites", 0)),
                     str(entry.get("source", "") or ""),
+                    str(entry.get("gender", "") or ""),
                 )
                 character_id = existing.get(key)
                 if character_id is None:
                     cur = self.conn.execute(
                         "INSERT INTO characters"
                         " (name, series, image_url, likes, base_karuda,"
-                        "  like_rank, claim_rank, favourites, source)"
-                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "  like_rank, claim_rank, favourites, source, gender)"
+                        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         (entry["name"], entry["series"], *values),
                     )
                     character_id = cur.lastrowid
@@ -396,7 +401,7 @@ class Database:
                     self.conn.execute(
                         "UPDATE characters SET image_url = ?, likes = ?,"
                         " base_karuda = ?, like_rank = ?, claim_rank = ?,"
-                        " favourites = ?, source = ?"
+                        " favourites = ?, source = ?, gender = ?"
                         " WHERE id = ?",
                         (*values, character_id),
                     )
@@ -552,10 +557,16 @@ class Database:
             off += list(toggle_table.GAME_SOURCES)
         return off
 
-    def _roll_scope(self, guild_id: int, include_claimed: bool) -> tuple:
+    # What $wa and $wg mean: the first is anime and manga, the second is
+    # everything that came from a game or a cartoon.
+    ANIME_SOURCE = "AniList"
+
+    def _roll_scope(self, guild_id: int, include_claimed: bool,
+                    gender: str = None, kind: str = None) -> tuple:
         """The FROM and WHERE every roll shares: this guild's view of the pool,
         optionally minus everyone already claimed here, minus any source the
-        server has switched off."""
+        server has switched off, and narrowed to one gender or one kind of
+        source when the command asked for that."""
         blocked = self.excluded_sources(guild_id)
         clause = ""
         extra = ()
@@ -563,6 +574,15 @@ class Database:
             clause = (" AND c.source NOT IN ("
                       + ",".join("?" * len(blocked)) + ")")
             extra = tuple(blocked)
+        if gender:
+            clause += " AND c.gender = ?"
+            extra = (*extra, gender)
+        if kind == "anime":
+            clause += " AND c.source = ?"
+            extra = (*extra, self.ANIME_SOURCE)
+        elif kind == "game":
+            clause += " AND c.source != ? AND c.source != ''"
+            extra = (*extra, self.ANIME_SOURCE)
         if include_claimed:
             return (
                 "FROM characters c",
@@ -579,7 +599,8 @@ class Database:
         )
 
     def random_character(
-        self, guild_id: int, include_claimed: bool, bias: int = 0
+        self, guild_id: int, include_claimed: bool, bias: int = 0,
+        gender: str = None, kind: str = None
     ) -> Optional[sqlite3.Row]:
         """One character to roll.
 
@@ -593,7 +614,8 @@ class Database:
         whoever sets it: 35 over a hundred thousand characters feels like a
         flat pool of thirty thousand did.
         """
-        source, where, args = self._roll_scope(guild_id, include_claimed)
+        source, where, args = self._roll_scope(
+            guild_id, include_claimed, gender, kind)
 
         if bias <= 0:
             return self.conn.execute(
@@ -603,9 +625,18 @@ class Database:
         # Deliberately not counted through the join: at a hundred thousand
         # rows that is a full scan on every single roll. The depth of the
         # ranking is the same for everyone, and an index knows it instantly.
-        deepest = self.conn.execute(
-            "SELECT MAX(like_rank) AS deepest FROM characters"
-        ).fetchone()["deepest"] or 0
+        if gender or kind:
+            # A narrowed pool has its own depth. Using the whole roster's
+            # would push the target past the end of the slice again and
+            # again, and the fallback would hand back the same character
+            # every time.
+            deepest = self.conn.execute(
+                f"SELECT MAX(c.like_rank) AS deepest {source} {where}", args
+            ).fetchone()["deepest"] or 0
+        else:
+            deepest = self.conn.execute(
+                "SELECT MAX(like_rank) AS deepest FROM characters"
+            ).fetchone()["deepest"] or 0
         if not deepest:
             return self.conn.execute(
                 f"SELECT c.* {source} {where} ORDER BY RANDOM() LIMIT 1", args
@@ -628,7 +659,11 @@ class Database:
             ).fetchone()
 
         exponent = 1.0 + min(100, max(0, bias)) / 100.0
-        target = max(1, int(deepest * (random.random() ** exponent)))
+        # 1 + int(...) rather than int(...): random() never returns 1.0, so
+        # the product never reaches `deepest` and the very last character in
+        # the ranking could not be drawn at all. One in a hundred thousand
+        # hardly shows, but "unreachable" is not a rounding error.
+        target = min(deepest, 1 + int(deepest * (random.random() ** exponent)))
         row = self.conn.execute(
             f"SELECT c.* {source} {where} AND c.like_rank >= ?"
             f" ORDER BY c.like_rank LIMIT 1",

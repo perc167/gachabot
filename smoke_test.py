@@ -1003,6 +1003,66 @@ async def main():
     check("leaderboards read only this server",
           db.top_claimers(OTHER) == [] or True)
 
+    # 20j6. The roll family. These were nine aliases of one command until
+    # gender existed, so the help page said "roll a guy" and rolled anybody.
+    rolldb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "rolls.db"))
+    rolldb.import_characters([
+        {"name": "Anime Girl", "series": "A", "image_url": "https://e.invalid/1.png",
+         "likes": 0, "like_rank": 1, "claim_rank": 1, "base_karuda": 90,
+         "source": "AniList", "gender": "Female"},
+        {"name": "Anime Guy", "series": "A", "image_url": "https://e.invalid/2.png",
+         "likes": 0, "like_rank": 2, "claim_rank": 2, "base_karuda": 80,
+         "source": "AniList", "gender": "Male"},
+        {"name": "Game Girl", "series": "G", "image_url": "https://e.invalid/3.png",
+         "likes": 0, "like_rank": 3, "claim_rank": 3, "base_karuda": 70,
+         "source": "overfast-api", "gender": "Female"},
+        {"name": "Game Guy", "series": "G", "image_url": "https://e.invalid/4.png",
+         "likes": 0, "like_rank": 4, "claim_rank": 4, "base_karuda": 60,
+         "source": "overfast-api", "gender": "Male"},
+        {"name": "Nobody Knows", "series": "A", "image_url": "https://e.invalid/5.png",
+         "likes": 0, "like_rank": 5, "claim_rank": 5, "base_karuda": 50,
+         "source": "AniList", "gender": ""},
+    ])
+    check("gender survives an import",
+          rolldb.find_character_by_name("Anime Girl")["gender"] == "Female")
+
+    def drawn(**kw):
+        names = set()
+        for _ in range(200):
+            row = rolldb.random_character(GUILD, True, 35, **kw)
+            if row is not None:
+                names.add(row["name"])
+        return names
+
+    check("a plain roll reaches everybody", len(drawn()) == 5, str(drawn()))
+    check("$w rolls only women",
+          drawn(gender="Female") == {"Anime Girl", "Game Girl"})
+    check("$h rolls only men",
+          drawn(gender="Male") == {"Anime Guy", "Game Guy"})
+    check("$wa is women from anime",
+          drawn(gender="Female", kind="anime") == {"Anime Girl"})
+    check("$wg is women from games",
+          drawn(gender="Female", kind="game") == {"Game Girl"})
+    check("$hg is men from games",
+          drawn(gender="Male", kind="game") == {"Game Guy"})
+    check("$ma keeps the ungendered ones",
+          "Nobody Knows" in drawn(kind="anime"))
+    check("an ungendered character is never a $w or an $h",
+          "Nobody Knows" not in drawn(gender="Female")
+          and "Nobody Knows" not in drawn(gender="Male"))
+
+    # A narrowed pool has its own depth. Using the whole roster's would push
+    # the target past the end of the slice and hand back the same face.
+    check("a narrow roll still varies",
+          len(drawn(gender="Female")) == 2)
+
+    check("every roll command exists",
+          all(b.get_command(name) for name in
+              ("w", "h", "m", "wa", "wg", "ha", "hg", "ma", "mg")))
+    check("the roll commands are not all one command",
+          len({b.get_command(n).qualified_name for n in ("w", "h", "m")}) == 3)
+    rolldb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

@@ -347,6 +347,9 @@ class Admin(commands.Cog):
                 # And this is what lets a server switch games or cartoons off
                 # without switching off the roster.
                 "source": str(entry.get("source", "") or "")[:64],
+                # Blank for anyone AniList has no gender for, which is about
+                # half of them; those roll under $m only.
+                "gender": str(entry.get("gender", "") or "")[:24],
                 "images": [
                     str(u).strip()
                     for u in (entry.get("images") or [])
