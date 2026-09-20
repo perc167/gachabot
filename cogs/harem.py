@@ -122,10 +122,10 @@ class Harem(commands.Cog):
         )
         if not character:
             return
-        embed = utils.character_embed(
+        embed, art = utils.character_card(
             self.bot.db, ctx.guild.id, character, footer=f"ID {character['id']}"
         )
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, **art)
 
     @commands.command(name="search", aliases=["sc", "s", "commandsearch"])
     @commands.guild_only()

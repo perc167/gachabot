@@ -1,13 +1,19 @@
 """Reusable interactive views: page flipping and yes/no confirmation."""
 import discord
 
+import utils
+
 
 class Paginator(discord.ui.View):
     """Flips through a prebuilt list of embeds. Only the invoker may click."""
 
-    def __init__(self, embeds, owner_id: int, timeout: float = 120):
+    def __init__(self, embeds, owner_id: int, timeout: float = 120, art=None):
         super().__init__(timeout=timeout)
         self.embeds = embeds
+        # One image source per page, for characters whose art travels with
+        # the bot instead of living on a CDN. A fresh file is built on every
+        # flip because a discord.File is spent by the send that uses it.
+        self.art = list(art) if art else [None] * len(embeds)
         self.owner_id = owner_id
         self.index = 0
         self.message = None
@@ -37,8 +43,13 @@ class Paginator(discord.ui.View):
 
     async def _show(self, interaction: discord.Interaction):
         self._sync_labels()
+        attachment = utils.art_file(self.art[self.index])
+        # Passed explicitly either way: leaving it out keeps whatever the
+        # previous page attached, so a page with no file of its own would
+        # still be showing the last one.
         await interaction.response.edit_message(
-            embed=self.embeds[self.index], view=self
+            embed=self.embeds[self.index], view=self,
+            attachments=[attachment] if attachment else [],
         )
 
     @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
@@ -58,7 +69,11 @@ class Paginator(discord.ui.View):
         await self._show(interaction)
 
     async def start(self, ctx):
-        self.message = await ctx.send(embed=self.embeds[0], view=self)
+        attachment = utils.art_file(self.art[0])
+        self.message = await ctx.send(
+            embed=self.embeds[0], view=self,
+            **({"file": attachment} if attachment else {}),
+        )
         return self.message
 
 

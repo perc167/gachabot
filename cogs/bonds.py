@@ -57,7 +57,7 @@ class Bonds(commands.Cog):
             return
 
         rate = db.get_setting(gid, "karuda_rate")
-        embed = utils.character_embed(db, gid, character, show_owner=False)
+        embed, art = utils.character_card(db, gid, character, show_owner=False)
         embed.title = f"\U0001f496  {character['name']}"
         embed.set_footer(
             text=f"{member.display_name}'s soulmate · "
@@ -70,7 +70,7 @@ class Bonds(commands.Cog):
                 value="No longer in their harem — the bond is only a memory.",
                 inline=False,
             )
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, **art)
 
     @commands.command(name="setsoulmate", aliases=["smset", "makesoulmate"])
     @commands.guild_only()
@@ -230,7 +230,7 @@ class Bonds(commands.Cog):
         new_level = db.raise_key_level(gid, character["id"])
         after = utils.value_with_keys(db, gid, character, rate)
 
-        embed = utils.character_embed(db, gid, character, show_owner=False)
+        embed, art = utils.character_card(db, gid, character, show_owner=False)
         embed.title = f"\U0001f511  {character['name']}"
         embed.add_field(
             name="Key level",
@@ -244,7 +244,7 @@ class Bonds(commands.Cog):
         embed.set_footer(
             text=f"{db.get_player(gid, ctx.author.id)['keys']} key(s) left"
         )
-        await ctx.send(embed=embed)
+        await ctx.send(embed=embed, **art)
 
     @commands.command(name="keyed", aliases=["keylist"])
     @commands.guild_only()

@@ -1,5 +1,6 @@
 """Shared helpers: cooldown bookkeeping, karuda math, embed building."""
 import json
+import os
 import time
 
 import discord
@@ -50,6 +51,46 @@ def shard_icon(key: str) -> str:
         return fallback
     emoji = discord.utils.get(_bot.emojis, name=key)
     return str(emoji) if emoji else fallback
+
+
+# Characters whose art no CDN will serve keep their picture in the repo
+# instead, recorded as "local:<filename>". Fandom blocks hotlinking, so those
+# images are attached to the message rather than linked from it.
+LOCAL_ART = "local:"
+ART_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "assets", "characters")
+
+
+def local_art_path(image_url):
+    """Where a bundled image lives, or None if this is an ordinary URL."""
+    if not image_url or not str(image_url).startswith(LOCAL_ART):
+        return None
+    # basename only: the roster is data, and data does not get to pick which
+    # part of the filesystem the bot reads.
+    name = os.path.basename(str(image_url)[len(LOCAL_ART):])
+    path = os.path.join(ART_DIR, name)
+    return path if name and os.path.exists(path) else None
+
+
+def art_file(image_url):
+    """A fresh discord.File for a bundled image, or None.
+
+    Fresh every time on purpose: a File carries an open buffer that one send
+    spends, so a paginator flipping back to a page it has already shown needs
+    a new one rather than the old one again.
+    """
+    path = local_art_path(image_url)
+    if not path:
+        return None
+    return discord.File(path, filename=os.path.basename(path))
+
+
+def art_reference(image_url):
+    """What the embed should point at: an attachment, or the URL itself."""
+    path = local_art_path(image_url)
+    if path:
+        return "attachment://" + os.path.basename(path)
+    return image_url
 
 
 def value_with_keys(db, guild_id: int, character, rate_percent: int) -> int:
@@ -180,8 +221,11 @@ def character_embed(
         image_url = (
             db.random_image(character["id"]) if random_art else character["image_url"]
         )
-    if image_url:
-        embed.set_image(url=image_url)
+    # A bundled image that has gone missing from disk reads as "no art"
+    # rather than as a broken card.
+    if image_url and (not str(image_url).startswith(LOCAL_ART)
+                      or local_art_path(image_url)):
+        embed.set_image(url=art_reference(image_url))
     else:
         embed.description += (
             f"\n\n*no image yet — `$setimage {character['id']} <url>`*"
@@ -274,3 +318,25 @@ def iter_roster(path: str):
             if not line or line == "]":
                 continue
             yield json.loads(line)
+
+
+def character_card(db, guild_id: int, character, *, random_art: bool = False,
+                   image_url: str = None, **kwargs):
+    """The card, plus whatever has to be attached alongside it.
+
+    Returns (embed, send_kwargs). Spread the second into send():
+
+        embed, art = utils.character_card(db, gid, character)
+        await ctx.send(embed=embed, **art)
+
+    The image is resolved once, here, so the file attached is always the one
+    the embed points at. Choosing it twice would let a random-art roll attach
+    a different picture than the one it displays.
+    """
+    if image_url is None:
+        image_url = (db.random_image(character["id"]) if random_art
+                     else character["image_url"])
+    embed = character_embed(db, guild_id, character, image_url=image_url,
+                            **kwargs)
+    attachment = art_file(image_url)
+    return embed, ({"file": attachment} if attachment else {})

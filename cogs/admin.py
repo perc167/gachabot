@@ -132,10 +132,11 @@ class Admin(commands.Cog):
         self.bot.db.add_image(character_id, url, source="setimage")
         # Usable in a DM, so guild-specific bits fall back to defaults.
         preview_guild = ctx.guild.id if ctx.guild else 0
-        embed = utils.character_embed(
+        embed, art = utils.character_card(
             self.bot.db, preview_guild, self.bot.db.get_character(character_id)
         )
-        await ctx.send(f"Art set for **{character['name']}**.", embed=embed)
+        await ctx.send(f"Art set for **{character['name']}**.",
+                       embed=embed, **art)
 
     @commands.command(name="addimage", aliases=["addart", "ai"])
     @is_bot_owner()
@@ -193,7 +194,7 @@ class Admin(commands.Cog):
                 footer=f"Image {index} of {len(urls)} • ID {character['id']}",
             )
             embeds.append(embed)
-        await Paginator(embeds, ctx.author.id).start(ctx)
+        await Paginator(embeds, ctx.author.id, art=urls).start(ctx)
 
     @commands.command(name="delimage", aliases=["rmimage"])
     @is_bot_owner()
@@ -326,8 +327,14 @@ class Admin(commands.Cog):
             if not (name and series):
                 skipped.append(f"#{index} ({name or 'unnamed'}): blank name or series")
                 continue
-            if image_url and not image_url.startswith(("http://", "https://")):
-                skipped.append(f"#{index} ({name}): image_url is not an http link")
+            # "local:" names a picture that ships with the bot, for the
+            # characters whose art no CDN will serve. Rejecting it here would
+            # silently drop every one of them on import.
+            if image_url and not image_url.startswith(
+                    ("http://", "https://", utils.LOCAL_ART)):
+                skipped.append(
+                    f"#{index} ({name}): image_url is not a link or a"
+                    f" bundled image")
                 continue
 
             record = {

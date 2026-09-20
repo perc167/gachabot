@@ -209,7 +209,7 @@ class Rolling(commands.Cog):
 
         owner_id = db.owner_of(gid, character["id"])
         wishers = db.wishers_of(gid, character["id"])
-        embed = utils.character_embed(
+        embed, art = utils.character_card(
             db, gid, character, random_art=True,
             footer=f"{left} rolls left • rolled by {ctx.author.display_name}",
         )
@@ -223,7 +223,7 @@ class Rolling(commands.Cog):
         else:
             view = KarudaView(self, gid, character)
 
-        message = await ctx.send(content=content, embed=embed, view=view)
+        message = await ctx.send(content=content, embed=embed, view=view, **art)
         view.message = message
 
     @commands.command(name="rolls", aliases=["ru", "rollsleft", "cooldowns", "cd", "timers"])

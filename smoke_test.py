@@ -351,8 +351,25 @@ async def main():
     check("roster entries all have name and series",
           all(r.get("name") and r.get("series") for r in roster))
     bad_urls = [r["name"] for r in roster
-                if r.get("image_url") and not r["image_url"].startswith("https://")]
-    check("roster image urls are https", not bad_urls, ", ".join(bad_urls[:5]))
+                if r.get("image_url")
+                and not r["image_url"].startswith(("https://", utils.LOCAL_ART))]
+    check("roster image urls are https or bundled",
+          not bad_urls, ", ".join(bad_urls[:5]))
+
+    # A roster pointing at a picture that never got committed would show up
+    # as a broken card and nowhere else, so it is checked here instead.
+    bundled = [r for r in roster
+               if str(r.get("image_url", "")).startswith(utils.LOCAL_ART)]
+    absent = [r["name"] for r in bundled if not utils.local_art_path(r["image_url"])]
+    check("every bundled image is really in the repo",
+          not absent, str(len(absent)) + " missing: " + ", ".join(absent[:5]))
+    check("bundled art is actually used", len(bundled) > 0, str(len(bundled)))
+
+    # The import path has its own opinion about what a usable image is, and
+    # it silently skips characters it disagrees with.
+    check("import accepts a bundled image",
+          utils.LOCAL_ART in open(
+              os.path.join(PROJECT, "cogs", "admin.py"), encoding="utf-8").read())
     check("no duplicate name+series pairs",
           len({(r["name"], r["series"]) for r in roster}) == len(roster))
 
@@ -775,37 +792,42 @@ async def main():
     db.delete_character(custom_id)
     check("deleting a custom clears it", db.custom_count(GUILD) == 0)
 
-    # 20j. Help: every section renders, and every command it lists is real.
+    # 20j. Help: one page, everything on it, nothing on it that is not real.
     from cogs import help as helpmod
 
     check("help has sections", len(helpmod.CATEGORIES) >= 10,
           str(len(helpmod.CATEGORIES)))
-    over = helpmod.overview_embed("$")
-    check("overview fits Discord limits", len(over) < 6000, str(len(over)))
-    check("overview lists every section",
-          len(over.fields) == len(helpmod.CATEGORIES))
+    page = helpmod.help_embed("$")
 
-    unknown, oversized = [], []
-    for index in range(len(helpmod.CATEGORIES)):
-        page = helpmod.category_embed(index, "$")
-        if len(page) >= 6000 or len(page.description) >= 4096:
-            oversized.append(helpmod.CATEGORIES[index][1])
-    for _icon, _name, _blurb, entries in helpmod.CATEGORIES:
-        for usage, _desc in entries:
-            if not usage:
-                continue
-            # First word, minus any argument decoration, should be a command.
-            word = usage.split()[0].split("|")[0].strip()
-            if word and not b.get_command(word):
-                unknown.append(word)
-    check("every section page fits", not oversized, ", ".join(oversized))
-    check("help lists no command that does not exist",
-          not unknown, ", ".join(sorted(set(unknown))))
+    # The whole point is that it is one message, so it has to fit in one.
+    check("help fits in a single embed", len(page) < 6000, str(len(page)))
+    check("help fits Discord's field limit", len(page.fields) <= 25,
+          str(len(page.fields)))
+    fat = [f.name for f in page.fields if len(f.value) > 1024]
+    check("no help section overflows its field", not fat, ", ".join(fat))
+    check("help shows every section",
+          len(page.fields) == len(helpmod.CATEGORIES))
+    check("help needs no clicking", not hasattr(helpmod, "HelpView"))
 
-    view = helpmod.HelpView("$", ALICE)
-    check("help view has a jump menu and arrows", len(view.children) == 4)
-    check("help opens on the overview", view.index is None)
-    check("help renders a section", helpmod.category_embed(0, "$").title)
+    listed = [command for _icon, _name, entries in helpmod.CATEGORIES
+              for command, _gloss in entries]
+    unknown = sorted({c for c in listed if not b.get_command(c)})
+    check("help lists no command that does not exist", not unknown,
+          ", ".join(unknown))
+    check("help describes every command it lists",
+          all(gloss.strip() for _icon, _name, entries in helpmod.CATEGORIES
+              for _command, gloss in entries))
+
+    # The reason this page exists is to find things in, so a command that is
+    # missing from it may as well not exist. $help itself is the exception -
+    # you are already reading it.
+    covered = {b.get_command(c) for c in listed}
+    unlisted = sorted(
+        command.qualified_name for command in b.walk_commands()
+        if command not in covered and command.qualified_name != "help"
+    )
+    check("every command appears on the help page", not unlisted,
+          ", ".join(unlisted))
 
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod

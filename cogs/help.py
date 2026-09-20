@@ -1,244 +1,185 @@
-"""Help, sent by DM.
+"""Help: every command on one page, sent by DM.
 
-Seventy-nine commands in one message is a wall nobody reads. This sends an
-overview privately, with a menu to open one section at a time, so the channel
-stays clean and so does the page.
+The old version put each section behind a dropdown, which meant knowing which
+section a command lived in before you could find it - exactly backwards for
+somebody who does not know the command yet. So it is one page now: every
+command visible at once, grouped, three columns, one short line each.
+
+Each line is a command and what it does in two or three words. Anything
+longer belongs in `$help <command>`, which prints the full description, the
+arguments and the aliases.
 """
 import discord
 from discord.ext import commands
 
 import config
 
-# (icon, name, blurb, [(usage, description), ...])
-# An empty entry is a spacer. Those blank lines are most of what stops a list
-# of twenty commands reading as a wall of text.
+# (icon, section, [(command, what it does), ...])
+#
+# The command shown is the one people actually type - `w` rather than `roll` -
+# and every one of them resolves, aliases included. Keep the descriptions to
+# two or three words: the point of this page is scanning, not reading.
 CATEGORIES = [
-    ("\U0001f3b4", "Rolling", "Finding characters", [
-        ("w", "Roll a character"),
-        ("h", "Roll a husbando"),
-        ("m", "Roll anything"),
-        ("", ""),
-        ("rolls", "Rolls left and every cooldown"),
+    ("\U0001f3b2", "Rolling", [
+        ("w", "roll someone"),
+        ("h", "roll a guy"),
+        ("m", "roll anyone"),
+        ("rolls", "what you have left"),
     ]),
-    ("\U0001f495", "Your characters", "Everyone you have claimed", [
-        ("mm [@user]", "Browse a harem"),
-        ("mm @user recent", "…or sort by likes, name, recent, karuda"),
-        ("", ""),
-        ("im <name>", "Character card"),
-        ("album <name>", "Every image a character has"),
-        ("search <text>", "Search by name or series"),
-        ("series <name>", "A series and everyone in it"),
-        ("", ""),
-        ("note", "Annotate one of yours"),
-        ("divorce", "Let one go"),
-        ("top", "Biggest harems here"),
+    ("\U0001f48d", "Your harem", [
+        ("harem", "everyone you own"),
+        ("info", "one character's card"),
+        ("album", "all of their art"),
+        ("search", "find by name"),
+        ("series", "a whole series"),
+        ("note", "scribble on one"),
+        ("divorce", "let one go"),
+        ("top", "biggest harems here"),
     ]),
-    ("\U0001f9f9", "Clearing out", "Letting go in bulk", [
-        ("divorceall", "Your whole harem"),
-        ("divorceseries <name>", "Everyone from one series"),
-        ("divorceallbut <n>", "Keep your best n by value"),
-        ("", ""),
-        ("wishremoveall", "Empty your wishlist"),
+    ("\U0001f9f9", "Clearing out", [
+        ("divorceall", "let everyone go"),
+        ("divorceseries", "one series, gone"),
+        ("divorceallbut", "keep only your best"),
+        ("wishremoveall", "empty your wishlist"),
+        ("likeclear", "empty your likes"),
     ]),
-    ("\U0001f48e", "Karuda", "The currency", [
-        ("dk", "Two shards: keep one, others may snipe the rest"),
-        ("shards", "What each shard pays, and the odds"),
-        ("", ""),
-        ("k [@user]", "Balance and shard collection"),
-        ("pay @user <amount>", "Send karuda"),
-        ("richest", "Who has the most"),
+    ("\U0001f48e", "Karuda", [
+        ("dk", "your daily shards"),
+        ("shards", "payouts and odds"),
+        ("balance", "what you have"),
+        ("pay", "send some over"),
+        ("richest", "who has the most"),
     ]),
-    ("\U0001f6d2", "Shop", "Somewhere for karuda to go", [
-        ("shop", "What karuda buys"),
-        ("", ""),
-        ("buyrolls [n]", "More rolls this window"),
-        ("resetclaim", "Claim again now"),
-        ("wishslot", "A permanent wishlist slot"),
+    ("\U0001f6d2", "Shop", [
+        ("shop", "what karuda buys"),
+        ("buyrolls", "more rolls now"),
+        ("resetclaim", "claim again now"),
+        ("wishslot", "one more wish"),
     ]),
-    ("🏅", "Badges & tower", "Long-term perks", [
-        ("badges", "What you can buy, and what you own"),
-        ("buybadge <name>", "Buy one"),
-        ("", ""),
-        ("kt", "Your tower, and the next floor"),
-        ("ktup", "Climb a floor"),
-        ("toptower", "Who has climbed highest"),
-        ("", ""),
-        ("perks", "What it all adds up to"),
+    ("\U0001f3c5", "Badges & tower", [
+        ("badges", "perks you can buy"),
+        ("buybadge", "buy one"),
+        ("tower", "your tower"),
+        ("ktup", "climb a floor"),
+        ("toptower", "who climbed highest"),
+        ("perks", "everything you have earned"),
     ]),
-    ("💖", "Bonds", "Soulmates and keys", [
-        ("setsoulmate", "Name one character your soulmate"),
-        ("soulmate [@user]", "See a soulmate"),
-        ("soulmates", "Who everyone here has chosen"),
-        ("", ""),
-        ("keys", "Keys you hold and have spent"),
-        ("key", "Spend one to raise a character's value"),
-        ("keyed [@user]", "Everyone you have keyed"),
+    ("\U0001f496", "Bonds", [
+        ("setsoulmate", "choose your soulmate"),
+        ("soulmate", "see a soulmate"),
+        ("soulmates", "everyone's choices"),
+        ("unsoulmate", "break the bond"),
+        ("keys", "keys you hold"),
+        ("key", "spend one"),
+        ("keyed", "who you have keyed"),
     ]),
-    ("⭐", "Wishes", "Get pinged when they roll", [
-        ("wish <name>", "Add a wish"),
-        ("wishseries <name>", "Wish a whole series"),
-        ("", ""),
-        ("wishlist [@user]", "See a wishlist"),
-        ("unwish", "Drop one"),
-        ("wishedby <name>", "Who is waiting on someone"),
+    ("⭐", "Wishes", [
+        ("wish", "get pinged for them"),
+        ("wishseries", "wish a whole series"),
+        ("wishlist", "see a wishlist"),
+        ("unwish", "drop one"),
+        ("wishedby", "who is waiting"),
     ]),
-    ("❤️", "Likes", "Vote for characters", [
-        ("like <name>", "Like a character"),
-        ("unlike <name>", "Take it back"),
-        ("", ""),
-        ("likelist [@user]", "Everyone you like"),
-        ("mostliked", "This server's favourites"),
-        ("likepos <name>", "Where someone ranks here"),
+    ("❤️", "Likes", [
+        ("like", "vote for someone"),
+        ("unlike", "take it back"),
+        ("likelist", "everyone you like"),
+        ("mostliked", "this server's favourites"),
+        ("likepos", "where they rank"),
     ]),
-    ("\U0001f91d", "Trading", "Both sides pick from a menu", [
-        ("trade @user", "Swap one for one"),
-        ("gift @user", "Hand one over"),
+    ("\U0001f91d", "Trading", [
+        ("trade", "swap one for one"),
+        ("gift", "hand one over"),
     ]),
-    ("\U0001f464", "You", "Your standing, and odds and ends", [
-        ("profile [@user]", "Balance, best claim, cooldowns"),
-        ("access", "What you have access to"),
-        ("", ""),
-        ("stats", "Pool size and what this server has claimed"),
-        ("myid", "Your Discord id"),
-        ("invite", "Add the bot elsewhere"),
-        ("ping", "Latency"),
+    ("\U0001f3ae", "Games", [
+        ("quiz", "name the character"),
+        ("slots", "gamble your karuda"),
+        ("duel", "fight someone"),
     ]),
-    ("✨", "Custom characters", "Your own · Manage Server", [
-        ("addcustom Name | Series | url", "One only this server rolls"),
-        ("customlist", "Everything this server made"),
-        ("", ""),
-        ("imgcustom Name | url", "Add an image"),
-        ("namecustom Old | New", "Rename"),
-        ("seriescustom Name | Series", "Refile"),
-        ("valuecustom <n> <name>", "Set what one is worth"),
-        ("deletecustom <name>", "Remove one"),
+    ("\U0001f464", "You", [
+        ("profile", "your whole standing"),
+        ("access", "what you can use"),
+        ("redeem", "use a premium key"),
+        ("stats", "pool and server totals"),
+        ("myid", "your Discord id"),
+        ("invite", "add the bot elsewhere"),
+        ("ping", "is it awake"),
+        ("uptime", "how long it has run"),
+        ("alea", "roll a dice"),
+        ("jankenpon", "rock paper scissors"),
     ]),
-    ("⚙️", "Server admin", "Manage Server", [
-        ("settings", "Every tunable and its value"),
-        ("set <key> <value>", "Change one"),
-        ("", ""),
-        ("setrolls / setclaim / setinterval", "Friendlier setters"),
-        ("setrate / setgrab / setrefund", "Economy dials"),
-        ("", ""),
-        ("prefix <char>", "Change the prefix here"),
-        ("disable / enable <command>", "Switch a command off or on"),
-        ("channelallow / channeldeny", "Limit the bot to channels"),
+    ("✨", "Your own characters", [
+        ("addcustom", "invent one"),
+        ("customlist", "see them all"),
+        ("imgcustom", "give it art"),
+        ("namecustom", "rename it"),
+        ("seriescustom", "refile it"),
+        ("valuecustom", "price it"),
+        ("deletecustom", "remove it"),
     ]),
-    ("\U0001f527", "Bot owner", "Pool management", [
-        ("import [path]", "Bulk load characters"),
-        ("addseries <name>", "Pull one series in from AniList"),
-        ("export", "Dump the pool"),
-        ("", ""),
-        ("addchar / editchar / delchar", "One at a time"),
-        ("setimage / addimage / delimage", "Artwork"),
-        ("missingart [series]", "What still needs art"),
-        ("", ""),
-        ("genkey [n] [note]", "Mint keys"),
-        ("keystats", "How many premium keys exist and are spent"),
+    ("⚙️", "Server admin", [
+        ("settings", "every dial"),
+        ("set", "change one"),
+        ("resetsettings", "back to defaults"),
+        ("setrolls", "rolls per window"),
+        ("prefix", "change the prefix"),
+        ("disable", "switch a command off"),
+        ("enable", "switch it back on"),
+        ("enableall", "switch them all on"),
+        ("disablelist", "what is switched off"),
+        ("channelallow", "allow a channel"),
+        ("channeldeny", "block a channel"),
+        ("channellist", "which channels"),
+        ("channelclear", "allow everywhere"),
+    ]),
+    ("\U0001f527", "Bot owner", [
+        ("import", "load the roster"),
+        ("export", "dump the roster"),
+        ("pool", "what is loaded"),
+        ("addseries", "pull in a series"),
+        ("addchar", "add one by hand"),
+        ("editchar", "edit one"),
+        ("delchar", "delete one"),
+        ("setimage", "set the art"),
+        ("addimage", "add to the album"),
+        ("delimage", "remove an image"),
+        ("missingart", "who has no picture"),
+        ("genkey", "mint premium keys"),
+        ("keystats", "keys made and spent"),
     ]),
 ]
 
-TOTAL = sum(sum(1 for usage, _ in entries if usage) for *_, entries in CATEGORIES)
+TOTAL = sum(len(entries) for *_, entries in CATEGORIES)
 
 
-def overview_embed(prefix: str) -> discord.Embed:
+def help_embed(prefix: str) -> discord.Embed:
+    """Every command, on one page.
+
+    Sections are inline fields so Discord lays them out three across instead
+    of as one long column - the whole thing fits in about a screen, which is
+    the entire point.
+    """
     embed = discord.Embed(
-        title="Commands",
+        title="Every command",
         description=(
-            f"Prefix is `{prefix}` — start with `{prefix}w` to roll,"
-            f" then `{prefix}dk` for your daily.\n\n"
-            "Pick a section below, or page through with the arrows."
+            f"Type the command after `{prefix}` — so `{prefix}w` to roll.\n"
+            f"**New here?** `{prefix}w`, press **Claim**, then `{prefix}dk`"
+            f" for your daily.\n"
+            f"Want detail on one? `{prefix}help <command>`."
         ),
         colour=config.CARD_COLOUR,
     )
-    # Inline fields lay the sections out in columns rather than one long list.
-    for icon, name, blurb, entries in CATEGORIES:
-        count = sum(1 for usage, _ in entries if usage)
+    for icon, name, entries in CATEGORIES:
         embed.add_field(
-            name=f"{icon}  {name}", value=f"{blurb}\n`{count} commands`", inline=True
+            name=f"{icon}  {name}",
+            value="\n".join(
+                f"`{prefix}{command}` {description}"
+                for command, description in entries
+            ),
+            inline=True,
         )
-    embed.set_footer(text=f"{TOTAL} commands · {prefix}help <command> for detail")
+    embed.set_footer(text=f"{TOTAL} commands")
     return embed
-
-
-def category_embed(index: int, prefix: str) -> discord.Embed:
-    icon, name, blurb, entries = CATEGORIES[index]
-    lines = []
-    for usage, description in entries:
-        if not usage:
-            lines.append("")  # breathing room between groups
-            continue
-        # Command on one line, what it does indented under it: far easier to
-        # scan than name and description fighting on the same line.
-        lines.append(f"`{prefix}{usage}`\n　{description}")
-    embed = discord.Embed(
-        title=f"{icon}  {name}",
-        description="\n".join(lines),
-        colour=config.CARD_COLOUR,
-    )
-    embed.set_footer(text=f"{blurb} · section {index + 1} of {len(CATEGORIES)}")
-    return embed
-
-
-class HelpView(discord.ui.View):
-    """Overview, a jump menu and arrows, living in the reader's DMs."""
-
-    def __init__(self, prefix: str, owner_id: int, timeout: float = 600):
-        super().__init__(timeout=timeout)
-        self.prefix = prefix
-        self.owner_id = owner_id
-        self.index = None  # None is the overview
-        self.message = None
-
-        select = discord.ui.Select(
-            placeholder="Jump to a section…",
-            options=[
-                discord.SelectOption(
-                    label=name, value=str(i), emoji=icon, description=blurb[:100]
-                )
-                for i, (icon, name, blurb, _entries) in enumerate(CATEGORIES)
-            ],
-            row=0,
-        )
-        select.callback = self._on_select
-        self.add_item(select)
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id == self.owner_id
-
-    def render(self) -> discord.Embed:
-        if self.index is None:
-            return overview_embed(self.prefix)
-        return category_embed(self.index, self.prefix)
-
-    async def _refresh(self, interaction: discord.Interaction):
-        await interaction.response.edit_message(embed=self.render(), view=self)
-
-    async def _on_select(self, interaction: discord.Interaction):
-        self.index = int(interaction.data["values"][0])
-        await self._refresh(interaction)
-
-    @discord.ui.button(label="◀", row=1)
-    async def previous(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.index = len(CATEGORIES) - 1 if self.index in (None, 0) else self.index - 1
-        await self._refresh(interaction)
-
-    @discord.ui.button(label="Overview", style=discord.ButtonStyle.primary, row=1)
-    async def overview(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.index = None
-        await self._refresh(interaction)
-
-    @discord.ui.button(label="▶", row=1)
-    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.index = 0 if self.index is None else (self.index + 1) % len(CATEGORIES)
-        await self._refresh(interaction)
-
-    async def on_timeout(self):
-        if self.message:
-            try:
-                await self.message.edit(view=None)
-            except discord.HTTPException:
-                pass
 
 
 class Help(commands.Cog):
@@ -254,18 +195,15 @@ class Help(commands.Cog):
             await self._one_command(ctx, command.strip().lstrip(prefix), prefix)
             return
 
-        view = HelpView(prefix, ctx.author.id)
+        embed = help_embed(prefix)
         try:
-            view.message = await ctx.author.send(
-                embed=overview_embed(prefix), view=view
-            )
+            await ctx.author.send(embed=embed)
         except discord.Forbidden:
             # DMs closed. Post it here rather than failing silently, which
             # would look like the command is broken.
-            view.message = await ctx.send(
+            await ctx.send(
                 content=f"{ctx.author.mention} your DMs are closed, so here it is.",
-                embed=overview_embed(prefix),
-                view=view,
+                embed=embed,
             )
             return
         if ctx.guild:

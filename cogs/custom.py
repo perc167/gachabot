@@ -85,11 +85,12 @@ class Custom(commands.Cog):
             await ctx.send(f"**{name}** ({series}) already exists.")
             return
 
-        embed = utils.character_embed(db, gid, db.get_character(character_id))
+        embed, art = utils.character_card(
+            db, gid, db.get_character(character_id))
         await ctx.send(
             f"Added **{name}** — only this server rolls them."
             f" ({db.custom_count(gid)}/{limit} used)",
-            embed=embed,
+            embed=embed, **art,
         )
 
     @commands.command(name="deletecustom", aliases=["dc", "customdelete"])
