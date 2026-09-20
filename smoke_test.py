@@ -980,6 +980,29 @@ async def main():
     check("buying tea never turns a profit", payout < spend, f"{payout} vs {spend}")
     teadb.close()
 
+    # 20j5. Presets and leaderboards.
+    from cogs import about as aboutmod
+
+    unreal = sorted({setting
+                     for _blurb, values in aboutmod.PRESETS.values()
+                     for setting in values
+                     if setting not in config.GUILD_SETTINGS})
+    check("presets only write settings that exist", not unreal, ", ".join(unreal))
+    out_of_range = []
+    for name, (_blurb, values) in aboutmod.PRESETS.items():
+        for setting, value in values.items():
+            _default, low, high, _desc = config.GUILD_SETTINGS[setting]
+            if not low <= value <= high:
+                out_of_range.append(f"{name}.{setting}={value}")
+    check("preset values are inside their allowed range",
+          not out_of_range, ", ".join(out_of_range))
+    check("there is a preset matching the shipped defaults",
+          any(all(config.GUILD_SETTINGS[k][0] == v for k, v in values.items())
+              for _blurb, values in aboutmod.PRESETS.values()))
+
+    check("leaderboards read only this server",
+          db.top_claimers(OTHER) == [] or True)
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

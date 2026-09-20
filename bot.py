@@ -40,6 +40,8 @@ COGS = [
     "cogs.moderation",
     "cogs.aliases",
     "cogs.tea",
+    "cogs.leaderboards",
+    "cogs.about",
     "cogs.help",
 ]
 

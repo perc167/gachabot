@@ -35,7 +35,6 @@ CATEGORIES = [
         ("series", "a whole series"),
         ("note", "scribble on one"),
         ("divorce", "let one go"),
-        ("top", "biggest harems here"),
     ]),
     ("\U0001f9f9", "Clearing out", [
         ("divorceall", "let everyone go"),
@@ -49,7 +48,6 @@ CATEGORIES = [
         ("shards", "payouts and odds"),
         ("balance", "what you have"),
         ("pay", "send some over"),
-        ("richest", "who has the most"),
     ]),
     ("\U0001f6d2", "Shop", [
         ("shop", "what karuda buys"),
@@ -62,7 +60,6 @@ CATEGORIES = [
         ("buybadge", "buy one"),
         ("tower", "your tower"),
         ("ktup", "climb a floor"),
-        ("toptower", "who climbed highest"),
         ("perks", "everything you have earned"),
     ]),
     ("\U0001f496", "Bonds", [
@@ -85,7 +82,6 @@ CATEGORIES = [
         ("like", "vote for someone"),
         ("unlike", "take it back"),
         ("likelist", "everyone you like"),
-        ("mostliked", "this server's favourites"),
         ("likepos", "where they rank"),
     ]),
     ("\U0001f91d", "Trading", [
@@ -132,6 +128,25 @@ CATEGORIES = [
         ("channeldeny", "block a channel"),
         ("channellist", "which channels"),
         ("channelclear", "allow everywhere"),
+    ]),
+    ("\U0001f3c6", "Leaderboards", [
+        ("top", "biggest harems"),
+        ("topclaims", "most claimed"),
+        ("topvalue", "richest harems"),
+        ("topseries", "this server's taste"),
+        ("topwished", "most wished for"),
+        ("topshards", "shard collectors"),
+        ("richest", "biggest balances"),
+        ("mostliked", "most liked here"),
+        ("toptower", "highest climbers"),
+        ("serveroverview", "the server at a glance"),
+    ]),
+    ("\U0001f4d6", "About", [
+        ("tuto", "how to play"),
+        ("about", "what this bot is"),
+        ("support", "what it costs"),
+        ("preset", "set several dials"),
+        ("lang", "which languages"),
     ]),
     ("\U0001f375", "Tea", [
         ("tea", "what you are holding"),

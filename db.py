@@ -1498,6 +1498,82 @@ class Database:
             (guild_id, user_id, f"%{text}%"),
         ).fetchall()
 
+    # ---------- leaderboards ----------
+
+    def top_harem_value(self, guild_id: int, limit: int = 10) -> list:
+        """Whose characters are worth the most, all added up."""
+        return self.conn.execute(
+            "SELECT m.user_id, COUNT(*) AS owned,"
+            "       SUM(c.base_karuda) AS worth"
+            " FROM marriages m JOIN characters c ON c.id = m.character_id"
+            " WHERE m.guild_id = ?"
+            " GROUP BY m.user_id ORDER BY worth DESC LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    def top_series(self, guild_id: int, limit: int = 10) -> list:
+        """Which series this server has claimed the most of."""
+        return self.conn.execute(
+            "SELECT c.series, COUNT(*) AS claimed"
+            " FROM marriages m JOIN characters c ON c.id = m.character_id"
+            " WHERE m.guild_id = ?"
+            " GROUP BY c.series ORDER BY claimed DESC, c.series LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    def top_wished(self, guild_id: int, limit: int = 10) -> list:
+        """Who the most people here are waiting for."""
+        return self.conn.execute(
+            "SELECT c.name, c.series, COUNT(*) AS wishers"
+            " FROM wishes w JOIN characters c ON c.id = w.character_id"
+            " WHERE w.guild_id = ?"
+            " GROUP BY w.character_id ORDER BY wishers DESC, c.name LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    def top_shards(self, guild_id: int, limit: int = 10) -> list:
+        """Who has pulled the most shards."""
+        return self.conn.execute(
+            "SELECT user_id, SUM(count) AS pulled FROM shard_pulls"
+            " WHERE guild_id = ? GROUP BY user_id"
+            " ORDER BY pulled DESC LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    def top_claimers(self, guild_id: int, limit: int = 10) -> list:
+        return self.conn.execute(
+            "SELECT user_id, COUNT(*) AS owned FROM marriages"
+            " WHERE guild_id = ? GROUP BY user_id"
+            " ORDER BY owned DESC LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    def guild_overview(self, guild_id: int) -> dict:
+        """A quick picture of how far along a server is."""
+        def one(statement, *args):
+            row = self.conn.execute(statement, args).fetchone()
+            return (row[0] if row and row[0] is not None else 0)
+
+        return {
+            "players": one("SELECT COUNT(*) FROM players WHERE guild_id = ?",
+                           guild_id),
+            "claimed": one("SELECT COUNT(*) FROM marriages WHERE guild_id = ?",
+                           guild_id),
+            "series": one("SELECT COUNT(DISTINCT c.series) FROM marriages m"
+                          " JOIN characters c ON c.id = m.character_id"
+                          " WHERE m.guild_id = ?", guild_id),
+            "karuda": one("SELECT SUM(karuda) FROM players WHERE guild_id = ?",
+                          guild_id),
+            "wishes": one("SELECT COUNT(*) FROM wishes WHERE guild_id = ?",
+                          guild_id),
+            "likes": one("SELECT COUNT(*) FROM character_likes WHERE guild_id = ?",
+                         guild_id),
+            "customs": one("SELECT COUNT(*) FROM characters WHERE guild_id = ?",
+                           guild_id),
+            "aliases": one("SELECT COUNT(*) FROM character_aliases"
+                           " WHERE guild_id = ?", guild_id),
+        }
+
     # ---------- items ----------
 
     def add_item(self, guild_id: int, user_id: int, item: str,
