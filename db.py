@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS player_items (
     PRIMARY KEY (guild_id, user_id, item)
 );
 
+-- One row per substep somebody has finished. Substeps inside a step may be
+-- done in any order, so the step itself is only finished when every one of
+-- its keys is present.
+CREATE TABLE IF NOT EXISTS tutorial_progress (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    step     INTEGER NOT NULL,
+    substep  TEXT NOT NULL,
+    done_at  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, step, substep)
+);
+
 CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id INTEGER NOT NULL,
     key      TEXT NOT NULL,
@@ -238,6 +250,8 @@ class Database:
             ("marriages", "note_image", "TEXT"),
             ("players", "harem_sort", "TEXT NOT NULL DEFAULT ''"),
             ("players", "showcase_id", "INTEGER NOT NULL DEFAULT 0"),
+            ("players", "tuto_step", "INTEGER NOT NULL DEFAULT 1"),
+            ("players", "tuto_silent", "INTEGER NOT NULL DEFAULT 0"),
         ):
             existing = {
                 row["name"]
@@ -925,6 +939,10 @@ class Database:
                 ("items",
                  "DELETE FROM player_items WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
+                ("tutorial steps",
+                 "DELETE FROM tutorial_progress"
+                 " WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
                 ("player",
                  "DELETE FROM players WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
@@ -944,6 +962,7 @@ class Database:
                 ("shards", "shard_pulls"),
                 ("badges", "badges"),
                 ("items", "player_items"),
+                ("tutorial steps", "tutorial_progress"),
                 ("keys", "character_keys"),
                 ("players", "players"),
                 ("settings", "guild_settings"),
@@ -998,6 +1017,8 @@ class Database:
             "soulmate_set_at",
             "harem_sort",
             "showcase_id",
+            "tuto_step",
+            "tuto_silent",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:
@@ -1536,6 +1557,76 @@ class Database:
             " ORDER BY c.name",
             (guild_id, user_id, f"%{text}%"),
         ).fetchall()
+
+    # ---------- tutorial ----------
+
+    def tuto_step(self, guild_id: int, user_id: int) -> int:
+        player = self.get_player(guild_id, user_id)
+        if "tuto_step" not in player.keys():
+            return 1
+        return max(1, player["tuto_step"] or 1)
+
+    def set_tuto_step(self, guild_id: int, user_id: int, step: int):
+        self.update_player(guild_id, user_id, tuto_step=max(1, step))
+
+    def tuto_silent(self, guild_id: int, user_id: int) -> bool:
+        player = self.get_player(guild_id, user_id)
+        if "tuto_silent" not in player.keys():
+            return False
+        return bool(player["tuto_silent"])
+
+    def set_tuto_silent(self, guild_id: int, user_id: int, quiet: bool) -> bool:
+        self.update_player(guild_id, user_id, tuto_silent=1 if quiet else 0)
+        return quiet
+
+    def finish_substep(self, guild_id: int, user_id: int, step: int,
+                       substep: str) -> bool:
+        """Mark one substep done. False if it already was."""
+        try:
+            self.conn.execute(
+                "INSERT INTO tutorial_progress"
+                " (guild_id, user_id, step, substep, done_at)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (guild_id, user_id, step, substep, int(time.time())),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        self.conn.commit()
+        return True
+
+    def finished_substeps(self, guild_id: int, user_id: int, step: int) -> set:
+        return {
+            row["substep"] for row in self.conn.execute(
+                "SELECT substep FROM tutorial_progress"
+                " WHERE guild_id = ? AND user_id = ? AND step = ?",
+                (guild_id, user_id, step),
+            ).fetchall()
+        }
+
+    def tuto_done_count(self, guild_id: int, user_id: int) -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) AS c FROM tutorial_progress"
+            " WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        ).fetchone()["c"]
+
+    def reset_tutorial(self, guild_id: int, user_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM tutorial_progress WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        )
+        self.conn.commit()
+        self.set_tuto_step(guild_id, user_id, 1)
+        return cur.rowcount
+
+    def tuto_finished_anywhere(self, user_id: int, last_step: int) -> bool:
+        """Whether this player has finished the main tutorial on some other
+        server - which is what $skiptuto is for."""
+        row = self.conn.execute(
+            "SELECT MAX(step) AS deepest FROM tutorial_progress"
+            " WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        return bool(row and (row["deepest"] or 0) >= last_step)
 
     # ---------- harem management ----------
 

@@ -50,38 +50,9 @@ PRESETS = {
     ),
 }
 
-TUTORIAL = [
-    ("1. Roll", "`$w` shows a character with a **Claim** button."),
-    ("2. Claim", "Press it. They are yours on this server, and nobody else"
-                 " here can have them."),
-    ("3. Collect", "`$dk` is your daily shards. `$k` is what you have."),
-    ("4. Look after them",
-     "`$mm` flips through your harem, `$note` scribbles on one,"
-     " `$wish` gets you pinged when somebody you want turns up."),
-    ("5. Spend it",
-     "`$shop` sells rolls and resets, `$kt` climbs the tower,"
-     " `$badges` buys perks that last."),
-]
-
-
 class About(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-
-    @commands.command(name="tuto", aliases=["tutorial", "howto", "start"])
-    async def tuto(self, ctx):
-        """How to play, in five steps."""
-        prefix = ctx.prefix or config.PREFIX
-        embed = discord.Embed(
-            title="How to play",
-            description=f"Everything starts with `{prefix}w`.",
-            colour=config.CARD_COLOUR,
-        )
-        for name, value in TUTORIAL:
-            embed.add_field(name=name, value=value.replace("$", prefix),
-                            inline=False)
-        embed.set_footer(text=f"{prefix}help lists everything")
-        await ctx.send(embed=embed)
 
     @commands.command(name="about", aliases=["wiki", "aboutbot", "miscellaneous"])
     async def about(self, ctx):

@@ -161,7 +161,12 @@ CATEGORIES = [
         ("serveroverview", "the server at a glance"),
     ]),
     ("\U0001f4d6", "About", [
-        ("tuto", "how to play"),
+        ("tuto", "the tutorial"),
+        ("tutoprogress", "how far you are"),
+        ("skipsubstep", "skip a blocked one"),
+        ("silentstep", "quieten the ticks"),
+        ("skiptuto", "jump to challenges"),
+        ("resettuto", "start it again"),
         ("about", "what this bot is"),
         ("support", "what it costs"),
         ("preset", "set several dials"),

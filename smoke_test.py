@@ -1079,6 +1079,109 @@ async def main():
               for r in db.top_characters(GUILD, limit=5, series="QA"))
           or db.count_characters_in(GUILD, "QA") == 0)
 
+    # 20j8. The tutorial: the data has to be real and the engine has to pay.
+    import tutorial as tutomod
+
+    check("the tutorial has steps", tutomod.TOTAL_STEPS >= 15,
+          str(tutomod.TOTAL_STEPS))
+    check("there are challenge steps after the main ones",
+          tutomod.TOTAL_STEPS > tutomod.MAIN_STEPS)
+
+    unreal, dupes, unchecked = [], [], []
+    for number in range(1, tutomod.TOTAL_STEPS + 1):
+        entry = tutomod.step(number)
+        seen = set()
+        for sub in entry["substeps"]:
+            if sub["key"] in seen:
+                dupes.append(f"{number}.{sub['key']}")
+            seen.add(sub["key"])
+            for name in sub["commands"]:
+                if not b.get_command(name):
+                    unreal.append(f"{number}.{sub['key']}:{name}")
+            if not sub["commands"] and not sub.get("check"):
+                unchecked.append(f"{number}.{sub['key']}")
+    check("every tutorial substep names real commands", not unreal,
+          ", ".join(unreal[:6]))
+    check("substep keys are unique inside a step", not dupes, ", ".join(dupes))
+
+    # Two substeps in one step that the same single command satisfies would
+    # both tick off at once, which makes one of them a lie.
+    ambiguous = []
+    for number in range(1, tutomod.TOTAL_STEPS + 1):
+        subs = tutomod.substeps_for(number)
+        for i, one in enumerate(subs):
+            for two in subs[i + 1:]:
+                shared = one["commands"] & two["commands"]
+                if not shared:
+                    continue
+                # Fine if something else tells them apart.
+                if (one.get("wants") or two.get("wants")
+                        or one.get("check") or two.get("check")):
+                    continue
+                ambiguous.append(
+                    f"{number}: {one['key']}/{two['key']} both on"
+                    f" {sorted(shared)[0]}")
+    check("no two substeps tick off on the same command",
+          not ambiguous, "; ".join(ambiguous))
+    check("no substep is impossible to finish", not unchecked,
+          ", ".join(unchecked))
+    check("every step pays something",
+          all(tutomod.step(n)["reward"] for n in
+              range(1, tutomod.TOTAL_STEPS + 1)))
+    check("every substep explains itself",
+          all(sub["text"].strip() and sub["title"].strip()
+              for n in range(1, tutomod.TOTAL_STEPS + 1)
+              for sub in tutomod.substeps_for(n)))
+    check("rewards describe themselves",
+          all(tutomod.describe_reward(tutomod.step(n)["reward"])
+              for n in range(1, tutomod.TOTAL_STEPS + 1)))
+
+    # The engine: finishing every substep of a step has to advance and pay.
+    tdb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "tuto.db"))
+    check("everyone starts on step one", tdb.tuto_step(GUILD, ALICE) == 1)
+    check("a fresh player has finished nothing",
+          tdb.finished_substeps(GUILD, ALICE, 1) == set())
+
+    first = tutomod.substeps_for(1)
+    for sub in first[:-1]:
+        tdb.finish_substep(GUILD, ALICE, 1, sub["key"])
+    wanted = {sub["key"] for sub in first}
+    check("a part-finished step is not finished",
+          not wanted <= tdb.finished_substeps(GUILD, ALICE, 1))
+    tdb.finish_substep(GUILD, ALICE, 1, first[-1]["key"])
+    check("a fully finished step is recognised",
+          wanted <= tdb.finished_substeps(GUILD, ALICE, 1))
+    check("a substep cannot be counted twice",
+          not tdb.finish_substep(GUILD, ALICE, 1, first[0]["key"]))
+
+    check("progress is per server",
+          tdb.finished_substeps(OTHER, ALICE, 1) == set())
+    check("progress is per player",
+          tdb.finished_substeps(GUILD, BOB, 1) == set())
+
+    tdb.set_tuto_step(GUILD, ALICE, 4)
+    check("a step can be reached", tdb.tuto_step(GUILD, ALICE) == 4)
+    check("skipping is refused to somebody who never finished it",
+          not tdb.tuto_finished_anywhere(BOB, tutomod.MAIN_STEPS))
+    check("silent mode toggles",
+          tdb.set_tuto_silent(GUILD, ALICE, True)
+          and tdb.tuto_silent(GUILD, ALICE))
+    check("a reset puts them back to the start",
+          tdb.reset_tutorial(GUILD, ALICE) > 0
+          and tdb.tuto_step(GUILD, ALICE) == 1
+          and tdb.finished_substeps(GUILD, ALICE, 1) == set())
+
+    # Only the ones a quiet server can genuinely block are skippable.
+    skippable = [sub["key"] for n in range(1, tutomod.TOTAL_STEPS + 1)
+                 for sub in tutomod.substeps_for(n) if sub.get("skippable")]
+    check("some substeps can be skipped when a server cannot offer them",
+          len(skippable) >= 2, str(skippable))
+    check("challenge substeps cannot be skipped",
+          not any(sub.get("skippable")
+                  for n in range(tutomod.MAIN_STEPS + 1, tutomod.TOTAL_STEPS + 1)
+                  for sub in tutomod.substeps_for(n)))
+    tdb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

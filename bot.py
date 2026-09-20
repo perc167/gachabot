@@ -43,6 +43,7 @@ COGS = [
     "cogs.leaderboards",
     "cogs.about",
     "cogs.haremextra",
+    "cogs.tutorial",
     "cogs.help",
 ]
 
