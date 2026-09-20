@@ -40,6 +40,17 @@ FEMALE = {
         "Dess Holiday",
     ],
     "Doki Doki Literature Club!": ["Monika", "Sayori", "Yuri", "Natsuki"],
+    "Disco Elysium": [
+        "Klaasje", "Joyce Messier", "Cunoesse", "Sylvie", "Ruby", "Lena",
+        "Acele", "Soona", "Annette", "Plaisance", "Judit Minot",
+        "Dolores Dei",
+    ],
+    # The twelve sinners, plus the two who are not in question. Dante is
+    # written as ambiguous on purpose and stays blank.
+    "Limbus Company": [
+        "Faust", "Don Quixote", "Ry\u014dsh\u016b", "Ishmael", "Rodion",
+        "Outis", "Charon",
+    ],
 }
 
 MALE = {
@@ -64,6 +75,16 @@ MALE = {
     "Deltarune": [
         "Ralsei", "Lancer", "King", "Berdly", "Spamton", "Jevil", "Seam",
         "Rouxls Kaard", "Rudolph Holiday", "Mike", "Spamton G. Spamton",
+    ],
+    "Disco Elysium": [
+        "Harry Du Bois", "Kim Kitsuragi", "Cuno", "Measurehead",
+        "Evrart Claire", "Edgar Claire", "Garte", "Titus Hardie",
+        "Gaston Martin", "Siileng", "Steban", "Ulixes Richaud",
+        "Idiot Doom Spiral", "Trant Heidelstam", "Jean Vicquemare", "Morell",
+    ],
+    "Limbus Company": [
+        "Yi Sang", "Meursault", "Hong Lu", "Heathcliff", "Sinclair",
+        "Gregor", "Vergilius",
     ],
 }
 

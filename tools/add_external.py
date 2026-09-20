@@ -283,6 +283,87 @@ def source_fortnite(existing_names) -> list:
     return rows
 
 
+ANILIST = "https://graphql.anilist.co"
+
+VOCALOID_QUERY = """
+query ($search: String, $page: Int) {
+  Media(search: $search, type: MANGA) {
+    characters(sort: FAVOURITES_DESC, perPage: 25, page: $page) {
+      pageInfo { hasNextPage }
+      nodes { id name { full } favourites image { large } }
+    }
+  }
+}
+"""
+
+
+def source_vocaloid() -> list:
+    """The Vocaloids, filed under Vocaloid.
+
+    They are on AniList with real favourites - Miku has 3,634 - but only as
+    the cast of a gag manga, and the sweep files everyone under the most
+    popular thing they appear in. That left Miku under Zoku Sayonara
+    Zetsubou-Sensei, which she is in for one joke. These carry their AniList
+    id, so the merge re-files the ones already in the roster rather than
+    adding a second copy of them.
+    """
+    rows, page = [], 1
+    while page <= 4:
+        body = json.dumps({
+            "query": VOCALOID_QUERY,
+            "variables": {"search": "Hachune Miku no Nichijou Roipara",
+                          "page": page},
+        }).encode()
+        request = urllib.request.Request(ANILIST, data=body, headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "gachabot-external/1.0",
+        })
+        with urllib.request.urlopen(request, timeout=45) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        block = ((payload.get("data") or {}).get("Media") or {}).get(
+            "characters") or {}
+        for node in block.get("nodes") or []:
+            name = (node.get("name") or {}).get("full")
+            image = (node.get("image") or {}).get("large") or ""
+            if not name or not image or "default.jpg" in image:
+                continue
+            row = record(name, "Vocaloid", image,
+                         node.get("favourites") or 0, "AniList")
+            row["anilist_id"] = node["id"]
+            rows.append(row)
+        if not (block.get("pageInfo") or {}).get("hasNextPage"):
+            break
+        page += 1
+        time.sleep(2.1)
+    return rows
+
+
+DISCO_LEADS = ["Harry Du Bois", "Kim Kitsuragi", "Klaasje", "Cuno",
+               "Measurehead", "Evrart Claire", "Joyce Messier"]
+DISCO_REST = ["Cunoesse", "Garte", "Sylvie", "Titus Hardie", "Ruby", "Lena",
+              "Morell", "Gaston Martin", "Acele", "Siileng", "Soona",
+              "Steban", "Ulixes Richaud", "Annette", "Plaisance",
+              "Idiot Doom Spiral", "Trant Heidelstam", "Jean Vicquemare",
+              "Judit Minot", "Dolores Dei", "Edgar Claire"]
+
+LIMBUS_LEADS = ["Yi Sang", "Faust", "Don Quixote", "Ryōshū", "Meursault",
+                "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair",
+                "Outis", "Gregor", "Dante"]
+LIMBUS_REST = ["Vergilius", "Charon", "Mephistopheles", "Sancho",
+               "Effie", "Kromer", "Hermann", "Ahab"]
+
+
+def source_discoelysium() -> list:
+    return from_fandom("discoelysium", "Disco Elysium",
+                       DISCO_LEADS, DISCO_REST, "discoelysium.fandom")
+
+
+def source_limbuscompany() -> list:
+    return from_fandom("limbuscompany", "Limbus Company",
+                       LIMBUS_LEADS, LIMBUS_REST, "limbuscompany.fandom")
+
+
 SOURCES = {
     "avatar": source_avatar,
     "overwatch": source_overwatch,
@@ -290,6 +371,9 @@ SOURCES = {
     "deltarune": source_deltarune,
     "ddlc": source_ddlc,
     "fortnite": source_fortnite,
+    "vocaloid": source_vocaloid,
+    "discoelysium": source_discoelysium,
+    "limbuscompany": source_limbuscompany,
 }
 
 
@@ -341,18 +425,43 @@ def main():
     names = {r["name"].lower() for r in rows}
     print(f"Pool holds {len(rows):,} characters\n")
 
-    added = []
+    # Anyone already in the roster, by AniList id, so a source can move them
+    # rather than adding a second copy under a better series name.
+    by_anilist = {r["anilist_id"]: r for r in rows if r.get("anilist_id")}
+
+    added, refiled = [], 0
     for name in wanted:
         print(f"  {name}:")
         fetched = (SOURCES[name](names) if name == "fortnite"
                    else SOURCES[name]())
-        fresh = [r for r in fetched if (r["name"], r["series"]) not in pairs]
-        for row in fresh:
+        fresh, moved = [], 0
+        for row in fetched:
+            existing = by_anilist.get(row.get("anilist_id"))
+            if existing is not None:
+                if existing["series"] != row["series"]:
+                    print(f"      re-filing {existing['name']}:"
+                          f" {existing['series']} -> {row['series']}")
+                    pairs.discard((existing["name"], existing["series"]))
+                    existing["series"] = row["series"]
+                    pairs.add((existing["name"], existing["series"]))
+                    moved += 1
+                continue
+            if (row["name"], row["series"]) in pairs:
+                continue
             pairs.add((row["name"], row["series"]))
-        skipped = len(fetched) - len(fresh)
+            fresh.append(row)
+        refiled += moved
+        skipped = len(fetched) - len(fresh) - moved
         print(f"    {len(fresh):,} new"
+              + (f", {moved:,} re-filed" if moved else "")
               + (f", {skipped:,} already in" if skipped else ""))
         added.extend(fresh)
+
+    if refiled and not added:
+        load_rerank()(rows)
+        write_roster(rows, args.data)
+        print(f"\nRe-filed {refiled} characters in {args.data}")
+        return 0
 
     if not added:
         print("\nNothing new to add.")
@@ -382,6 +491,8 @@ def main():
     rows.extend(added)
     load_rerank()(rows)
     write_roster(rows, args.data)
+    if refiled:
+        print(f"  re-filed {refiled} characters already in the roster")
 
     print(f"\nWrote {len(rows):,} characters to {args.data}")
     print(f"  manifest of non-AniList additions: {len(manifest):,}"

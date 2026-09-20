@@ -38,6 +38,8 @@ WIKIS = {
     "Undertale": "undertale",
     "Deltarune": "deltarune",
     "Doki Doki Literature Club!": "doki-doki-literature-club",
+    "Disco Elysium": "discoelysium",
+    "Limbus Company": "limbuscompany",
 }
 
 BROWSER = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"

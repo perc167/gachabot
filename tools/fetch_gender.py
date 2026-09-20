@@ -77,6 +77,11 @@ def write(rows, path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--delay", type=float, default=2.1)
+    parser.add_argument("--series", default=None,
+                        help="only ask about one series. Without it every"
+                             " character still lacking a gender is asked"
+                             " again, including the tens of thousands AniList"
+                             " genuinely has none for.")
     parser.add_argument("--data", default=DATA)
     args = parser.parse_args()
 
@@ -91,7 +96,9 @@ def main():
 
     rows = list(utils.iter_roster(args.data))
     by_id = {r["anilist_id"]: r for r in rows
-             if r.get("anilist_id") and not r.get("gender")}
+             if r.get("anilist_id") and not r.get("gender")
+             and (not args.series
+                  or args.series.lower() in r["series"].lower())}
     ids = sorted(by_id)
     print(f"{len(rows):,} characters, {len(ids):,} need a gender\n", flush=True)
     if not ids:
