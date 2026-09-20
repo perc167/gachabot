@@ -42,6 +42,18 @@ CATEGORIES = [
         ("note", "scribble on one"),
         ("divorce", "let one go"),
     ]),
+    ("\U0001f5c3\ufe0f", "Harem tools", [
+        ("mmw", "just the women"),
+        ("mmh", "just the men"),
+        ("mmr", "most valuable first"),
+        ("sortmarry", "your default order"),
+        ("smpos", "where one sits"),
+        ("firstmarry", "your showcase"),
+        ("infomarry", "who owns one"),
+        ("haremcopy", "as plain text"),
+        ("divorcepage", "let a page go"),
+        ("haremlimit", "cap harem size"),
+    ]),
     ("\U0001f9f9", "Clearing out", [
         ("divorceall", "let everyone go"),
         ("divorceseries", "one series, gone"),
@@ -137,6 +149,7 @@ CATEGORIES = [
     ]),
     ("\U0001f3c6", "Leaderboards", [
         ("top", "biggest harems"),
+        ("topchars", "best in the pool"),
         ("topclaims", "most claimed"),
         ("topvalue", "richest harems"),
         ("topseries", "this server's taste"),

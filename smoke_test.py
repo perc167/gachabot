@@ -1063,6 +1063,22 @@ async def main():
           len({b.get_command(n).qualified_name for n in ("w", "h", "m")}) == 3)
     rolldb.close()
 
+    # 20j7. The character leaderboard. Every other top command ranks
+    # players; this one ranks characters, and it has to rank them by value.
+    top = db.top_characters(GUILD, limit=40)
+    values = [row["base_karuda"] for row in top]
+    check("the character board is ordered by value",
+          values == sorted(values, reverse=True), str(values[:6]))
+    check("the character board pages",
+          [r["id"] for r in db.top_characters(GUILD, limit=5, offset=5)]
+          != [r["id"] for r in db.top_characters(GUILD, limit=5)])
+    check("the character board counts what it ranks",
+          db.count_characters_in(GUILD) >= len(top))
+    check("the character board can be narrowed to a series",
+          all("QA" in r["series"]
+              for r in db.top_characters(GUILD, limit=5, series="QA"))
+          or db.count_characters_in(GUILD, "QA") == 0)
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

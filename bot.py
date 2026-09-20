@@ -42,6 +42,7 @@ COGS = [
     "cogs.tea",
     "cogs.leaderboards",
     "cogs.about",
+    "cogs.haremextra",
     "cogs.help",
 ]
 

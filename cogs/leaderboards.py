@@ -13,6 +13,7 @@ from discord.ext import commands
 
 import config
 import utils
+from views import Paginator
 
 
 def board(db, guild_id: int, title: str, lines, note: str = None):
@@ -36,6 +37,65 @@ def place(index: int) -> str:
 class Leaderboards(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.command(name="topchars",
+                      aliases=["tc", "topcharacters", "bestcharacters",
+                               "toppool", "topkaruda"])
+    @commands.guild_only()
+    async def topchars(self, ctx, *, series: str = None):
+        """The most valuable characters in the pool, ten to a page.
+
+        Every other `top` command ranks people; this one ranks characters.
+        Page one is the top ten, page two is eleven to twenty, and so on -
+        flip with the arrows. `$topchars Jujutsu Kaisen` ranks inside one
+        series instead.
+        """
+        db = self.bot.db
+        gid = ctx.guild.id
+        rate = db.get_setting(gid, "karuda_rate")
+        icon = utils.shard_icon(config.SHARD_TYPES[0][0])
+
+        total = db.count_characters_in(gid, series)
+        if not total:
+            await ctx.send(
+                f"Nothing in the pool matches `{series}`." if series
+                else "The pool is empty."
+            )
+            return
+
+        # Capped rather than unbounded: a hundred thousand characters is ten
+        # thousand pages, and nobody is flipping to page nine thousand.
+        shown = min(total, 500)
+        rows = db.top_characters(gid, limit=shown, series=series)
+
+        embeds, per_page = [], 10
+        pages = (len(rows) - 1) // per_page + 1
+        for number in range(pages):
+            window = rows[number * per_page:(number + 1) * per_page]
+            lines = []
+            for offset, row in enumerate(window):
+                position = number * per_page + offset + 1
+                owner = db.owner_of(gid, row["id"])
+                held = f" · <@{owner}>" if owner else ""
+                lines.append(
+                    f"{place(position - 1)} **{row['name']}** · {row['series']}\n"
+                    f"　{icon} {utils.karuda_value(row, rate):,}"
+                    f" · #{row['like_rank']:,}{held}"
+                )
+            embed = discord.Embed(
+                title=(f"\U0001f451  Most valuable in {series}" if series
+                       else "\U0001f451  Most valuable characters"),
+                description="\n".join(lines),
+                colour=db.get_pref(gid, "cardcolour", config.CARD_COLOUR),
+            )
+            embed.set_footer(
+                text=f"Page {number + 1}/{pages} · "
+                     f"{position} of {total:,} ranked"
+                     + (" · top 500 only" if total > shown else "")
+            )
+            embeds.append(embed)
+
+        await Paginator(embeds, ctx.author.id).start(ctx)
 
     @commands.command(name="topvalue", aliases=["topservv", "tsv", "richestharem"])
     @commands.guild_only()

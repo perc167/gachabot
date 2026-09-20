@@ -89,6 +89,17 @@ class Profile(commands.Cog):
             text=f"{left} rolls left, resets in {fmt_duration(reset_in)} · "
                  + ("claim ready" if claim_ready else f"claim in {fmt_duration(claim_in)}")
         )
+        # The one character they chose with $fm, if they still own them.
+        showcase = self.bot.db.showcase_of(ctx.guild.id, member.id)
+        if showcase:
+            embed.add_field(
+                name="Showcase",
+                value=f"**{showcase['name']}** · {showcase['series']}",
+                inline=False,
+            )
+            if showcase["image_url"] and not str(
+                    showcase["image_url"]).startswith(utils.LOCAL_ART):
+                embed.set_thumbnail(url=showcase["image_url"])
         await ctx.send(embed=embed)
 
     @commands.command(name="myid", aliases=["id"])

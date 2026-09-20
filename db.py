@@ -236,6 +236,8 @@ class Database:
             ("characters", "source", "TEXT NOT NULL DEFAULT ''"),
             ("characters", "gender", "TEXT NOT NULL DEFAULT ''"),
             ("marriages", "note_image", "TEXT"),
+            ("players", "harem_sort", "TEXT NOT NULL DEFAULT ''"),
+            ("players", "showcase_id", "INTEGER NOT NULL DEFAULT 0"),
         ):
             existing = {
                 row["name"]
@@ -994,6 +996,8 @@ class Database:
             "keys",
             "soulmate_id",
             "soulmate_set_at",
+            "harem_sort",
+            "showcase_id",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:
@@ -1533,7 +1537,90 @@ class Database:
             (guild_id, user_id, f"%{text}%"),
         ).fetchall()
 
+    # ---------- harem management ----------
+
+    def harem_filtered(self, guild_id: int, user_id: int, order: str = "likes",
+                       gender: str = None) -> list:
+        """A harem, optionally narrowed to one gender."""
+        rows = self.harem(guild_id, user_id, order)
+        if not gender:
+            return rows
+        return [row for row in rows if (row["gender"] or "") == gender]
+
+    def harem_position(self, guild_id: int, user_id: int, character_id: int,
+                       order: str = "likes") -> int:
+        """Where a character sits in someone's harem, 1-based. 0 if absent."""
+        for position, row in enumerate(self.harem(guild_id, user_id, order), 1):
+            if row["id"] == character_id:
+                return position
+        return 0
+
+    def set_showcase(self, guild_id: int, user_id: int, character_id: int):
+        """The one character shown at the top of a profile."""
+        self.update_player(guild_id, user_id, showcase_id=character_id)
+
+    def showcase_of(self, guild_id: int, user_id: int):
+        player = self.get_player(guild_id, user_id)
+        character_id = player["showcase_id"] if "showcase_id" in player.keys() else 0
+        if not character_id:
+            return None
+        # Still theirs? Losing them in a trade should not leave a stranger on
+        # the profile.
+        if self.owner_of(guild_id, character_id) != user_id:
+            return None
+        return self.get_character(character_id)
+
+    def set_harem_sort(self, guild_id: int, user_id: int, order: str):
+        self.update_player(guild_id, user_id, harem_sort=order)
+
+    def harem_sort_of(self, guild_id: int, user_id: int) -> str:
+        player = self.get_player(guild_id, user_id)
+        if "harem_sort" not in player.keys():
+            return ""
+        return player["harem_sort"] or ""
+
+    def claim_info(self, guild_id: int, character_id: int):
+        """Who owns a character here, when they got them, and what they wrote."""
+        return self.conn.execute(
+            "SELECT user_id, claimed_at, note FROM marriages"
+            " WHERE guild_id = ? AND character_id = ?",
+            (guild_id, character_id),
+        ).fetchone()
+
     # ---------- leaderboards ----------
+
+    def top_characters(self, guild_id: int, limit: int = 10,
+                       offset: int = 0, series: str = None) -> list:
+        """The pool's most valuable characters, in order.
+
+        Value comes from rank, so this is the global ranking itself rather
+        than a per-server one - the answer to "who is worth the most" is the
+        same everywhere, which is the point of a shared pool.
+        """
+        where = "WHERE (guild_id = 0 OR guild_id = ?) AND like_rank > 0"
+        args = [guild_id]
+        if series:
+            where += " AND series LIKE ?"
+            args.append(f"%{series}%")
+        # By value, not by rank. They are nearly the same order, but value
+        # is the average of the like and claim ranks and the claim rank
+        # carries a jitter - so ranking by like_rank alone puts a 435 above a
+        # 448 and makes a "most valuable" list look wrong.
+        return self.conn.execute(
+            f"SELECT * FROM characters {where}"
+            f" ORDER BY base_karuda DESC, like_rank LIMIT ? OFFSET ?",
+            (*args, limit, max(0, offset)),
+        ).fetchall()
+
+    def count_characters_in(self, guild_id: int, series: str = None) -> int:
+        where = "WHERE (guild_id = 0 OR guild_id = ?) AND like_rank > 0"
+        args = [guild_id]
+        if series:
+            where += " AND series LIKE ?"
+            args.append(f"%{series}%")
+        return self.conn.execute(
+            f"SELECT COUNT(*) AS c FROM characters {where}", args
+        ).fetchone()["c"]
 
     def top_harem_value(self, guild_id: int, limit: int = 10) -> list:
         """Whose characters are worth the most, all added up."""
