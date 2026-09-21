@@ -1,0 +1,13 @@
+{
+  // Serves the generated site/ folder as a static site on Cloudflare Workers.
+  // There is no "main" worker script on purpose: with only an assets binding,
+  // Cloudflare serves the files straight from its edge and never runs code.
+  //
+  // The bot itself does not deploy from here. This config covers the website
+  // only; the bot runs on Railway.
+  "name": "gachabot",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./site"
+  }
+}
