@@ -46,7 +46,7 @@ class Notes(commands.Cog):
             embeds.append(embed)
         await Paginator(embeds, ctx.author.id).start(ctx)
 
-    @commands.command(name="notesearch", aliases=["findnote"])
+    @commands.command(name="notesearch", aliases=["findnote", "fn"])
     @commands.guild_only()
     async def notesearch(self, ctx, *, text: str):
         """Find your notes containing some text."""

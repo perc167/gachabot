@@ -1450,6 +1450,27 @@ async def main():
 
     check("there is a way to ask from Discord", b.get_command("dbinfo"))
 
+    # 20j14. Finding things.
+    # Taken from the roster rather than assumed: an earlier section deletes
+    # the QA character it made, so hard-coding a series makes this pass or
+    # fail on test ordering instead of on the thing being tested.
+    a_series = roster[0]["series"]
+    resolved = db.series_cast(GUILD, a_series)
+    check("a typed series resolves to its cast",
+          resolved and all(r["series"] == resolved[0]["series"]
+                           for r in resolved),
+          f"{a_series!r} -> {len(resolved)}")
+    check("a series that does not exist resolves to nothing",
+          db.series_cast(GUILD, "zzzznosuchseries") == [])
+    check("the finding commands exist",
+          all(b.get_command(name) for name in
+              ("findharem", "findwish", "findlike", "unowned", "castof",
+               "imagecount", "quietly", "random")))
+    check("the Mudae spellings reach them",
+          all(b.get_command(name) for name in
+              ("fn", "fna", "fnw", "fnl", "fne", "ims", "ic", "gc",
+               "rdmperso")))
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

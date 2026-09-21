@@ -2064,6 +2064,19 @@ class Database:
             (series, *extra, limit),
         ).fetchall()
 
+    def series_cast(self, guild_id, query: str, limit: int = 200) -> list:
+        """The cast of whichever series a typed query best matches.
+
+        characters_in_series wants the exact title; nobody types the exact
+        title. This resolves the query to the biggest matching series first,
+        which is the same rule $series uses when it offers a choice.
+        """
+        matches = self.search_series(query, limit=1, guild_id=guild_id)
+        if not matches:
+            return []
+        return self.characters_in_series(matches[0][0], limit=limit,
+                                         guild_id=guild_id)
+
     # ---------- wishes ----------
 
     def add_wish(self, guild_id: int, user_id: int, character_id: int) -> bool:

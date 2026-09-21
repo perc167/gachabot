@@ -212,6 +212,16 @@ CATEGORIES = [
         ("addimg", "add one to the pool"),
         ("changeimg", "pick which one leads"),
     ]),
+    ("🔎", "Finding things", [
+        ("findharem", "search your own"),
+        ("findwish", "search your wishes"),
+        ("findlike", "search your likes"),
+        ("unowned", "who is still free"),
+        ("castof", "a series at a glance"),
+        ("imagecount", "how much art"),
+        ("quietly", "a card by DM"),
+        ("random", "a free random card"),
+    ]),
     ("\U0001f4dd", "Notes", [
         ("note", "scribble on one"),
         ("notelist", "everything you wrote"),

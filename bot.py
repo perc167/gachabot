@@ -47,6 +47,7 @@ COGS = [
     "cogs.haremextra",
     "cogs.tutorial",
     "cogs.personalise",
+    "cogs.find",
     "cogs.help",
 ]
 
