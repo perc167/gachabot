@@ -5,7 +5,7 @@
   //
   // The bot itself does not deploy from here. This config covers the website
   // only; the bot runs on Railway.
-  "name": "gachabot",
+  "name": "yuri-gacha",
   "compatibility_date": "2025-01-01",
   "assets": {
     "directory": "./site"
