@@ -1471,6 +1471,34 @@ async def main():
               ("fn", "fna", "fnw", "fnl", "fne", "ims", "ic", "gc",
                "rdmperso")))
 
+    # 20j15. The AutoMod list has to stay inside Discord's limits, and it
+    # only stays useful while it lists every command.
+    every = set()
+    for command in b.walk_commands():
+        every.add(command.name.lower())
+        every.update(alias.lower() for alias in command.aliases)
+    check("the command list fits Discord's keyword limit",
+          len(every) <= 1000, f"{len(every)} names")
+    check("no command name is too long to be a keyword",
+          not [n for n in every if len(n) + 1 > 60])
+
+    automod = os.path.join(PROJECT, "data", "automod.txt")
+    if os.path.exists(automod):
+        # Parse the keyword block rather than searching the whole file: the
+        # last keyword has no trailing comma and the file continues past it,
+        # so a substring search reports it missing when it is right there.
+        block = max(
+            open(automod, encoding="utf-8").read().splitlines(),
+            key=lambda line: line.count(", $"),
+        )
+        listed = {part.strip().lstrip("$")
+                  for part in block.split(",") if part.strip()}
+        absent = sorted(every - listed)
+        check("the generated AutoMod list covers every command",
+              not absent,
+              f"{len(absent)} missing: " + ", ".join(absent[:8])
+              + " - re-run tools/automod.py")
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 
