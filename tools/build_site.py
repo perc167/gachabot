@@ -302,6 +302,8 @@ code,kbd{
 footer{padding-block:38px 56px;color:var(--faint);font-size:13.5px}
 footer p{margin:0 0 6px}
 </style>
+</head>
+<body>
 
 <nav><div class="wrap nav-in">
   <a class="brand" href="#top"><span>Y</span>Yuri</a>
@@ -407,6 +409,27 @@ def step_html(steps) -> str:
             f'<div><h3>{title}</h3>{body}</div></div>'
         )
     return "\n".join(out)
+
+
+# The page body is authored for the artifact publisher, which wraps it in a
+# head of its own. Hosted anywhere else there is no wrapper, so the generator
+# emits a whole document: without the charset every em dash and Japanese name
+# arrives as mojibake, and without the viewport a phone renders the page at
+# desktop width and zooms out.
+DOCUMENT = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Yuri is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Yuri Gacha">
+<meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">
+<meta property="og:type" content="website">
+__PAGE__
+</body>
+</html>
+"""
 
 
 def build(embed: int = 0, invite_url: str = ""):
@@ -515,6 +538,7 @@ def build(embed: int = 0, invite_url: str = ""):
             .replace("__STEPS_HTML__", step_html(steps))
             .replace("__COMMANDS_HTML__", "\n".join(groups))
             .replace("__CHARACTERS_HTML__", "\n".join(cards)))
+    page = DOCUMENT.replace("__PAGE__", page)
     return page, total, series, command_total, len(shown)
 
 
