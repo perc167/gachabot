@@ -1304,6 +1304,74 @@ async def main():
           namedb.find_characters_by_name("zzzznobody") == [])
     namedb.close()
 
+    # 20j11. Two rankings. like_rank is what AniList measured; claim_rank is
+    # what a gacha is actually about, and it is what a character is worth.
+    check("the claim weight favours women",
+          config.FEMALE_CLAIM_WEIGHT > 1.0,
+          str(config.FEMALE_CLAIM_WEIGHT))
+    check("a woman outscores a man on equal favourites",
+          utils.claim_score(1000, "Female") > utils.claim_score(1000, "Male"))
+    check("an unrecorded gender is not penalised against men",
+          utils.claim_score(1000, "") == utils.claim_score(1000, "Male"))
+    check("nobody scores on no favourites",
+          utils.claim_score(0, "Female") == 0)
+
+    sample = [
+        {"name": "Famous Man", "series": "A", "gender": "Male",
+         "favourites": 30000, "image_url": "https://e.invalid/1.png", "likes": 0},
+        {"name": "Famous Woman", "series": "A", "gender": "Female",
+         "favourites": 20000, "image_url": "https://e.invalid/2.png", "likes": 0},
+        {"name": "Quiet Woman", "series": "A", "gender": "Female",
+         "favourites": 500, "image_url": "https://e.invalid/3.png", "likes": 0},
+        {"name": "Nobody", "series": "A", "gender": "",
+         "favourites": 1, "image_url": "https://e.invalid/4.png", "likes": 0},
+    ]
+    utils.rerank_roster(sample)
+    ranked = {r["name"]: r for r in sample}
+
+    check("like_rank still follows raw favourites",
+          ranked["Famous Man"]["like_rank"] == 1,
+          str(ranked["Famous Man"]["like_rank"]))
+    check("claim_rank does not",
+          ranked["Famous Woman"]["claim_rank"] == 1,
+          str(ranked["Famous Woman"]["claim_rank"]))
+    check("value follows the claim rank, not the like rank",
+          ranked["Famous Woman"]["base_karuda"]
+          > ranked["Famous Man"]["base_karuda"],
+          f"{ranked['Famous Woman']['base_karuda']} vs"
+          f" {ranked['Famous Man']['base_karuda']}")
+    check("a famous man is still valuable",
+          ranked["Famous Man"]["base_karuda"]
+          > ranked["Quiet Woman"]["base_karuda"])
+    check("every rank is filled in",
+          all(r["like_rank"] and r["claim_rank"] and r["base_karuda"]
+              for r in sample))
+    check("ranks are a permutation, not a tie",
+          sorted(r["claim_rank"] for r in sample) == [1, 2, 3, 4])
+
+    # The shipped roster has to obey the same rules.
+    shipped = sorted(roster, key=lambda r: r["claim_rank"])
+    check("the shipped roster is ranked by want",
+          [r["base_karuda"] for r in shipped[:50]]
+          == sorted((r["base_karuda"] for r in shipped[:50]), reverse=True))
+    top_ten = shipped[:10]
+    check("the top of the pool is mostly women",
+          sum(1 for r in top_ten if r.get("gender") == "Female") >= 6,
+          str([(r["name"], r.get("gender")) for r in top_ten[:3]]))
+    check("growing the roster still leaves ~300 above 300 karuda",
+          290 <= sum(1 for r in roster if r["base_karuda"] > 300) <= 310,
+          str(sum(1 for r in roster if r["base_karuda"] > 300)))
+
+    # One curve, in one place. Three copies is how they drift apart.
+    fetch_src = open(os.path.join(PROJECT, "tools", "fetch_roster.py"),
+                     encoding="utf-8").read()
+    series_src = open(os.path.join(PROJECT, "tools", "add_series.py"),
+                      encoding="utf-8").read()
+    check("the bulk fetcher does not keep its own ranking",
+          "utils.rerank_roster" in fetch_src)
+    check("add_series does not either",
+          "utils.rerank_roster" in series_src)
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

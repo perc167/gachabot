@@ -71,6 +71,21 @@ GUILD_SETTINGS = {
 # the moment you start gating, not before.
 FOUNDER_CUTOFF = 0
 
+# How much more a character is wanted than merely liked.
+#
+# Two rankings, because they answer different questions. like_rank is raw
+# AniList favourites - honest popularity, and it skews male: nine of the top
+# ten are men. claim_rank is how much people want to *own* somebody, which is
+# what a gacha is actually about and what Mudae ranks on, and that skews the
+# other way.
+#
+# One number produces the difference. At 2.2 the top of the pool is Makima,
+# Marin Kitagawa, Rem and Zero Two, while Gojou and Levi stay near it at
+# eleven and thirteen rather than owning it. At 1.0 the two rankings are the
+# same and the men are back on top; above 3 the men vanish from the top
+# twenty entirely.
+FEMALE_CLAIM_WEIGHT = 2.2
+
 # The currency. Karuda are shards; every payout is measured in them.
 CURRENCY = "karuda"
 CURRENCY_TITLE = "Karuda"

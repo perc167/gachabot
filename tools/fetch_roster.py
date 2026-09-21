@@ -365,13 +365,6 @@ def finish(collector: Collector, count: int) -> list:
         unique.append(row)
     rows = unique[:count]
 
-    total = len(rows)
-    for position, row in enumerate(rows, 1):
-        row["like_rank"] = position
-        row["claim_rank"] = claim_rank_for(position, row["name"], total)
-        row["base_karuda"] = karuda_for_rank(
-            max(1, (row["like_rank"] + row["claim_rank"]) // 2), total
-        )
     return rows
 
 
@@ -472,6 +465,13 @@ def main():
               flush=True)
 
     rows = finish(collector, args.count)
+    # Ranked by utils so the sweep, tools/add_series.py and the bot cannot
+    # drift apart about what a character is worth. It also applies the claim
+    # weighting, which the sweep has no business deciding on its own.
+    sys.path.insert(0, ROOT)
+    import utils  # noqa: E402
+
+    utils.rerank_roster(rows)
     total = len(rows)
     write(rows, args.out)
 

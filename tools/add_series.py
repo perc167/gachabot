@@ -91,16 +91,15 @@ def claim_rank_for(like_rank: int, name: str, total: int) -> int:
 
 
 def rerank(rows):
-    """Sort the whole pool by favourites and recompute ranks and values."""
-    rows.sort(key=lambda r: (-(r.get("favourites") or 0), r["name"]))
-    total = len(rows)
-    for position, row in enumerate(rows, 1):
-        row["like_rank"] = position
-        row["claim_rank"] = claim_rank_for(position, row["name"], total)
-        row["base_karuda"] = karuda_for_rank(
-            max(1, (row["like_rank"] + row["claim_rank"]) // 2), total
-        )
-    return rows
+    """Sort the whole pool and recompute ranks and values.
+
+    Delegates to utils so this tool, the bulk fetcher and the bot can never
+    disagree about what a character is worth.
+    """
+    sys.path.insert(0, ROOT)
+    import utils
+
+    return utils.rerank_roster(rows)
 
 
 def main():

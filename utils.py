@@ -119,6 +119,42 @@ def value_for_rank(rank: int, total: int) -> int:
     return max(low, round(low + (high - low) * (1 - t) ** exponent))
 
 
+def claim_score(favourites: int, gender: str) -> float:
+    """How much somebody is wanted, as opposed to how well known they are."""
+    weight = (config.FEMALE_CLAIM_WEIGHT
+              if (gender or "") == "Female" else 1.0)
+    return (favourites or 0) * weight
+
+
+def rerank_roster(rows) -> list:
+    """Set like_rank, claim_rank and base_karuda across a whole roster.
+
+    The single place any of this is decided. It used to live in three -
+    fetch_roster, add_series and utils - which is exactly the arrangement
+    where a curve gets changed in one of them and quietly disagrees with the
+    other two.
+
+    like_rank is raw favourites. claim_rank weights them by how much people
+    want to own somebody. Value comes from claim_rank, because what a
+    character is worth in a gacha is what people will fight over, not what
+    they will upvote.
+    """
+    rows.sort(key=lambda r: (-(r.get("favourites") or 0), r["name"]))
+    for position, row in enumerate(rows, 1):
+        row["like_rank"] = position
+
+    total = max(1, len(rows))
+    by_want = sorted(
+        rows,
+        key=lambda r: (-claim_score(r.get("favourites"), r.get("gender")),
+                       r["name"]),
+    )
+    for position, row in enumerate(by_want, 1):
+        row["claim_rank"] = position
+        row["base_karuda"] = value_for_rank(position, total)
+    return rows
+
+
 def karuda_value(character, rate_percent: int) -> int:
     """base_karuda already encodes how famous the character is, so the only
     adjustment is the server's own rate."""
