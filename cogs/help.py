@@ -319,6 +319,7 @@ CATEGORIES = [
         ("togglesnipe", "sniping in general"),
     ]),
     ("\U0001f527", "Bot owner", [
+        ("dbinfo", "is the data safe"),
         ("import", "load the roster"),
         ("export", "dump the roster"),
         ("pool", "what is loaded"),

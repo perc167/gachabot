@@ -1200,8 +1200,12 @@ async def main():
         remaining.add(reset_in)
     check("every player shares one deadline", len(deadlines) == 1,
           str(deadlines))
-    check("and is told the same time remaining", len(remaining) == 1,
-          str(remaining))
+    # Within a second of each other, not identical: each call computes the
+    # remaining time from the clock at that instant, so a second ticking over
+    # mid-loop is not a bug. The shared deadline is what matters, and it is
+    # checked exactly below.
+    check("and is told the same time remaining",
+          max(remaining) - min(remaining) <= 1, str(remaining))
     check("the shared deadline is the window's",
           deadlines == {ends_at})
 
@@ -1403,6 +1407,48 @@ async def main():
     check("a player reset takes their words with it",
           prefdb.reset_player(GUILD, ALICE)["preferences"] == 1)
     prefdb.close()
+
+    # 20j13. Where the save file lives. This is the difference between
+    # "update the bot" and "wipe everybody's progress".
+    import importlib
+
+    saved = {k: os.environ.get(k) for k in
+             ("DB_PATH", "RAILWAY_VOLUME_MOUNT_PATH", "VOLUME_PATH")}
+    try:
+        for key in saved:
+            os.environ.pop(key, None)
+        importlib.reload(config)
+        check("with no volume the bot admits it will forget",
+              not config.DB_PERSISTS)
+
+        mount = tempfile.mkdtemp()
+        os.environ["RAILWAY_VOLUME_MOUNT_PATH"] = mount
+        importlib.reload(config)
+        check("a mounted volume is found without being configured",
+              config.DB_PERSISTS
+              and os.path.dirname(config.DB_PATH) == mount,
+              config.DB_PATH)
+
+        # A path that is set but not actually mounted is the dangerous case:
+        # believing it persists when it does not is worse than knowing.
+        os.environ["RAILWAY_VOLUME_MOUNT_PATH"] = os.path.join(mount, "absent")
+        importlib.reload(config)
+        check("a volume that is not really there is not trusted",
+              not config.DB_PERSISTS)
+
+        os.environ["DB_PATH"] = os.path.join(mount, "chosen.db")
+        importlib.reload(config)
+        check("an explicit DB_PATH still wins",
+              config.DB_PERSISTS and config.DB_PATH.endswith("chosen.db"))
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        importlib.reload(config)
+
+    check("there is a way to ask from Discord", b.get_command("dbinfo"))
 
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod

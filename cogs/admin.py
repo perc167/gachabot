@@ -263,6 +263,46 @@ class Admin(commands.Cog):
         self.bot.db.delete_character(character_id)
         await ctx.send(f"Deleted **{character['name']}** ({character['series']}).")
 
+    @commands.command(name="dbinfo", aliases=["storage", "savefile"])
+    @is_bot_owner()
+    async def dbinfo(self, ctx):
+        """Where the save file is, and whether a redeploy will survive it."""
+        db = self.bot.db
+        path = os.path.abspath(config.DB_PATH)
+        size = os.path.getsize(path) / 1e6 if os.path.exists(path) else 0
+
+        safe = config.DB_PERSISTS
+        embed = discord.Embed(
+            title=("\U0001f512  Your data is on a volume" if safe
+                   else "\u26a0\ufe0f  Your data is on disposable storage"),
+            description=(
+                "It survives redeploys." if safe else
+                "**Everything is wiped the next time this bot is deployed** —"
+                " every claim, balance, tutorial and note. Attach a volume to"
+                " the service and redeploy; the bot finds it on its own and"
+                " nothing else needs changing."
+            ),
+            colour=(0x43B581 if safe else 0xE0525F),
+        )
+        embed.add_field(name="File", value=f"`{path}`", inline=False)
+        embed.add_field(name="Size", value=f"{size:.1f} MB", inline=True)
+        embed.add_field(
+            name="Holding",
+            value=f"{db.character_count():,} characters\n"
+                  f"{db.conn.execute('SELECT COUNT(*) FROM marriages').fetchone()[0]:,}"
+                  f" claims\n"
+                  f"{db.conn.execute('SELECT COUNT(*) FROM players').fetchone()[0]:,}"
+                  f" players",
+            inline=True,
+        )
+        if not safe:
+            embed.set_footer(
+                text=f"{ctx.prefix}export saves the roster; claims and"
+                     f" balances cannot be exported, so a volume is the only"
+                     f" way to keep them"
+            )
+        await ctx.send(embed=embed)
+
     @commands.command(name="import")
     @is_bot_owner()
     async def import_(self, ctx, path: str = None):

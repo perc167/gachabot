@@ -7,7 +7,32 @@ load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN", "").strip().strip("\"'")
 PREFIX = os.getenv("PREFIX", "$").strip() or "$"
-DB_PATH = os.getenv("DB_PATH", "gacha.db")
+def _database_path() -> tuple:
+    """Where the database lives, and whether it survives a redeploy.
+
+    A host like Railway rebuilds the container on every deploy, so anything
+    written beside the code is thrown away - claims, balances, tutorials, the
+    lot. The only thing that survives is a mounted volume.
+
+    Railway sets RAILWAY_VOLUME_MOUNT_PATH when one is attached, so attaching
+    a volume is all it takes: nothing to configure here, and nothing to
+    remember. DB_PATH still wins if it is set, for anyone hosting elsewhere.
+    """
+    explicit = os.getenv("DB_PATH", "").strip()
+    if explicit:
+        return explicit, True
+
+    mount = (os.getenv("RAILWAY_VOLUME_MOUNT_PATH")
+             or os.getenv("VOLUME_PATH") or "").strip()
+    if mount and os.path.isdir(mount):
+        return os.path.join(mount, "gacha.db"), True
+
+    # No volume. The bot still runs - it just forgets everything next deploy,
+    # and says so loudly at startup rather than letting it be a surprise.
+    return "gacha.db", False
+
+
+DB_PATH, DB_PERSISTS = _database_path()
 
 # Anything that is not a plain number is ignored, so leaving the placeholder
 # in .env warns instead of crashing on startup.

@@ -1,5 +1,7 @@
 """Entry point. Run with: python bot.py"""
+import asyncio
 import logging
+import os
 import sys
 import time
 
@@ -103,7 +105,47 @@ class GachaBot(commands.Bot):
 
     async def on_ready(self):
         log.info("logged in as %s (%s guilds)", self.user, len(self.guilds))
+        log.info("database: %s", os.path.abspath(config.DB_PATH))
+        if config.DB_PERSISTS:
+            log.info("this database survives a redeploy")
+        else:
+            log.warning(
+                "NO VOLUME MOUNTED - every claim, balance and tutorial on"
+                " this bot will be lost the next time it is deployed."
+                " Attach a volume and redeploy; nothing else needs changing."
+            )
+        await self._seed_pool()
         log.info("%s characters in the pool", self.db.character_count())
+
+    async def _seed_pool(self):
+        """Load the shipped roster if the pool is empty.
+
+        Saves running $import by hand on a fresh database, which is exactly
+        the moment somebody is least likely to know they have to.
+        """
+        if self.db.character_count():
+            return
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "data", "characters.json")
+        if not os.path.exists(path):
+            log.warning("no roster at %s - use %simport", path, config.PREFIX)
+            return
+        log.info("empty pool, loading %s", path)
+        try:
+            batch, loaded = [], 0
+            for record in utils.iter_roster(path):
+                batch.append(record)
+                if len(batch) >= 10000:
+                    loaded += (await asyncio.to_thread(
+                        self.db.import_characters, batch))["total"]
+                    batch.clear()
+            if batch:
+                loaded += (await asyncio.to_thread(
+                    self.db.import_characters, batch))["total"]
+            log.info("loaded %s characters", f"{loaded:,}")
+        except Exception:  # noqa: BLE001 - a bad roster must not stop the bot
+            log.exception("could not load the roster; use %simport",
+                          config.PREFIX)
         await self.change_presence(
             activity=discord.Game(name=f"{config.PREFIX}help | {config.PREFIX}w")
         )

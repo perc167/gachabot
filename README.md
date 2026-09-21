@@ -116,6 +116,48 @@ You'll get a character with a **Claim** button. Press it. You're playing.
 
 `$help` lists everything else.
 
+## Keeping everyone's progress when you update the bot
+
+**Attach a volume.** Without one, every deploy starts from an empty database:
+claims, karuda, tutorials, notes, badges, nicknames — all of it gone, because
+a host like Railway rebuilds the container from scratch and keeps nothing
+that was written beside the code.
+
+On Railway:
+
+1. Open the service → **Variables** → the **Volumes** tab (or *New* → *Volume*).
+2. Mount it at **`/data`**. Any path works; the bot finds it either way.
+3. Redeploy.
+
+There is nothing to configure. Railway sets `RAILWAY_VOLUME_MOUNT_PATH` when a
+volume is attached, and the bot puts its database there on its own. Hosting
+somewhere else? Set `DB_PATH` to a file on persistent storage.
+
+To check, run `$dbinfo`:
+
+- 🔒 **on a volume** — your data survives redeploys.
+- ⚠️ **on disposable storage** — it does not, and it says so in red.
+
+The startup log says the same thing, loudly, every time the bot boots without
+a volume.
+
+### What a volume does and does not cover
+
+| | Survives a deploy |
+|---|---|
+| Claims, karuda, tutorials, notes, badges, nicknames | only with a volume |
+| The character roster | always — it ships in the repo |
+
+The roster is loaded automatically the first time the bot starts with an empty
+pool, so a fresh volume needs no `$import`. You only need `$import` after
+changing `data/characters.json` yourself.
+
+### Getting a copy out
+
+`$export` dumps the roster to a file. Claims and balances have no export —
+they only exist in the database — so a volume is the only thing that keeps
+them.
+
 ## If something goes wrong
 
 | What you see | What it means |
