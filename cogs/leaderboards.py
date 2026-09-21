@@ -80,7 +80,7 @@ class Leaderboards(commands.Cog):
                 lines.append(
                     f"{place(position - 1)} **{row['name']}** · {row['series']}\n"
                     f"　{icon} {utils.karuda_value(row, rate):,}"
-                    f" · #{row['like_rank']:,}{held}"
+                    f" · #{row['claim_rank']:,}{held}"
                 )
             embed = discord.Embed(
                 title=(f"\U0001f451  Most valuable in {series}" if series

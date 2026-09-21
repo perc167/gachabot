@@ -1776,13 +1776,14 @@ class Database:
         if series:
             where += " AND series LIKE ?"
             args.append(f"%{series}%")
-        # By value, not by rank. They are nearly the same order, but value
-        # is the average of the like and claim ranks and the claim rank
-        # carries a jitter - so ranking by like_rank alone puts a 435 above a
-        # 448 and makes a "most valuable" list look wrong.
+        # By value, then by claim_rank, which is what value is computed from.
+        # The tie-break matters because the curve is capped: everyone the
+        # boost pushes over the ceiling lands on exactly 1300, and breaking
+        # those ties on like_rank ordered the top of the list by AniList
+        # popularity instead - so a hand-placed number one showed up third.
         return self.conn.execute(
             f"SELECT * FROM characters {where}"
-            f" ORDER BY base_karuda DESC, like_rank LIMIT ? OFFSET ?",
+            f" ORDER BY base_karuda DESC, claim_rank LIMIT ? OFFSET ?",
             (*args, limit, max(0, offset)),
         ).fetchall()
 

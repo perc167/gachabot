@@ -1098,6 +1098,16 @@ async def main():
     check("the character board pages",
           [r["id"] for r in db.top_characters(GUILD, limit=5, offset=5)]
           != [r["id"] for r in db.top_characters(GUILD, limit=5)])
+
+    # The value curve is capped, so everyone the boost pushes over the
+    # ceiling lands on exactly the same number. Ties have to fall back on
+    # claim_rank: breaking them on like_rank ordered the head of the list by
+    # AniList popularity, which showed a hand-placed number one in third.
+    tied = [row for row in top if row["base_karuda"] == top[0]["base_karuda"]]
+    ranks = [row["claim_rank"] for row in tied]
+    check("characters worth the same are ordered by rank",
+          ranks == sorted(ranks), f"{len(tied)} tied at"
+          f" {top[0]['base_karuda']}: {ranks[:6]}")
     check("the character board counts what it ranks",
           db.count_characters_in(GUILD) >= len(top))
     check("the character board can be narrowed to a series",
