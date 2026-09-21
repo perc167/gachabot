@@ -115,6 +115,9 @@ class Profile(commands.Cog):
             await ctx.send("Not logged in yet.")
             return
         permissions = discord.Permissions(
+            # view_channel because the setup guide tells servers to give the
+            # bot its own channel, and a locked one is invisible without it.
+            view_channel=True,
             send_messages=True,
             embed_links=True,
             attach_files=True,
