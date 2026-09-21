@@ -152,6 +152,31 @@ async def main():
     check("claim cooldown starts", not ready and remaining > 0, f"{remaining}s")
     check("bob can still claim", cd.claim_ready(GUILD, BOB)[0])
 
+    # Claims reset for the whole server at once, on a roll boundary. Two
+    # people who claimed hours apart must be told the same time remaining,
+    # and that moment must be one where rolls come back too.
+    cd.start_claim_cooldown(GUILD, BOB)
+    check("everyone's claim resets together",
+          db.get_player(GUILD, ALICE)["claim_ready_at"]
+          == db.get_player(GUILD, BOB)["claim_ready_at"])
+
+    claim_end, claim_len = cd.claim_window(GUILD)
+    roll_end, roll_len = cd.roll_window(GUILD)
+    check("the claim window is whole roll windows",
+          claim_len % roll_len == 0, f"{claim_len} vs {roll_len}")
+    check("a claim reset is always a roll reset",
+          claim_end % roll_len == 0 and roll_end % roll_len == 0,
+          f"{claim_end} {roll_end} {roll_len}")
+
+    # An odd interval is rounded up rather than allowed to drift off the
+    # roll boundary every other window.
+    db.set_setting(GUILD, "claim_interval_minutes", 90)
+    check("an odd claim interval snaps up to a roll window",
+          cd.claim_window(GUILD)[1] == 2 * roll_len,
+          str(cd.claim_window(GUILD)[1]))
+    db.set_setting(GUILD, "claim_interval_minutes",
+                   config.GUILD_SETTINGS["claim_interval_minutes"][0])
+
     # 6. Karuda economy.
     db.add_karuda(GUILD, ALICE, 500)
     check("karuda added", db.get_player(GUILD, ALICE)["karuda"] == 500)
@@ -1540,14 +1565,31 @@ async def main():
           f"{left}")
 
     # And the claim reduction has to shorten a real cooldown.
+    #
+    # The clock is pinned to the start of a window first. Claims now end on
+    # a shared boundary, so a perk only has room to help while that boundary
+    # is still further away than the shortened wait - run this late in a
+    # window and both times are the boundary, correctly and uninformatively.
     db.update_player(GUILD, CLIMBER, tower_floor=0)
-    cd.start_claim_cooldown(GUILD, CLIMBER)
-    plain = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
-    db.add_badge(GUILD, CLIMBER, "swift")
-    cd.start_claim_cooldown(GUILD, CLIMBER)
-    shortened = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
+    real_now = utils.now
+    window = cd.claim_window(GUILD)[1]
+    utils.now = lambda: (real_now() // window) * window
+    try:
+        cd.start_claim_cooldown(GUILD, CLIMBER)
+        plain = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
+        db.add_badge(GUILD, CLIMBER, "swift")
+        cd.start_claim_cooldown(GUILD, CLIMBER)
+        shortened = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
+    finally:
+        utils.now = real_now
     check("claim reduction shortens the real cooldown", shortened < plain,
           f"{shortened} vs {plain}")
+
+    # Whatever the perks, a claim can never be pushed past the shared reset.
+    cd.start_claim_cooldown(GUILD, CLIMBER)
+    check("a claim never waits past the shared reset",
+          db.get_player(GUILD, CLIMBER)["claim_ready_at"]
+          <= cd.claim_window(GUILD)[0])
 
     check("claim reduction is capped",
           perksmod.combine({"claim_percent": 90})["claim_percent"] == 90

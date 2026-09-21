@@ -164,9 +164,10 @@ def karuda_value(character, rate_percent: int) -> int:
 class Cooldowns:
     """Reads and writes the four timers every player has.
 
-    Rolls refill in blocks: when the reset time passes, the counter goes back
-    to zero and the next window starts. Claims and karuda are simple
-    ready-at timestamps.
+    Rolls and claims both refill in blocks read off the clock, so they come
+    back for the whole server at the same moment and the claim block always
+    ends on a roll block's boundary. Karuda is still a plain ready-at
+    timestamp that starts when you use it.
     """
 
     def __init__(self, db):
@@ -236,6 +237,25 @@ class Cooldowns:
         player = self.db.get_player(guild_id, user_id)
         self.db.update_player(guild_id, user_id, rolls_used=player["rolls_used"] + 1)
 
+    def claim_window(self, guild_id: int) -> tuple:
+        """The claim window everyone on this server shares: (ends_at, length).
+
+        Read off the clock like roll_window, and rounded up to a whole
+        number of roll windows so a claim reset always lands on a roll
+        reset. With the defaults - rolls hourly, claims every three hours -
+        claims come back at the top of every third hour, and that moment is
+        always one where rolls come back too.
+        """
+        _, roll_length = self.roll_window(guild_id)
+        wanted = self.db.get_setting(guild_id, "claim_interval_minutes") * 60
+        # Ceiling division: a 90 minute claim interval on an hourly roll
+        # window becomes 120, because 90 would drift off the roll boundary
+        # every other window and the two timers would stop agreeing.
+        blocks = max(1, -(-max(60, wanted) // roll_length))
+        window = blocks * roll_length
+        current = now()
+        return (current // window) * window + window, window
+
     def claim_ready(self, guild_id: int, user_id: int) -> tuple:
         """Returns (is_ready, seconds_remaining)."""
         player = self.db.get_player(guild_id, user_id)
@@ -243,11 +263,16 @@ class Cooldowns:
         return remaining <= 0, max(0, remaining)
 
     def start_claim_cooldown(self, guild_id: int, user_id: int):
-        minutes = self.db.get_setting(guild_id, "claim_interval_minutes")
-        # Badges and tower floors shorten the wait.
+        ends_at, window = self.claim_window(guild_id)
+        # Badges and tower floors shorten the wait, and shortening is the
+        # only thing they can do: the personal time is capped at the shared
+        # window, so somebody with no perks always waits exactly until the
+        # server's next reset rather than a private three hours of their own.
         reduction = perks.effective(self.db, guild_id, user_id)["claim_percent"]
-        seconds = int(minutes * 60 * (100 - reduction) / 100)
-        self.db.update_player(guild_id, user_id, claim_ready_at=now() + seconds)
+        personal = now() + int(window * (100 - reduction) / 100)
+        self.db.update_player(
+            guild_id, user_id, claim_ready_at=min(ends_at, personal)
+        )
 
     def karuda_ready(self, guild_id: int, user_id: int) -> tuple:
         player = self.db.get_player(guild_id, user_id)

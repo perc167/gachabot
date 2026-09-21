@@ -48,7 +48,10 @@ OWNERS = {
 GUILD_SETTINGS = {
     "roll_limit": (10, 1, 100, "Rolls each user gets per reset period"),
     "roll_reset_minutes": (60, 5, 1440, "Minutes between roll refills"),
-    "claim_interval_minutes": (180, 1, 10080, "Minutes between character claims"),
+    "claim_interval_minutes": (
+        180, 1, 10080,
+        "Minutes between claims, rounded up to whole roll windows",
+    ),
     "karuda_interval_minutes": (20, 1, 1440, "Minutes between karuda collects"),
     "max_marriages": (0, 0, 5000, "Harem size cap (0 = unlimited)"),
     "claim_window_seconds": (45, 5, 600, "How long a roll stays claimable"),
