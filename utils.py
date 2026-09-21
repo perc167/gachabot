@@ -257,9 +257,17 @@ class Cooldowns:
         return (current // window) * window + window, window
 
     def claim_ready(self, guild_id: int, user_id: int) -> tuple:
-        """Returns (is_ready, seconds_remaining)."""
+        """Returns (is_ready, seconds_remaining).
+
+        Clamped to the shared window on the way out, not just on the way in.
+        A stored time can outlive the rule that produced it - written by the
+        old per-player cooldown, or before the server shortened its claim
+        interval - and clamping here means no such value can ever hold
+        somebody past a reset everybody else is getting.
+        """
         player = self.db.get_player(guild_id, user_id)
-        remaining = player["claim_ready_at"] - now()
+        ends_at, _ = self.claim_window(guild_id)
+        remaining = min(player["claim_ready_at"], ends_at) - now()
         return remaining <= 0, max(0, remaining)
 
     def start_claim_cooldown(self, guild_id: int, user_id: int):

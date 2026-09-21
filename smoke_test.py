@@ -1591,6 +1591,16 @@ async def main():
           db.get_player(GUILD, CLIMBER)["claim_ready_at"]
           <= cd.claim_window(GUILD)[0])
 
+    # A time written by the old per-player cooldown, still sitting in the
+    # database after the update. Reading it must not hold anybody past the
+    # shared reset just because that is what the row says.
+    stale = cd.claim_window(GUILD)[0] + 9 * 3600
+    db.update_player(GUILD, CLIMBER, claim_ready_at=stale)
+    _, remaining = cd.claim_ready(GUILD, CLIMBER)
+    check("a stale claim time is clamped to the window",
+          remaining <= cd.claim_window(GUILD)[0] - utils.now(),
+          f"{remaining}s left of a {stale - utils.now()}s row")
+
     check("claim reduction is capped",
           perksmod.combine({"claim_percent": 90})["claim_percent"] == 90
           and perksmod.effective(db, GUILD, CLIMBER)["claim_percent"] <= 60)
