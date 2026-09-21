@@ -41,29 +41,10 @@ jobs:
       # command, so it needs discord.py installed above.
       - run: python tools/build_site.py
 
-      # The page shipped once without a charset, which turned every em dash
-      # and Japanese name to mojibake and broke nothing a build would notice.
-      # Check the things whose absence is invisible until someone reads it.
+      # Between building and deploying, so a page that fails the check
+      # never replaces the one already live.
       - name: Check the page before shipping it
-        run: |
-          python - <<'CHECK'
-          import io, sys
-          page = io.open("site/index.html", encoding="utf-8").read()
-          problems = []
-          for needed in ('<!doctype html>', '<meta charset="utf-8">',
-                         'name="viewport"', '</body>', '</html>'):
-              if page.count(needed) != 1:
-                  problems.append(f"{needed!r} appears {page.count(needed)} times, want 1")
-          if "__" in page.split("<style>")[0]:
-              problems.append("an unfilled __PLACEHOLDER__ made it into the head")
-          if len(page) < 80_000:
-              problems.append(f"page is only {len(page)} bytes, expected ~140k")
-          if problems:
-              print("
-".join("  " + p for p in problems))
-              sys.exit(1)
-          print(f"page looks sound: {len(page) / 1024:.0f} KB")
-          CHECK
+        run: python tools/check_site.py
 
       - uses: cloudflare/wrangler-action@v3
         with:
