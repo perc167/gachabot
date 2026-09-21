@@ -169,11 +169,12 @@ async def main():
           f"{claim_end} {roll_end} {roll_len}")
 
     # An odd interval is rounded up rather than allowed to drift off the
-    # roll boundary every other window.
-    db.set_setting(GUILD, "claim_interval_minutes", 90)
+    # roll boundary every other window. One minute past a whole window is
+    # the smallest interval that has to round, whatever the window is.
+    db.set_setting(GUILD, "claim_interval_minutes", roll_len // 60 + 1)
     check("an odd claim interval snaps up to a roll window",
           cd.claim_window(GUILD)[1] == 2 * roll_len,
-          str(cd.claim_window(GUILD)[1]))
+          f"{cd.claim_window(GUILD)[1]} for a {roll_len}s roll window")
     db.set_setting(GUILD, "claim_interval_minutes",
                    config.GUILD_SETTINGS["claim_interval_minutes"][0])
 

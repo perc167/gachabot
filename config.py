@@ -47,9 +47,12 @@ OWNERS = {
 # a one-line change.
 GUILD_SETTINGS = {
     "roll_limit": (10, 1, 100, "Rolls each user gets per reset period"),
-    "roll_reset_minutes": (60, 5, 1440, "Minutes between roll refills"),
+    # 170 minutes - two hours fifty. Rolls and claims share the number so
+    # they share a boundary: the claim window is rounded up to whole roll
+    # windows, and any two different numbers would only meet occasionally.
+    "roll_reset_minutes": (170, 5, 1440, "Minutes between roll refills"),
     "claim_interval_minutes": (
-        180, 1, 10080,
+        170, 1, 10080,
         "Minutes between claims, rounded up to whole roll windows",
     ),
     "karuda_interval_minutes": (20, 1, 1440, "Minutes between karuda collects"),

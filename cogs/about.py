@@ -32,8 +32,8 @@ PRESETS = {
         "The defaults, as shipped.",
         {
             "roll_limit": 10,
-            "roll_reset_minutes": 60,
-            "claim_interval_minutes": 180,
+            "roll_reset_minutes": 170,
+            "claim_interval_minutes": 170,
             "karuda_interval_minutes": 20,
             "karuda_grab_percent": 8,
         },
