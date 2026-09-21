@@ -4,6 +4,7 @@ from discord.ext import commands
 
 import config
 import utils
+from cogs.personalise import word
 from views import CharacterPicker, Paginator, choose_character
 
 ORDERS = ("likes", "name", "recent", "karuda")
@@ -100,7 +101,8 @@ class Harem(commands.Cog):
         embeds, art = [], []
         for position, row in enumerate(rows, 1):
             note = row["note"] if "note" in row.keys() else None
-            footer = (f"{position}/{len(rows)} in {member.display_name}'s harem"
+            called = word(db, gid, member.id, "harem_name")
+            footer = (f"{position}/{len(rows)} in {member.display_name}'s {called}"
                       f" • {total_karuda:,} karuda total • by {order}")
             if note:
                 footer = f"“{note}” • {footer}"
@@ -143,7 +145,9 @@ class Harem(commands.Cog):
         pages = utils.paginate(lines, 8)
         for page_no, page in enumerate(pages, 1):
             embed = discord.Embed(
-                title=f"{member.display_name}'s harem — {len(rows)} characters",
+                title=f"{member.display_name}'s "
+                      f"{word(self.bot.db, ctx.guild.id, member.id, 'harem_name')}"
+                      f" — {len(rows)} characters",
                 description="\n".join(page),
                 colour=self.bot.db.get_pref(ctx.guild.id, "cardcolour",
                                             config.CARD_COLOUR),
@@ -257,12 +261,14 @@ class Harem(commands.Cog):
             refund = max(1, utils.karuda_value(character, rate) * percent // 100)
             total = db.add_karuda(gid, ctx.author.id, refund)
             await ctx.send(
-                f"Divorced **{character['name']}**."
+                f"{word(db, gid, ctx.author.id, 'divorce_word').title()}"
+                f" **{character['name']}**."
                 f" +{refund:,} karuda (total: {total:,})."
             )
         else:
             await ctx.send(
-                f"Divorced **{character['name']}**. They are back in the pool."
+                f"{word(db, gid, ctx.author.id, 'divorce_word').title()}"
+                f" **{character['name']}**. They are back in the pool."
             )
 
     @commands.command(name="note", aliases=["notenote", "n"])

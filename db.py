@@ -83,6 +83,17 @@ CREATE TABLE IF NOT EXISTS tutorial_progress (
     PRIMARY KEY (guild_id, user_id, step, substep)
 );
 
+-- Small strings a player chooses for themselves: what to call their harem,
+-- whether wish pings come by DM, which character they starred. Text rather
+-- than the integer settings table, and per player rather than per server.
+CREATE TABLE IF NOT EXISTS player_prefs (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id, key)
+);
+
 CREATE TABLE IF NOT EXISTS guild_settings (
     guild_id INTEGER NOT NULL,
     key      TEXT NOT NULL,
@@ -976,6 +987,9 @@ class Database:
                  "DELETE FROM tutorial_progress"
                  " WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
+                ("preferences",
+                 "DELETE FROM player_prefs WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
                 ("player",
                  "DELETE FROM players WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
@@ -996,6 +1010,7 @@ class Database:
                 ("badges", "badges"),
                 ("items", "player_items"),
                 ("tutorial steps", "tutorial_progress"),
+                ("preferences", "player_prefs"),
                 ("keys", "character_keys"),
                 ("players", "players"),
                 ("settings", "guild_settings"),
@@ -1819,6 +1834,53 @@ class Database:
             "aliases": one("SELECT COUNT(*) FROM character_aliases"
                            " WHERE guild_id = ?", guild_id),
         }
+
+    # ---------- player preferences ----------
+
+    def get_player_pref(self, guild_id: int, user_id: int, key: str,
+                        default: str = "") -> str:
+        row = self.conn.execute(
+            "SELECT value FROM player_prefs"
+            " WHERE guild_id = ? AND user_id = ? AND key = ?",
+            (guild_id, user_id, key),
+        ).fetchone()
+        return row["value"] if row else default
+
+    def set_player_pref(self, guild_id: int, user_id: int, key: str,
+                        value: str):
+        """An empty value clears it, so one command can both set and unset."""
+        if not value:
+            self.conn.execute(
+                "DELETE FROM player_prefs"
+                " WHERE guild_id = ? AND user_id = ? AND key = ?",
+                (guild_id, user_id, key),
+            )
+        else:
+            self.conn.execute(
+                "INSERT INTO player_prefs (guild_id, user_id, key, value)"
+                " VALUES (?, ?, ?, ?)"
+                " ON CONFLICT (guild_id, user_id, key)"
+                " DO UPDATE SET value = excluded.value",
+                (guild_id, user_id, key, value),
+            )
+        self.conn.commit()
+
+    def player_prefs(self, guild_id: int, user_id: int) -> dict:
+        return {
+            row["key"]: row["value"] for row in self.conn.execute(
+                "SELECT key, value FROM player_prefs"
+                " WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            ).fetchall()
+        }
+
+    def clear_player_prefs(self, guild_id: int, user_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM player_prefs WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        )
+        self.conn.commit()
+        return cur.rowcount
 
     # ---------- items ----------
 

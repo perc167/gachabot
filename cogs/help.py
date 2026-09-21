@@ -172,6 +172,19 @@ CATEGORIES = [
         ("preset", "set several dials"),
         ("lang", "which languages"),
     ]),
+    ("🗣️", "Your words", [
+        ("renameharem", "rename your collection"),
+        ("renameclaim", "rename claiming"),
+        ("renamedivorce", "rename letting go"),
+        ("renamelikelist", "rename your likes"),
+        ("renames", "every word you changed"),
+    ]),
+    ("🌟", "Wish settings", [
+        ("starwish", "your one favourite"),
+        ("wishdm", "pings by DM"),
+        ("wishsort", "how it sorts"),
+        ("wishprotect", "how long it holds"),
+    ]),
     ("\U0001f375", "Tea", [
         ("tea", "what you are holding"),
         ("greentea", "three more rolls"),

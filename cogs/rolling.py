@@ -6,6 +6,7 @@ from discord.ext import commands
 
 import perks
 import utils
+from cogs.personalise import word
 from utils import fmt_duration, karuda_value
 
 
@@ -93,7 +94,9 @@ class ClaimView(discord.ui.View):
         )
         await interaction.response.edit_message(embed=embed, view=self)
         await interaction.followup.send(
-            f"{user.mention} married **{self.character['name']}**!"
+            f"{user.mention} "
+            f"{word(db, self.guild_id, user.id, 'claim_word')}"
+            f" **{self.character['name']}**!"
         )
         self.stop()
 
@@ -276,7 +279,30 @@ class Rolling(commands.Cog):
 
         content = None
         if wishers and owner_id is None:
-            content = " ".join(f"<@{w}>" for w in wishers) + " — wished!"
+            # Anyone who asked for their wishes privately gets a DM instead of
+            # a mention. The channel ping still happens for everyone else, so
+            # a shut DM never means a missed wish.
+            quiet, loud = [], []
+            for wisher in wishers:
+                target = quiet if db.get_player_pref(
+                    gid, wisher, "wish_dm") else loud
+                target.append(wisher)
+            if loud:
+                content = " ".join(f"<@{w}>" for w in loud) + " — wished!"
+            for wisher in quiet:
+                member = ctx.guild.get_member(wisher)
+                if member is None:
+                    continue
+                try:
+                    await member.send(
+                        f"\u2b50 **{character['name']}** ·"
+                        f" {character['series']} just rolled in"
+                        f" #{ctx.channel.name} — you wished for them."
+                    )
+                except discord.HTTPException:
+                    # DMs shut: fall back to the channel rather than losing it.
+                    content = ((content + " ") if content else "") \
+                        + f"<@{wisher}> — wished!"
 
         if owner_id is None:
             view = ClaimView(self, gid, character, ctx.author.id, wishers)

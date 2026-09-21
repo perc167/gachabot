@@ -1372,6 +1372,38 @@ async def main():
     check("add_series does not either",
           "utils.rerank_roster" in series_src)
 
+    # 20j12. Renames and the preferences behind them.
+    from cogs import personalise as pers
+
+    check("every rename has a default and an example",
+          all(what and default and example
+              for what, default, example in pers.RENAMES.values()))
+    check("every rename has a command",
+          all(b.get_command(name) for name in
+              ("renameharem", "renameclaim", "renamedivorce",
+               "renamelikelist")))
+
+    prefdb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "prefs.db"))
+    check("a word falls back to its default",
+          pers.word(prefdb, GUILD, ALICE, "harem_name") == "harem")
+    prefdb.set_player_pref(GUILD, ALICE, "harem_name", "menagerie")
+    check("a chosen word is used",
+          pers.word(prefdb, GUILD, ALICE, "harem_name") == "menagerie")
+    check("one player's words are their own",
+          pers.word(prefdb, GUILD, BOB, "harem_name") == "harem")
+    check("and do not cross servers",
+          pers.word(prefdb, OTHER, ALICE, "harem_name") == "harem")
+    prefdb.set_player_pref(GUILD, ALICE, "harem_name", "")
+    check("an empty value clears rather than stores",
+          pers.word(prefdb, GUILD, ALICE, "harem_name") == "harem"
+          and "harem_name" not in prefdb.player_prefs(GUILD, ALICE))
+    prefdb.set_player_pref(GUILD, ALICE, "wish_dm", "1")
+    check("preferences survive a round trip",
+          prefdb.player_prefs(GUILD, ALICE) == {"wish_dm": "1"})
+    check("a player reset takes their words with it",
+          prefdb.reset_player(GUILD, ALICE)["preferences"] == 1)
+    prefdb.close()
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

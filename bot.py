@@ -44,6 +44,7 @@ COGS = [
     "cogs.about",
     "cogs.haremextra",
     "cogs.tutorial",
+    "cogs.personalise",
     "cogs.help",
 ]
 
