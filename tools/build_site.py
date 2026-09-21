@@ -24,8 +24,10 @@ import urllib.request
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "site", "index.html")
 
-# Paste your bot's invite link here. $invite prints it in Discord.
-INVITE = ""
+# The bot's invite link, which is public — $invite prints it in Discord.
+# --invite or YURI_INVITE overrides it.
+INVITE = ("https://discord.com/oauth2/authorize"
+          "?client_id=1550497695582519418&scope=bot&permissions=379904")
 
 # How many characters the browser section carries. The whole roster is a
 # hundred thousand; a page does not need that to make the point.
