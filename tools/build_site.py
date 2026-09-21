@@ -409,7 +409,7 @@ def step_html(steps) -> str:
     return "\n".join(out)
 
 
-def build(embed: int = 0):
+def build(embed: int = 0, invite_url: str = ""):
     sections, command_total = asyncio.run(collect())
     shown, total, series = characters()
 
@@ -500,8 +500,9 @@ def build(embed: int = 0):
             f'<span>#{row["r"]:,} {mark}</span></span></div></div>'
         )
 
-    invite = (f'<a class="btn" href="{esc(INVITE)}">Add Yuri to your server</a>'
-              if INVITE else
+    link = invite_url or INVITE
+    invite = (f'<a class="btn" href="{esc(link)}">Add Yuri to your server</a>'
+              if link else
               '<a class="btn ghost" href="#setup">Run $invite for the link</a>')
 
     page = (PAGE
@@ -523,6 +524,10 @@ def main():
     parser.add_argument("--embed", type=int, default=0, metavar="N",
                         help="inline this many portraits as data URIs, for"
                              " hosts that block images from elsewhere")
+    parser.add_argument("--invite", default=os.getenv("YURI_INVITE", ""),
+                        metavar="URL",
+                        help="the bot's invite link, for the hero button;"
+                             " $invite prints it in Discord")
     args = parser.parse_args()
 
     for stream in (sys.stdout, sys.stderr):
@@ -531,7 +536,7 @@ def main():
         except (AttributeError, ValueError):
             pass
 
-    page, total, series, commands, shown = build(args.embed)
+    page, total, series, commands, shown = build(args.embed, args.invite)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with io.open(args.out, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(page)
@@ -540,8 +545,9 @@ def main():
     print(f"  showcase: {shown} characters"
           + (" (art inlined)" if args.embed else " with linkable art"))
     print(f"  page: {len(page) / 1024:.0f} KB")
-    if not INVITE:
-        print("  no INVITE set - the button points at the setup section")
+    if not (args.invite or INVITE):
+        print("  no invite link - the button points at the setup section;"
+              " pass --invite URL")
     print(f"\nWrote {args.out}")
     return 0
 
