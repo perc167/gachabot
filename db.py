@@ -764,6 +764,41 @@ class Database:
         """Bulk add. Returns how many were new."""
         return sum(1 for url in urls if url and self.add_image(character_id, url))
 
+    def add_art(self, entries) -> int:
+        """Bulk-add album images, matching characters by name and series.
+
+        `entries` are (name, series, urls). Written as one statement per URL
+        that resolves the character in the same query, so a few hundred
+        thousand rows do not become a few hundred thousand round trips
+        through Python. Rows already present are ignored, which makes this
+        safe to run on every boot.
+        """
+        stamp = int(time.time())
+        rows = [
+            (url, stamp, name, series)
+            for name, series, urls in entries
+            for url in (urls or [])
+            if url
+        ]
+        if not rows:
+            return 0
+
+        before = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM character_images"
+        ).fetchone()["c"]
+        self.conn.executemany(
+            "INSERT OR IGNORE INTO character_images"
+            " (character_id, url, source, added_at)"
+            " SELECT id, ?, 'safebooru', ? FROM characters"
+            "  WHERE name = ? AND series = ? AND guild_id = 0",
+            rows,
+        )
+        self.conn.commit()
+        after = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM character_images"
+        ).fetchone()["c"]
+        return after - before
+
     def images_for(self, character_id: int) -> list:
         rows = self.conn.execute(
             "SELECT url FROM character_images WHERE character_id = ?"

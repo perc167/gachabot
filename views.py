@@ -17,14 +17,25 @@ class Paginator(discord.ui.View):
         self.owner_id = owner_id
         self.index = 0
         self.message = None
+        if len(embeds) < self.JUMP_FROM:
+            self.remove_item(self.first)
+            self.remove_item(self.last)
         self._sync_labels()
         if len(embeds) == 1:
             self.clear_items()
 
+    # Below this, jumping to an end is the same as pressing an arrow, and two
+    # extra buttons on a two page flip is clutter.
+    JUMP_FROM = 4
+
     def _sync_labels(self):
         self.page_label.label = f"{self.index + 1}/{len(self.embeds)}"
-        self.prev.disabled = self.index == 0
-        self.next.disabled = self.index >= len(self.embeds) - 1
+        at_start = self.index == 0
+        at_end = self.index >= len(self.embeds) - 1
+        self.prev.disabled = at_start
+        self.next.disabled = at_end
+        self.first.disabled = at_start
+        self.last.disabled = at_end
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.owner_id:
@@ -52,6 +63,11 @@ class Paginator(discord.ui.View):
             attachments=[attachment] if attachment else [],
         )
 
+    @discord.ui.button(label="⏮", style=discord.ButtonStyle.secondary)
+    async def first(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = 0
+        await self._show(interaction)
+
     @discord.ui.button(label="◀", style=discord.ButtonStyle.secondary)
     async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index = max(0, self.index - 1)
@@ -66,6 +82,11 @@ class Paginator(discord.ui.View):
     @discord.ui.button(label="▶", style=discord.ButtonStyle.secondary)
     async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index = min(len(self.embeds) - 1, self.index + 1)
+        await self._show(interaction)
+
+    @discord.ui.button(label="⏭", style=discord.ButtonStyle.secondary)
+    async def last(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.index = len(self.embeds) - 1
         await self._show(interaction)
 
     async def start(self, ctx):

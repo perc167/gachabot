@@ -1,5 +1,6 @@
 """Entry point. Run with: python bot.py"""
 import asyncio
+import json
 import logging
 import os
 import sys
@@ -147,9 +148,52 @@ class GachaBot(commands.Bot):
         except Exception:  # noqa: BLE001 - a bad roster must not stop the bot
             log.exception("could not load the roster; use %simport",
                           config.PREFIX)
+        await self._seed_art()
         await self.change_presence(
             activity=discord.Game(name=f"{config.PREFIX}help | {config.PREFIX}w")
         )
+
+    async def _seed_art(self):
+        """Top up character albums from the shipped extra art.
+
+        Unlike the roster this runs on every boot, because art arrives in
+        batches long after the characters do. It is skipped when the file has
+        not changed since it was last applied - the inserts are harmless
+        either way, but a few hundred thousand of them on every restart is
+        not a thing to do for nothing.
+        """
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "data", "character_art.json")
+        if not os.path.exists(path):
+            return
+
+        # Size and mtime together: enough to notice a new file, and cheaper
+        # than hashing 20MB on a cold start.
+        info = os.stat(path)
+        stamp = (int(info.st_mtime) * 1000003) ^ info.st_size
+        # Guild 0 is not a guild - snowflakes are never zero - so it serves
+        # as the slot for facts about the bot rather than about a server.
+        if self.db.get_pref(0, "art_stamp", 0) == stamp:
+            return
+
+        try:
+            def apply():
+                with open(path, encoding="utf-8") as handle:
+                    art = json.load(handle)
+                entries = []
+                for key, urls in art.items():
+                    name, _, series = key.partition("\x1f")
+                    if name and urls:
+                        entries.append((name, series, urls))
+                return self.db.add_art(entries), len(entries)
+
+            added, characters = await asyncio.to_thread(apply)
+            self.db.set_pref(0, "art_stamp", stamp)
+            if added:
+                log.info("added %s images across %s characters",
+                         f"{added:,}", f"{characters:,}")
+        except Exception:  # noqa: BLE001 - art is a nicety, not a reason to die
+            log.exception("could not load the extra art")
 
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
