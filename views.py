@@ -1,4 +1,6 @@
 """Reusable interactive views: page flipping and yes/no confirmation."""
+import copy
+
 import discord
 
 import utils
@@ -283,3 +285,61 @@ async def choose_character(ctx, rows, prompt: str, colour: int = 0x7C6BF0):
     view.message = await ctx.send(embed=embed, view=view)
     await view.wait()
     return view.chosen
+
+
+class DidYouMean(discord.ui.View):
+    """Offers the command a typo was probably reaching for.
+
+    The button re-runs the original message with the name corrected, so any
+    arguments that were typed survive: "$harme gojou" becomes "$harem gojou"
+    rather than a bare $harem.
+    """
+
+    def __init__(self, message, prefix: str, suggestion: str, rest: str,
+                 owner_id: int, timeout: float = 60):
+        super().__init__(timeout=timeout)
+        self.message = message
+        self.prefix = prefix
+        self.suggestion = suggestion
+        self.rest = rest
+        self.owner_id = owner_id
+        self.sent = None
+        self.run.label = f"{prefix}{suggestion}"
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "That one is not yours to answer.", ephemeral=True
+            )
+            return False
+        return True
+
+    async def on_timeout(self):
+        # The offer expires quietly rather than leaving a dead button.
+        if self.sent:
+            try:
+                await self.sent.delete()
+            except discord.HTTPException:
+                pass
+
+    @discord.ui.button(style=discord.ButtonStyle.primary)
+    async def run(self, interaction: discord.Interaction,
+                  button: discord.ui.Button):
+        corrected = f"{self.prefix}{self.suggestion}{self.rest}"
+        await interaction.response.edit_message(
+            content=f"Running `{corrected}`", view=None
+        )
+        # A shallow copy with the content swapped: the real message carries
+        # the author, channel and guild the command needs, and rebuilding
+        # those by hand is how permissions checks get skipped by accident.
+        echo = copy.copy(self.message)
+        echo.content = corrected
+        await interaction.client.process_commands(echo)
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.secondary)
+    async def dismiss(self, interaction: discord.Interaction,
+                      button: discord.ui.Button):
+        await interaction.response.edit_message(
+            content="Never mind. `$help` lists everything.", view=None
+        )
+        self.stop()

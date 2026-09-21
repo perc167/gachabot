@@ -1095,6 +1095,25 @@ async def main():
     values = [row["base_karuda"] for row in top]
     check("the character board is ordered by value",
           values == sorted(values, reverse=True), str(values[:6]))
+    # 20j7b. Mistyped commands get a suggestion, and - more importantly -
+    # the things that are not typos do not.
+    import bot as botmod
+    vocab = ["harem", "roll", "wishlist", "profile", "tuto", "divorce",
+             "kakera", "topclaims", "a", "w"]
+    for typed, want in [("harme", "harem"), ("rol", "roll"),
+                        ("wishlst", "wishlist"), ("profle", "profile"),
+                        ("divroce", "divorce"), ("toplcaims", "topclaims")]:
+        check(f"${typed} suggests ${want}",
+              botmod.suggestion_for(typed, vocab) == want,
+              botmod.suggestion_for(typed, vocab))
+    for quiet, why in [("20", "money"), ("5", "money"), ("", "empty"),
+                       ("a", "already a command"), ("xyzzy", "nothing like one"),
+                       ("harem", "spelled right"),
+                       ("x" * 30, "far too long")]:
+        check(f"${quiet or '(nothing)'} stays silent - {why}",
+              botmod.suggestion_for(quiet, vocab) == "",
+              botmod.suggestion_for(quiet, vocab))
+
     check("the character board pages",
           [r["id"] for r in db.top_characters(GUILD, limit=5, offset=5)]
           != [r["id"] for r in db.top_characters(GUILD, limit=5)])

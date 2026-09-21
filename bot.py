@@ -1,5 +1,6 @@
 """Entry point. Run with: python bot.py"""
 import asyncio
+import difflib
 import json
 import logging
 import os
@@ -10,6 +11,7 @@ import discord
 from discord.ext import commands
 
 import config
+import views
 from db import Database
 import utils
 from utils import Cooldowns
@@ -53,6 +55,31 @@ COGS = [
 ]
 
 
+# How alike a typo has to be before the bot guesses. 0.72 catches harme/harem
+# and rol/roll without offering $roll to somebody who typed a word that merely
+# starts with r.
+SUGGEST_CUTOFF = 0.72
+
+
+def suggestion_for(typed: str, names, cutoff: float = SUGGEST_CUTOFF) -> str:
+    """The command a mistyped name was probably reaching for, or "".
+
+    Separate from the bot so the rules are testable: most of this is about
+    what NOT to guess at. "$20" and "$5 each" are money, "$" on its own is a
+    stray keystroke, and anything long or punctuated is somebody talking
+    rather than somebody typing a command badly.
+    """
+    typed = (typed or "").lower()
+    if len(typed) < 2 or len(typed) > 24:
+        return ""
+    if not typed[0].isalpha() or not typed.replace("_", "").isalnum():
+        return ""
+    close = difflib.get_close_matches(typed, names, n=1, cutoff=cutoff)
+    if not close or close[0] == typed:
+        return ""
+    return close[0]
+
+
 class GachaBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -67,6 +94,9 @@ class GachaBot(commands.Bot):
         self.db = Database()
         self.started_at = time.time()
         self.cooldowns = Cooldowns(self.db)
+        # Filled the first time a typo needs guessing at, after the cogs are
+        # loaded - asking for it here would find no commands at all.
+        self._command_names = None
 
     async def _prefix_for(self, bot, message):
         """Servers can set their own prefix; mentions always work."""
@@ -117,6 +147,9 @@ class GachaBot(commands.Bot):
                 " Attach a volume and redeploy; nothing else needs changing."
             )
         await self._seed_pool()
+        # Outside _seed_pool on purpose: that returns early once the pool has
+        # anything in it, and art arrives in batches long after the roster.
+        await self._seed_art()
         log.info("%s characters in the pool", self.db.character_count())
 
     async def _seed_pool(self):
@@ -148,7 +181,6 @@ class GachaBot(commands.Bot):
         except Exception:  # noqa: BLE001 - a bad roster must not stop the bot
             log.exception("could not load the roster; use %simport",
                           config.PREFIX)
-        await self._seed_art()
         await self.change_presence(
             activity=discord.Game(name=f"{config.PREFIX}help | {config.PREFIX}w")
         )
@@ -195,8 +227,48 @@ class GachaBot(commands.Bot):
         except Exception:  # noqa: BLE001 - art is a nicety, not a reason to die
             log.exception("could not load the extra art")
 
+    def every_command_name(self):
+        """Every name and alias the bot answers to, built once."""
+        if self._command_names is None:
+            names = set()
+            for command in self.walk_commands():
+                names.add(command.name.lower())
+                names.update(alias.lower() for alias in command.aliases)
+            self._command_names = sorted(names)
+        return self._command_names
+
+    async def suggest_command(self, ctx):
+        """Offer the command a mistyped one was probably reaching for."""
+        guess = suggestion_for(ctx.invoked_with, self.every_command_name())
+        if not guess:
+            return
+        close = [guess]
+
+        # Silent wherever the real command would have been silent: outside
+        # the allowed channels, and for anything the server switched off.
+        if ctx.guild is not None and ctx.author.id not in config.OWNERS:
+            allowed = self.db.allowed_channels(ctx.guild.id)
+            if allowed and ctx.channel.id not in allowed:
+                return
+            if close[0] in self.db.disabled_commands(ctx.guild.id):
+                return
+
+        prefix = ctx.prefix or config.PREFIX
+        rest = ctx.message.content[len(prefix) + len(ctx.invoked_with):]
+        view = views.DidYouMean(ctx.message, prefix, close[0], rest,
+                                ctx.author.id)
+        try:
+            view.sent = await ctx.send(
+                f"There is no `{prefix}{ctx.invoked_with}`."
+                f" Did you mean `{prefix}{close[0]}`?",
+                view=view,
+            )
+        except discord.HTTPException:
+            pass
+
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
+            await self.suggest_command(ctx)
             return
         if isinstance(error, commands.MissingPermissions):
             await ctx.send("You need Manage Server for that.")
