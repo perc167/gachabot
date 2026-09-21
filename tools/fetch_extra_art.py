@@ -202,6 +202,17 @@ def usable(post) -> str:
     return url
 
 
+def confirmed(posts, wanted) -> bool:
+    """Does anything in these posts' tags name the series?"""
+    if not wanted:
+        return True
+    tagged = set()
+    for post in posts:
+        tagged.update(post.get("tags", "").split())
+    blob = " ".join(tagged)
+    return any(token in blob for token in wanted)
+
+
 def art_for(name: str, series: str, want: int) -> tuple:
     """Extra images for one character: (urls, the tag they came from)."""
     wanted = series_tokens(series)
@@ -215,16 +226,18 @@ def art_for(name: str, series: str, want: int) -> tuple:
 
         # The series has to show up somewhere in the tags, or this is a
         # different person who happens to share a name.
-        if wanted:
-            tagged = set()
-            for post in posts:
-                tagged.update(post.get("tags", "").split())
-            blob = " ".join(tagged)
-            if not any(token in blob for token in wanted):
-                continue
+        if not confirmed(posts, wanted):
+            continue
 
         if len(posts) > len(best):
             best, best_tag = posts, tag
+
+        # A full page from a confirmed tag is as good as this gets, so the
+        # other name order has nothing left to win. Only a full page counts:
+        # the reason both orders are tried at all is that a wrong order can
+        # still return a handful of posts from some unrelated junk tag.
+        if len(posts) >= FETCH:
+            break
 
     # Nothing under the plain name. Ask the index what the booru calls them.
     if not best:
