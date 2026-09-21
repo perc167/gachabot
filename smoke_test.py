@@ -1388,9 +1388,22 @@ async def main():
     check("the top of the pool is mostly women",
           sum(1 for r in top_ten if r.get("gender") == "Female") >= 6,
           str([(r["name"], r.get("gender")) for r in top_ten[:3]]))
-    check("growing the roster still leaves ~300 above 300 karuda",
-          290 <= sum(1 for r in roster if r["base_karuda"] > 300) <= 310,
-          str(sum(1 for r in roster if r["base_karuda"] > 300)))
+    # The curve pins rank 300 at 300 karuda, and the top-of-roster boost then
+    # lifts everyone inside the fade above it. So the band runs to roughly
+    # where the boost stops mattering, not to 300 - and it must still be a
+    # band rather than half the roster.
+    premium = sum(1 for r in roster if r["base_karuda"] > 300)
+    check("the premium band ends where the boost fades out",
+          utils.BOOST_TOP <= premium <= utils.BOOST_FADE, str(premium))
+
+    # The boost has to fade, not stop dead: a cliff would make rank 200 worth
+    # a third more than rank 201 for no reason a player could see.
+    ranked = {r["claim_rank"]: r["base_karuda"] for r in roster}
+    edge = [ranked.get(r) for r in range(utils.BOOST_TOP - 1,
+                                         utils.BOOST_TOP + 3)]
+    if all(edge):
+        drops = [a - b for a, b in zip(edge, edge[1:])]
+        check("no cliff at the edge of the boost", max(drops) <= 5, str(edge))
 
     # One curve, in one place. Three copies is how they drift apart.
     fetch_src = open(os.path.join(PROJECT, "tools", "fetch_roster.py"),

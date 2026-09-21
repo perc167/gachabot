@@ -100,6 +100,26 @@ def value_with_keys(db, guild_id: int, character, rate_percent: int) -> int:
                       * perks.key_multiplier(level)))
 
 
+# The top of the roster is worth more than the curve alone gives it, and the
+# extra fades out rather than stopping dead. A flat boost to the top 200 would
+# leave rank 200 worth a third more than rank 201 for no reason anybody could
+# see; tapering it away by BOOST_FADE keeps the list monotonic and smooth.
+BOOST = 0.30
+BOOST_TOP = 200
+BOOST_FADE = 600
+VALUE_CEILING = 1300
+
+
+def rank_boost(rank: int) -> float:
+    """The multiplier on a rank's value: 1.30 at the top, 1.0 past the fade."""
+    if rank <= BOOST_TOP:
+        return 1.0 + BOOST
+    if rank >= BOOST_FADE:
+        return 1.0
+    span = BOOST_FADE - BOOST_TOP
+    return 1.0 + BOOST * (BOOST_FADE - rank) / span
+
+
 def value_for_rank(rank: int, total: int) -> int:
     """Rank to base value, matching tools/fetch_roster.py.
 
@@ -116,7 +136,8 @@ def value_for_rank(rank: int, total: int) -> int:
     pin = math.log(premium_rank) / math.log(total)
     share = (premium_value - low) / (high - low)
     exponent = math.log(share) / math.log(1 - pin) if 0 < pin < 1 else 2.0
-    return max(low, round(low + (high - low) * (1 - t) ** exponent))
+    base = low + (high - low) * (1 - t) ** exponent
+    return max(low, min(VALUE_CEILING, round(base * rank_boost(rank))))
 
 
 def claim_score(favourites: int, gender: str) -> float:
@@ -124,6 +145,76 @@ def claim_score(favourites: int, gender: str) -> float:
     weight = (config.FEMALE_CLAIM_WEIGHT
               if (gender or "") == "Female" else 1.0)
     return (favourites or 0) * weight
+
+
+PIN_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "data", "pinned_ranks.json")
+_pins_cache = None
+
+
+def pinned_ranks() -> list:
+    """The hand-placed top of the list, read once and remembered."""
+    global _pins_cache
+    if _pins_cache is None:
+        try:
+            with open(PIN_FILE, encoding="utf-8") as handle:
+                _pins_cache = json.load(handle).get("pins", [])
+        except (OSError, ValueError):
+            _pins_cache = []
+    return _pins_cache
+
+
+def _apply_pins(ordered: list) -> list:
+    """Move the pinned characters to their ranks, closing up behind them.
+
+    Everyone else keeps their relative order and slides into whatever is
+    left, so pinning somebody to rank 1 costs the rest one place each rather
+    than reshuffling the list.
+    """
+    pins = pinned_ranks()
+    if not pins:
+        return ordered
+
+    def norm(text):
+        return "".join(c for c in (text or "").lower() if c.isalnum())
+
+    by_name = {}
+    for row in ordered:
+        by_name.setdefault(norm(row["name"]), []).append(row)
+
+    placed, taken = {}, set()
+    for pin in pins:
+        rank = int(pin.get("rank", 0))
+        if rank < 1 or rank in placed:
+            continue
+        candidates = by_name.get(norm(pin.get("name")), [])
+        hint = norm(pin.get("series"))
+        if hint:
+            candidates = [c for c in candidates
+                          if hint in norm(c.get("series"))] or candidates
+        # Unqualified names go to the best known of that name, which is what
+        # somebody writing "Rem" in a list means.
+        candidates = [c for c in candidates if id(c) not in taken]
+        if not candidates:
+            continue
+        chosen = max(candidates, key=lambda c: c.get("favourites") or 0)
+        placed[rank] = chosen
+        taken.add(id(chosen))
+
+    if not placed:
+        return ordered
+
+    rest = [row for row in ordered if id(row) not in taken]
+    out, feed = [], iter(rest)
+    for position in range(1, len(ordered) + 1):
+        if position in placed:
+            out.append(placed.pop(position))
+        else:
+            out.append(next(feed))
+    # A pin beyond the end of the roster has nowhere to go; it stays in the
+    # natural order rather than being dropped.
+    out.extend(placed.values())
+    return out
 
 
 def rerank_roster(rows) -> list:
@@ -149,6 +240,7 @@ def rerank_roster(rows) -> list:
         key=lambda r: (-claim_score(r.get("favourites"), r.get("gender")),
                        r["name"]),
     )
+    by_want = _apply_pins(by_want)
     for position, row in enumerate(by_want, 1):
         row["claim_rank"] = position
         row["base_karuda"] = value_for_rank(position, total)
