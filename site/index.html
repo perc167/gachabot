@@ -23,6 +23,9 @@
   --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
 }
 *{box-sizing:border-box}
+/* The hidden attribute loses to any display rule - .grid's display:grid
+   kept the roster on screen under the Secret tab - so it has to win. */
+[hidden]{display:none!important}
 body{
   margin:0;background:var(--ink);color:var(--text);
   font-family:var(--body);font-size:16px;line-height:1.6;

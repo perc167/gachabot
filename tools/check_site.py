@@ -44,6 +44,12 @@ def main():
         if found != 1:
             problems.append(f"{needed!r} appears {found} times, wanted exactly 1")
 
+    # The page toggles sections with the hidden attribute, which any display
+    # rule overrides. Without this the Secret tab showed the whole roster.
+    if "[hidden]{display:none!important}" not in page:
+        problems.append("no [hidden]{display:none!important} rule, so hidden"
+                        " sections with a display style stay on screen")
+
     head = page.split("<style>")[0]
     if "__" in head:
         problems.append("an unfilled __PLACEHOLDER__ reached the head")
