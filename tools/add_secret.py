@@ -92,6 +92,9 @@ def main():
                         help="file names to put first; the first is the cover")
     parser.add_argument("--last", nargs="*", default=[],
                         help="file names to put last, such as rough sketches")
+    parser.add_argument("--only", nargs="*", default=[],
+                        help="use exactly these files, in this order, and"
+                             " leave the rest of the folder out")
     parser.add_argument("--by", default="",
                         help="who made them, shown under the name")
     parser.add_argument("--roll", action="store_true",
@@ -118,6 +121,11 @@ def main():
     if not files:
         print(f"no images in {args.folder}")
         return 1
+    if args.only:
+        missing = [f for f in args.only if f not in files]
+        if missing:
+            print("not in the folder: " + ", ".join(missing))
+            return 1
 
     slug = slug_for(args.name)
     out_dir = os.path.join(SITE, slug)
@@ -135,7 +143,10 @@ def main():
             os.remove(os.path.join(BOT_ART, old_file))
 
     images, bot_images = [], []
-    for number, name in enumerate(ordered(files, args.first, args.last), 1):
+    # --only is a curated album: the artist's folder can hold drafts and
+    # rejects without them ever reaching the site or the bot.
+    chosen = args.only or ordered(files, args.first, args.last)
+    for number, name in enumerate(chosen, 1):
         target = os.path.join(out_dir, f"{number:02d}.jpg")
         width, height = shrink(os.path.join(args.folder, name), target)
         images.append(f"secret/{slug}/{number:02d}.jpg")
