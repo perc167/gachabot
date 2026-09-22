@@ -14,6 +14,8 @@ on:
       - 'tools/build_site.py'
       - 'data/characters.json'
       - 'data/extra_characters.json'
+      - 'data/secret_characters.json'
+      - 'site/secret/**'
       - 'wrangler.jsonc'
       - '.github/workflows/site.yml'
   workflow_dispatch:

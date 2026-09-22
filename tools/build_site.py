@@ -23,6 +23,9 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "site", "index.html")
+# Original characters for the Secret button. tools/add_secret.py writes both
+# this file and the images it points at, under site/secret/.
+SECRET_DATA = os.path.join(ROOT, "data", "secret_characters.json")
 
 # The bot's invite link, which is public — $invite prints it in Discord.
 # --invite or YURI_INVITE overrides it.
@@ -301,6 +304,33 @@ code,kbd{
 }
 .card .kr span{color:var(--faint)}
 
+/* ---- secret: original characters, one album each ---- */
+.sec-row{display:flex;flex-wrap:wrap;align-items:flex-start;
+  justify-content:space-between;gap:4px 28px}
+.secret-toggle{margin-top:4px;cursor:pointer;border-color:var(--rose);
+  color:var(--rose);flex:none}
+.secret-toggle:hover{background:var(--raise);border-color:var(--rose)}
+.secret-toggle[aria-pressed="true"]{background:var(--rose);color:#0C0A14}
+button.card{font:inherit;color:inherit;text-align:left;padding:0;
+  cursor:pointer;width:100%}
+button.card:hover{border-color:var(--rose)}
+.card .kr.tag{color:var(--rose)}
+
+#album{background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
+#album::backdrop{background:rgba(6,5,10,.84)}
+.album-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;
+  font-family:var(--display);font-weight:600}
+#album-count{font-family:var(--mono);font-size:12px;color:var(--faint);
+  margin-left:auto;font-variant-numeric:tabular-nums}
+#album-img{display:block;max-width:100%;max-height:72vh;margin:0 auto;
+  border-radius:8px;object-fit:contain}
+.album-nav{display:flex;justify-content:center;gap:10px;margin-top:12px}
+#album button{font:inherit;background:var(--raise);color:var(--text);
+  border:1px solid var(--line);border-radius:9px;padding:8px 18px;cursor:pointer}
+#album button:disabled{opacity:.35;cursor:default}
+#album button:hover:not(:disabled){border-color:var(--rose)}
+
 footer{padding-block:38px 56px;color:var(--faint);font-size:13.5px}
 footer p{margin:0 0 6px}
 </style>
@@ -354,11 +384,20 @@ footer p{margin:0 0 6px}
 </section>
 
 <section id="characters">
-  <h2>The top of the roster</h2>
-  <p class="sub">The __SHOWN__ most wanted, out of __TOTAL__. Value comes from
-  how much people want to own somebody, which is not the same as how many have
-  heard of them — so the top here is not the top of a popularity chart.</p>
-  <div class="grid">__CHARACTERS_HTML__</div>
+  <div class="sec-row">
+    <div>
+      <h2 id="roster-title">The top of the roster</h2>
+      <p class="sub" id="roster-sub">The __SHOWN__ most wanted, out of __TOTAL__.
+      Value comes from how much people want to own somebody, which is not the
+      same as how many have heard of them — so the top here is not the top of
+      a popularity chart.</p>
+      <p class="sub" id="secret-sub" hidden>Original characters from the
+      people around Yuri. Tap one to flip through their art.</p>
+    </div>
+    __SECRET_BUTTON__
+  </div>
+  <div class="grid" id="roster-grid">__CHARACTERS_HTML__</div>
+  __SECRET_HTML__
 </section>
 
 <footer>
@@ -399,6 +438,84 @@ footer p{margin:0 0 6px}
   all.addEventListener("click", function(){ q.value = ""; apply(); q.focus(); });
   apply();
 })();
+
+(function(){
+  var toggle = document.getElementById("secret-toggle");
+  if (!toggle) return;
+  var roster = document.getElementById("roster-grid");
+  var secret = document.getElementById("secret");
+  var title = document.getElementById("roster-title");
+  var rosterSub = document.getElementById("roster-sub");
+  var secretSub = document.getElementById("secret-sub");
+  var dialog = document.getElementById("album");
+  var img = document.getElementById("album-img");
+  var count = document.getElementById("album-count");
+  var label = document.getElementById("album-name");
+  var prev = dialog.querySelector(".prev");
+  var next = dialog.querySelector(".next");
+  var album = [], at = 0;
+
+  function show(on){
+    roster.hidden = on;
+    secret.hidden = !on;
+    rosterSub.hidden = on;
+    secretSub.hidden = !on;
+    title.textContent = on ? "Secret" : "The top of the roster";
+    toggle.textContent = on ? "Back to the roster" : "Secret";
+    toggle.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+
+  toggle.addEventListener("click", function(){
+    var on = secret.hidden;
+    show(on);
+    try { history.replaceState(null, "", on ? "#secret" : "#characters"); }
+    catch (e) {}
+  });
+
+  function paint(){
+    img.src = album[at];
+    img.alt = label.textContent + ", image " + (at + 1) + " of " + album.length;
+    count.textContent = (at + 1) + " / " + album.length;
+    prev.disabled = at === 0;
+    next.disabled = at === album.length - 1;
+  }
+  function step(by){
+    at = Math.max(0, Math.min(album.length - 1, at + by));
+    paint();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".secret-card"),
+    function(card){
+      card.addEventListener("click", function(){
+        album = JSON.parse(card.dataset.album);
+        at = 0;
+        label.textContent = card.dataset.name;
+        paint();
+        if (dialog.showModal) dialog.showModal();
+        else dialog.setAttribute("open", "");
+      });
+    });
+
+  prev.addEventListener("click", function(){ step(-1); });
+  next.addEventListener("click", function(){ step(1); });
+  dialog.querySelector(".close").addEventListener("click", function(){
+    dialog.close();
+  });
+  // A click on the dimmed backdrop lands on the dialog itself.
+  dialog.addEventListener("click", function(event){
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener("keydown", function(event){
+    if (event.key === "ArrowLeft") step(-1);
+    if (event.key === "ArrowRight") step(1);
+  });
+
+  // A shared link to #secret opens straight onto it.
+  if (location.hash === "#secret") {
+    show(true);
+    document.getElementById("characters").scrollIntoView();
+  }
+})();
 </script>
 """
 
@@ -432,6 +549,57 @@ __PAGE__
 </body>
 </html>
 """
+
+
+def secret_markup() -> tuple:
+    """The Secret button and everything behind it: (button, grid + viewer).
+
+    Both come back empty when there are no secret characters, so the page
+    carries no button that opens onto nothing.
+    """
+    import json
+
+    esc = html.escape
+    if not os.path.exists(SECRET_DATA):
+        return "", ""
+    with io.open(SECRET_DATA, encoding="utf-8") as handle:
+        people = [c for c in json.load(handle).get("characters", [])
+                  if c.get("images")]
+    if not people:
+        return "", ""
+
+    cards = []
+    for person in people:
+        images = person["images"]
+        count = f"{len(images)} image" + ("" if len(images) == 1 else "s")
+        cards.append(
+            f'<button type="button" class="card secret-card"'
+            f' data-name="{esc(person["name"])}"'
+            f' data-album="{esc(json.dumps(images))}">'
+            f'<img class="art" loading="lazy" alt="{esc(person["name"])}"'
+            f' src="{esc(images[0])}">'
+            f'<div class="meta"><span class="nm">{esc(person["name"])}</span>'
+            f'<span class="sr">{esc(person.get("by") or "Original character")}'
+            f'</span><span class="kr tag">Secret<span>{count}</span></span>'
+            f'</div></button>'
+        )
+
+    button = ('<button type="button" class="btn ghost secret-toggle"'
+              ' id="secret-toggle" aria-pressed="false"'
+              ' aria-controls="secret">Secret</button>')
+    body = (
+        f'<div id="secret" hidden><div class="grid">{"".join(cards)}</div></div>'
+        '<dialog id="album" aria-label="Album">'
+        '<div class="album-top"><span id="album-name"></span>'
+        '<span id="album-count"></span>'
+        '<button type="button" class="close" aria-label="Close">✕</button>'
+        '</div><img id="album-img" alt="">'
+        '<div class="album-nav">'
+        '<button type="button" class="prev" aria-label="Previous image">◀</button>'
+        '<button type="button" class="next" aria-label="Next image">▶</button>'
+        '</div></dialog>'
+    )
+    return button, body
 
 
 def build(embed: int = 0, invite_url: str = ""):
@@ -525,6 +693,8 @@ def build(embed: int = 0, invite_url: str = ""):
             f'<span>#{row["r"]:,} {mark}</span></span></div></div>'
         )
 
+    secret_button, secret_html = secret_markup()
+
     link = invite_url or INVITE
     invite = (f'<a class="btn" href="{esc(link)}">Add Yuri to your server</a>'
               if link else
@@ -539,7 +709,9 @@ def build(embed: int = 0, invite_url: str = ""):
             .replace("__INVITE__", invite)
             .replace("__STEPS_HTML__", step_html(steps))
             .replace("__COMMANDS_HTML__", "\n".join(groups))
-            .replace("__CHARACTERS_HTML__", "\n".join(cards)))
+            .replace("__CHARACTERS_HTML__", "\n".join(cards))
+            .replace("__SECRET_BUTTON__", secret_button)
+            .replace("__SECRET_HTML__", secret_html))
     page = DOCUMENT.replace("__PAGE__", page)
     return page, total, series, command_total, len(shown)
 
