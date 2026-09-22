@@ -150,6 +150,7 @@ class GachaBot(commands.Bot):
         # Outside _seed_pool on purpose: that returns early once the pool has
         # anything in it, and art arrives in batches long after the roster.
         await self._seed_art()
+        await self._seed_secrets()
         log.info("%s characters in the pool", self.db.character_count())
 
     async def _seed_pool(self):
@@ -226,6 +227,43 @@ class GachaBot(commands.Bot):
                          f"{added:,}", f"{characters:,}")
         except Exception:  # noqa: BLE001 - art is a nicety, not a reason to die
             log.exception("could not load the extra art")
+
+    # The series every secret character is filed under. It is what $im
+    # shows beneath the name, and a real series could never be called this.
+    SECRET_SERIES = "Secret"
+
+    async def _seed_secrets(self):
+        """Load the rollable secret characters from data/secret_characters.json.
+
+        Every boot, and cheap: there are a handful of them. Anyone taken off
+        the list stops rolling but is not deleted, so a claim survives.
+        """
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "data", "secret_characters.json")
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path, encoding="utf-8") as handle:
+                people = json.load(handle).get("characters", [])
+            listed = []
+            for person in people:
+                images = person.get("bot_images") or []
+                if not person.get("rollable") or not images:
+                    continue
+                self.db.upsert_secret(
+                    person["name"], self.SECRET_SERIES, images,
+                    value=person.get("value", 2000),
+                    odds=person.get("odds", 20000),
+                    gender=person.get("gender", ""),
+                )
+                listed.append(person["name"])
+            retired = self.db.retire_secrets(listed)
+            if listed:
+                log.info("%s secret character(s) can be rolled", len(listed))
+            if retired:
+                log.info("%s secret character(s) retired", retired)
+        except Exception:  # noqa: BLE001 - a bad list must not stop the bot
+            log.exception("could not load the secret characters")
 
     def every_command_name(self):
         """Every name and alias the bot answers to, built once."""

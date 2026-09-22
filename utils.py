@@ -438,7 +438,17 @@ def character_embed(
               + (f"\n\U0001f511 ×{level}" if level else ""),
         inline=True,
     )
-    if character["claim_rank"] or character["like_rank"]:
+    try:
+        odds = character["secret_odds"]
+    except (IndexError, KeyError):
+        odds = 0
+    if odds and odds > 0:
+        embed.add_field(
+            name="Secret",
+            value=f"\u2726 1 in **{odds:,}** rolls",
+            inline=True,
+        )
+    elif character["claim_rank"] or character["like_rank"]:
         embed.add_field(
             name="Rank",
             value=(

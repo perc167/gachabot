@@ -254,7 +254,7 @@ class Rolling(commands.Cog):
         include_claimed = bool(db.get_setting(gid, "show_claimed"))
         character = db.random_character(
             gid, include_claimed, db.get_setting(gid, "roll_bias"),
-            gender=gender, kind=kind,
+            gender=gender, kind=kind, secret=True,
         )
         if character is None:
             narrowed = " matching that" if (gender or kind) else ""

@@ -2,6 +2,12 @@
 
     python tools/add_secret.py "asparagus ᧔࿔᧓" "C:/path/to/folder"
     python tools/add_secret.py "Name" folder --first cover.png --last sketch.png
+    python tools/add_secret.py "Name" folder --roll --value 2000 --odds 20000
+
+With --roll the character also joins the gacha: worth --value karuda, and
+turning up once in --odds rolls, outside the ordinary pool entirely. Their
+images are copied into assets/characters/ so the bot carries them itself
+rather than depending on the website staying where it is.
 
 Every image in the folder becomes part of that character's album, shrunk to a
 sensible size and saved under site/secret/<slug>/, and the character is
@@ -29,6 +35,8 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data", "secret_characters.json")
 SITE = os.path.join(ROOT, "site", "secret")
+# The bot's bundled-art folder; utils.local_art_path only reads from here.
+BOT_ART = os.path.join(ROOT, "assets", "characters")
 
 IMAGE_TYPES = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
 LONG_SIDE = 1400
@@ -86,6 +94,14 @@ def main():
                         help="file names to put last, such as rough sketches")
     parser.add_argument("--by", default="",
                         help="who made them, shown under the name")
+    parser.add_argument("--roll", action="store_true",
+                        help="also make them rollable in the bot")
+    parser.add_argument("--value", type=int, default=2000,
+                        help="karuda they are worth, with --roll")
+    parser.add_argument("--odds", type=int, default=20000,
+                        help="one roll in this many finds them, with --roll")
+    parser.add_argument("--gender", default="", choices=["", "Female", "Male"],
+                        help="blank answers to every roll command")
     args = parser.parse_args()
 
     for stream in (sys.stdout, sys.stderr):
@@ -111,11 +127,22 @@ def main():
         shutil.rmtree(out_dir)
     os.makedirs(out_dir)
 
-    images = []
+    # The bot's copies go too, so a re-run leaves no stale image behind.
+    os.makedirs(BOT_ART, exist_ok=True)
+    stem = f"secret-{slug}-"
+    for old_file in os.listdir(BOT_ART):
+        if old_file.startswith(stem):
+            os.remove(os.path.join(BOT_ART, old_file))
+
+    images, bot_images = [], []
     for number, name in enumerate(ordered(files, args.first, args.last), 1):
         target = os.path.join(out_dir, f"{number:02d}.jpg")
         width, height = shrink(os.path.join(args.folder, name), target)
         images.append(f"secret/{slug}/{number:02d}.jpg")
+        if args.roll:
+            bundled = f"{stem}{number:02d}.jpg"
+            shutil.copyfile(target, os.path.join(BOT_ART, bundled))
+            bot_images.append("local:" + bundled)
         print(f"  {number:02d}. {name}  ->  {width}x{height},"
               f" {os.path.getsize(target) // 1024} KB")
 
@@ -124,13 +151,22 @@ def main():
         with io.open(DATA, encoding="utf-8") as handle:
             roster = json.load(handle).get("characters", [])
     roster = [c for c in roster if c.get("slug") != slug]
-    roster.append({
+    entry = {
         "name": args.name,
         "slug": slug,
         "by": args.by,
         "images": images,
         "added": int(time.time()),
-    })
+        "rollable": bool(args.roll),
+    }
+    if args.roll:
+        entry.update({
+            "value": args.value,
+            "odds": max(1, args.odds),
+            "gender": args.gender,
+            "bot_images": bot_images,
+        })
+    roster.append(entry)
 
     with io.open(DATA, "w", encoding="utf-8", newline="\n") as handle:
         json.dump({"characters": roster}, handle, ensure_ascii=False, indent=2)
@@ -140,6 +176,9 @@ def main():
                 for f in os.listdir(out_dir))
     print(f"\n{args.name}: {len(images)} images, {total / 1024:.0f} KB,"
           f" in site/secret/{slug}/")
+    if args.roll:
+        print(f"Rollable: worth {args.value:,} karuda, 1 in {args.odds:,}"
+              " rolls. The bot picks this up on its next boot.")
     print(f"{len(roster)} secret character(s) in total."
           " Now run: python tools/build_site.py")
     return 0

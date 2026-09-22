@@ -2023,6 +2023,82 @@ async def main():
     check("biased rolls respect the claimed filter", unclaimed_only)
     wdb.close()
 
+    # 21. Secret characters. They roll only through their own odds - never
+    # out of the pool, where being unranked would hand them a fair share and
+    # a non-AniList source would file them under games.
+    sdb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "secret.db"))
+    sdb.import_characters([
+        {"name": "P" + str(i), "series": "Pool",
+         "image_url": "https://e.invalid/p.png", "likes": 0,
+         "like_rank": i, "claim_rank": i,
+         "base_karuda": utils.value_for_rank(i, 150)}
+        for i in range(1, 151)
+    ])
+    album = ["local:secret-t-01.jpg", "local:secret-t-02.jpg",
+             "local:secret-t-03.jpg"]
+    sid = sdb.upsert_secret("Sprout", "Secret", album, value=2000, odds=1)
+
+    check("a secret character keeps the value it was given",
+          sdb.get_character(sid)["base_karuda"] == 2000)
+    check("a secret album keeps its order, cover first",
+          sdb.images_for(sid) == album, str(sdb.images_for(sid)))
+    check("the cover is the first image",
+          sdb.get_character(sid)["image_url"] == album[0])
+
+    ordinary = [sdb.random_character(GUILD, True, 60)["id"] for _ in range(3000)]
+    check("a secret character never comes out of the ordinary pool",
+          sid not in ordinary)
+    flat = [sdb.random_character(GUILD, True, 0)["id"] for _ in range(1500)]
+    check("nor out of a flat pool", sid not in flat)
+    games = [sdb.random_character(GUILD, True, 60, kind="game")
+             for _ in range(300)]
+    check("a secret character is not a game character",
+          all(g is None or g["id"] != sid for g in games))
+
+    check("at one in one, a real roll always finds them",
+          all(sdb.random_character(GUILD, True, 60, secret=True)["id"] == sid
+              for _ in range(50)))
+    check("a roll narrowed to anime or games never does",
+          all((sdb.random_character(GUILD, True, 60, kind="anime",
+                                    secret=True) or {"id": 0})["id"] != sid
+              for _ in range(50)))
+
+    sdb.upsert_secret("Sprout", "Secret", album, value=2000, odds=10 ** 9)
+    rare = [sdb.random_character(GUILD, True, 60, secret=True)["id"]
+            for _ in range(3000)]
+    check("long odds really are long", sid not in rare)
+    check("updating a secret does not duplicate them",
+          len(sdb.find_characters_by_name("Sprout")) == 1)
+
+    # Odds of about one in ten land near one in ten.
+    sdb.upsert_secret("Sprout", "Secret", album, value=2000, odds=10)
+    hits = sum(1 for _ in range(4000)
+               if sdb.random_character(GUILD, True, 60, secret=True)["id"] == sid)
+    check("the odds are the odds", 250 <= hits <= 560, f"{hits} of 4000")
+
+    sdb.upsert_secret("Sprout", "Secret", album, value=2000, odds=1,
+                      gender="Female")
+    husbandos = [sdb.random_character(GUILD, True, 60, gender="Male",
+                                      secret=True) for _ in range(50)]
+    check("a secret with a gender stays out of the other gender's rolls",
+          all(h is None or h["id"] != sid for h in husbandos))
+
+    sdb.claim(GUILD, sid, ALICE)
+    after = [sdb.random_character(GUILD, False, 60, secret=True)["id"]
+             for _ in range(50)]
+    check("a claimed secret stops rolling where claimed ones are hidden",
+          sid not in after)
+    check("and still rolls in another server",
+          sdb.random_character(OTHER, False, 60, secret=True)["id"] == sid)
+
+    retired = sdb.retire_secrets([])
+    check("taking them off the list retires them", retired == 1)
+    gone = [sdb.random_character(OTHER, True, 60, secret=True)["id"]
+            for _ in range(300)]
+    check("a retired secret rolls from nowhere", sid not in gone)
+    check("but a claim on them survives", sdb.owner_of(GUILD, sid) == ALICE)
+    sdb.close()
+
     await b.close()
 
 

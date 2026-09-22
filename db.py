@@ -235,6 +235,10 @@ class DuplicateCharacter(Exception):
 INDEXES = """
 CREATE INDEX IF NOT EXISTS idx_characters_rank
     ON characters (like_rank);
+-- Partial, so asking "is there a secret character to roll" on every single
+-- roll reads a handful of rows rather than scanning a hundred thousand.
+CREATE INDEX IF NOT EXISTS idx_characters_secret
+    ON characters (secret_odds) WHERE secret_odds != 0;
 CREATE INDEX IF NOT EXISTS idx_characters_series
     ON characters (series);
 CREATE INDEX IF NOT EXISTS idx_characters_name
@@ -258,6 +262,10 @@ class Database:
         for table, column, spec in (
             ("characters", "source", "TEXT NOT NULL DEFAULT ''"),
             ("characters", "gender", "TEXT NOT NULL DEFAULT ''"),
+            # 0 for everybody in the ordinary pool. Above 0, a secret
+            # character who rolls one time in this many and never through
+            # the pool. Below 0, a secret character who no longer rolls.
+            ("characters", "secret_odds", "INTEGER NOT NULL DEFAULT 0"),
             ("marriages", "note_image", "TEXT"),
             ("players", "harem_sort", "TEXT NOT NULL DEFAULT ''"),
             ("players", "showcase_id", "INTEGER NOT NULL DEFAULT 0"),
@@ -628,7 +636,11 @@ class Database:
         server has switched off, and narrowed to one gender or one kind of
         source when the command asked for that."""
         blocked = self.excluded_sources(guild_id)
-        clause = ""
+        # Secret characters never come out of the pool. Left in, they would
+        # count as unranked - which the bias gives a fair share of rolls - and
+        # as "game" characters, since their source is not AniList. Their odds
+        # are their own, decided in _secret_roll.
+        clause = " AND c.secret_odds = 0"
         extra = ()
         if blocked:
             clause = (" AND c.source NOT IN ("
@@ -658,9 +670,97 @@ class Database:
             (guild_id, guild_id, *extra),
         )
 
+    def _secret_roll(self, guild_id: int, include_claimed: bool,
+                     gender: str = None) -> Optional[sqlite3.Row]:
+        """A secret character, if one of them comes up on this roll.
+
+        Each gets its own independent draw at one in secret_odds, so adding a
+        second secret character does not make the first any easier to find.
+        A secret character with no gender recorded answers to every roll
+        command; one with a gender only to that command and to plain rolls.
+        """
+        join, claimed = "", ""
+        args = [guild_id]
+        if not include_claimed:
+            join = (" LEFT JOIN marriages m"
+                    " ON m.character_id = c.id AND m.guild_id = ?")
+            claimed = " AND m.character_id IS NULL"
+            args = [guild_id, guild_id]
+        rows = self.conn.execute(
+            f"SELECT c.* FROM characters c{join}"
+            f" WHERE c.secret_odds > 0"
+            f"  AND (c.guild_id = 0 OR c.guild_id = ?){claimed}",
+            args,
+        ).fetchall()
+        for row in rows:
+            if gender and row["gender"] and row["gender"] != gender:
+                continue
+            if random.random() * row["secret_odds"] < 1:
+                return row
+        return None
+
+    def upsert_secret(self, name: str, series: str, images: list,
+                      value: int, odds: int, gender: str = "") -> int:
+        """Create or update one secret character, album and all.
+
+        The album is replaced rather than added to, so an image somebody asked
+        to take down is gone after the next boot, and the first image is the
+        cover because that is the order it is inserted in.
+        """
+        cover = images[0] if images else ""
+        self.conn.execute(
+            "INSERT INTO characters (name, series, image_url, likes,"
+            " base_karuda, like_rank, claim_rank, guild_id, source, gender,"
+            " secret_odds)"
+            " VALUES (?, ?, ?, 0, ?, 0, 0, 0, 'Secret', ?, ?)"
+            " ON CONFLICT (name, series) DO UPDATE SET"
+            "   image_url = excluded.image_url,"
+            "   base_karuda = excluded.base_karuda,"
+            "   source = 'Secret',"
+            "   gender = excluded.gender,"
+            "   secret_odds = excluded.secret_odds",
+            (name, series, cover, int(value), gender or "", int(odds)),
+        )
+        character_id = self.conn.execute(
+            "SELECT id FROM characters WHERE name = ? AND series = ?",
+            (name, series),
+        ).fetchone()["id"]
+        self.conn.execute(
+            "DELETE FROM character_images WHERE character_id = ?",
+            (character_id,),
+        )
+        stamp = int(time.time())
+        # One second apart, so the album sorts in the order given however the
+        # file names happen to compare.
+        self.conn.executemany(
+            "INSERT OR IGNORE INTO character_images"
+            " (character_id, url, source, added_at) VALUES (?, ?, 'secret', ?)",
+            [(character_id, url, stamp + n) for n, url in enumerate(images)],
+        )
+        self.conn.commit()
+        return character_id
+
+    def retire_secrets(self, keep) -> int:
+        """Stop rolling any secret character that is no longer listed.
+
+        Retired rather than deleted: somebody may have claimed them, and a
+        claim should not vanish because the list changed. Negative odds keep
+        them out of the pool as well as out of the secret draw.
+        """
+        keep = list(keep)
+        marks = ",".join("?" * len(keep)) or "''"
+        changed = self.conn.execute(
+            f"UPDATE characters SET secret_odds = -1"
+            f" WHERE source = 'Secret' AND secret_odds > 0"
+            f"  AND name NOT IN ({marks})",
+            keep,
+        ).rowcount
+        self.conn.commit()
+        return changed
+
     def random_character(
         self, guild_id: int, include_claimed: bool, bias: int = 0,
-        gender: str = None, kind: str = None
+        gender: str = None, kind: str = None, secret: bool = False
     ) -> Optional[sqlite3.Row]:
         """One character to roll.
 
@@ -674,6 +774,14 @@ class Database:
         whoever sets it: 35 over a hundred thousand characters feels like a
         flat pool of thirty thousand did.
         """
+        # Only a real roll can turn up a secret character - not a quiz, not
+        # $random - and not a roll narrowed to anime or games, which she is
+        # neither of.
+        if secret and not kind:
+            found = self._secret_roll(guild_id, include_claimed, gender)
+            if found is not None:
+                return found
+
         source, where, args = self._roll_scope(
             guild_id, include_claimed, gender, kind)
 

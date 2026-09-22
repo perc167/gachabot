@@ -572,6 +572,13 @@ def secret_markup() -> tuple:
     for person in people:
         images = person["images"]
         count = f"{len(images)} image" + ("" if len(images) == 1 else "s")
+        # A rollable one shows what it is worth and how rare it is; the rest
+        # are only here to be looked at.
+        if person.get("rollable"):
+            tag = (f'{person.get("value", 0):,} karuda'
+                   f'<span>1 in {person.get("odds", 0):,}</span>')
+        else:
+            tag = f"Secret<span>{count}</span>"
         cards.append(
             f'<button type="button" class="card secret-card"'
             f' data-name="{esc(person["name"])}"'
@@ -580,7 +587,7 @@ def secret_markup() -> tuple:
             f' src="{esc(images[0])}">'
             f'<div class="meta"><span class="nm">{esc(person["name"])}</span>'
             f'<span class="sr">{esc(person.get("by") or "Original character")}'
-            f'</span><span class="kr tag">Secret<span>{count}</span></span>'
+            f'</span><span class="kr tag">{tag}</span>'
             f'</div></button>'
         )
 
