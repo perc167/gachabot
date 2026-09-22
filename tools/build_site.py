@@ -318,6 +318,10 @@ button.card{font:inherit;color:inherit;text-align:left;padding:0;
   cursor:pointer;width:100%}
 button.card:hover{border-color:var(--rose)}
 .card .kr.tag{color:var(--rose)}
+/* White behind secret art: transparent emotes drawn with black outlines
+   disappear into a dark card. */
+.secret-card .art,#album-img{background:#fff}
+.secret-card .art{object-fit:contain}
 
 #album{background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}

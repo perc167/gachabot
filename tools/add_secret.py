@@ -62,6 +62,29 @@ def ordered(files, first, last):
     return first + middle + last
 
 
+def is_animated(source: str) -> bool:
+    """True for a GIF (or WebP) with more than one frame."""
+    from PIL import Image
+
+    with Image.open(source) as image:
+        return getattr(image, "n_frames", 1) > 1
+
+
+def keep(source: str, target: str):
+    """Copy an animation as it is.
+
+    Re-encoding an animated GIF through Pillow tends to make it bigger and
+    uglier - dithered palettes, broken transparency - and flattening it to a
+    JPEG keeps one frame of it. Emotes are small already, so they ship as the
+    artist made them.
+    """
+    from PIL import Image
+
+    shutil.copyfile(source, target)
+    with Image.open(source) as image:
+        return image.size
+
+
 def shrink(source: str, target: str):
     """Save a web-sized JPEG copy of one image."""
     from PIL import Image
@@ -147,15 +170,19 @@ def main():
     # rejects without them ever reaching the site or the bot.
     chosen = args.only or ordered(files, args.first, args.last)
     for number, name in enumerate(chosen, 1):
-        target = os.path.join(out_dir, f"{number:02d}.jpg")
-        width, height = shrink(os.path.join(args.folder, name), target)
-        images.append(f"secret/{slug}/{number:02d}.jpg")
+        source = os.path.join(args.folder, name)
+        moving = is_animated(source)
+        ext = os.path.splitext(name)[1].lower() if moving else ".jpg"
+        target = os.path.join(out_dir, f"{number:02d}{ext}")
+        width, height = (keep if moving else shrink)(source, target)
+        images.append(f"secret/{slug}/{number:02d}{ext}")
         if args.roll:
-            bundled = f"{stem}{number:02d}.jpg"
+            bundled = f"{stem}{number:02d}{ext}"
             shutil.copyfile(target, os.path.join(BOT_ART, bundled))
             bot_images.append("local:" + bundled)
         print(f"  {number:02d}. {name}  ->  {width}x{height},"
-              f" {os.path.getsize(target) // 1024} KB")
+              f" {os.path.getsize(target) // 1024} KB"
+              + ("  (animated, kept as is)" if moving else ""))
 
     roster = []
     if os.path.exists(DATA):
