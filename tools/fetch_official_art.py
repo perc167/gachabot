@@ -17,8 +17,10 @@ What survives the filter:
   - not a child post of something already taken, which is how the same
     poster otherwise turns up twice
 
-What ranks first: plain and transparent backgrounds and full-body renders -
-the look of a wiki gallery - then everything else by score.
+Frames from the episodes themselves come first, where the site has any -
+about fifteen thousand exist across every series there is, so most
+characters have none. The rest is official art ranked for the same look: a
+real background and a closer crop first, cut-outs on white last.
 
 Names are resolved through Danbooru's character tags, which are
 disambiguated (rem_(re:zero), makima_(chainsaw_man)) and, unlike the old
@@ -75,9 +77,21 @@ REJECT = {
     "real_life", "3d", "pixel_art", "chibi", "variant_set", "collage",
 }
 
-# The wiki-gallery look, which is what was asked for.
+# A cut-out on white is a product render, not a picture of somebody in their
+# own show. It is what the character looks like, which is why it ranked first
+# at one point, but it is not what a card wants.
 PLAIN = {"white_background", "simple_background", "transparent_background",
-         "grey_background"}
+         "grey_background", "gradient_background", "no_background"}
+
+# A real place behind them.
+SCENE = {"scenery", "outdoors", "indoors", "sky", "tree", "cloud", "window",
+         "night", "sunset", "forest", "city", "street", "room", "classroom",
+         "building", "water", "grass", "snow", "rain", "blurry_background",
+         "depth_of_field", "bokeh"}
+
+# Framed close, the way a shot from an episode is.
+CLOSE = {"portrait", "upper_body", "close-up", "cowboy_shot", "face",
+         "looking_at_viewer", "profile"}
 
 # Writing across the picture. Rejected outright: an album of event posters
 # and title cards was the thing that looked least like the character, even
@@ -173,6 +187,16 @@ def official_posts(tag: str) -> list:
     return get("posts.json", tags=f"{tag} official_art", limit=str(FETCH)) or []
 
 
+def screenshot_posts(tag: str) -> list:
+    """Frames lifted from the episodes themselves.
+
+    The best answer to "just photos from the actual anime", and the rarest:
+    the whole site holds about fifteen thousand of these across every series
+    there is, so two characters in three have none at all.
+    """
+    return get("posts.json", tags=f"{tag} anime_screenshot", limit=str(FETCH)) or []
+
+
 def confirms(tag: str, posts, wanted) -> bool:
     """Does the tag's parenthetical, or the posts' copyrights, name the series?"""
     if not wanted:
@@ -220,8 +244,11 @@ def pick(posts, tag: str, want: int) -> list:
         url = post.get("large_file_url") or post.get("file_url") or ""
         if not url.lower().endswith(EMBEDDABLE):
             continue
-        rank = ((2 if general & PLAIN else 0)
-                + (1 if "full_body" in general else 0))
+        # A scene with a background and a closer crop beats a cut-out render.
+        rank = ((2 if general & SCENE else 0)
+                + (1 if general & CLOSE else 0)
+                - (2 if general & PLAIN else 0)
+                - (1 if "full_body" in general else 0))
         scored.append((rank, int(post.get("score") or 0), post, url))
 
     scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
@@ -247,12 +274,22 @@ def pick(posts, tag: str, want: int) -> list:
     return chosen
 
 
+def images_for_tag(tag: str, want: int) -> list:
+    """Screenshots first, then official art to fill the album up."""
+    found = pick(screenshot_posts(tag), tag, want)
+    if len(found) < want:
+        for url in pick(official_posts(tag), tag, want - len(found)):
+            if url not in found:
+                found.append(url)
+    return found[:want]
+
+
 def art_for(name: str, series: str, want: int, known_tag: str = "") -> tuple:
     """(urls, tag) for one character. Empty when nothing clean exists."""
     wanted = series_tokens(series)
 
     if known_tag:
-        return pick(official_posts(known_tag), known_tag, want), known_tag
+        return images_for_tag(known_tag, want), known_tag
 
     candidates = []
     for base in name_bases(name):
@@ -264,7 +301,7 @@ def art_for(name: str, series: str, want: int, known_tag: str = "") -> tuple:
     for _count, tag in candidates[:CANDIDATES]:
         posts = official_posts(tag)
         if posts and confirms(tag, posts, wanted):
-            return pick(posts, tag, want), tag
+            return images_for_tag(tag, want), tag
 
     # The booru files the series under a title the roster does not carry -
     # Maomao is kusuriya_no_hitorigoto, not The Apothecary Diaries. Accept the
@@ -272,7 +309,7 @@ def art_for(name: str, series: str, want: int, known_tag: str = "") -> tuple:
     top_count, top_tag = candidates[0]
     runner_up = candidates[1][0] if len(candidates) > 1 else 0
     if top_count >= MIN_POSTS and top_count >= max(1, runner_up) * DOMINANCE:
-        return pick(official_posts(top_tag), top_tag, want), top_tag
+        return images_for_tag(top_tag, want), top_tag
     return [], ""
 
 
