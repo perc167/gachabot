@@ -79,12 +79,19 @@ REJECT = {
 PLAIN = {"white_background", "simple_background", "transparent_background",
          "grey_background"}
 
-# Posters and promos with writing across them. Not rejected - sometimes they
-# are all a character has - but ranked below anything without.
+# Writing across the picture. Rejected outright: an album of event posters
+# and title cards was the thing that looked least like the character, even
+# when it left somebody with nothing but their main image.
+#
+# A signature or a date in the corner is not writing across the picture, so
+# artist_name and dated stay allowed, and so does promotional_art - most
+# official art of anybody is promotional.
 TEXTY = {"english_text", "japanese_text", "chinese_text", "korean_text",
-         "character_name", "title", "happy_birthday", "happy_new_year",
-         "happy_halloween", "merry_christmas", "promotional_art",
-         "translation_request", "artist_name"}
+         "thai_text", "russian_text", "character_name", "title",
+         "happy_birthday", "happy_new_year", "happy_halloween",
+         "merry_christmas", "happy_valentine", "translation_request",
+         "speech_bubble", "sign", "poster_(object)", "advertisement",
+         "fake_screenshot", "subtitled"}
 
 # Two images whose 8x8 thumbnails differ in this few bits are the same image
 # re-uploaded - Makima's poster turned up twice as two unrelated posts.
@@ -204,7 +211,7 @@ def pick(posts, tag: str, want: int) -> list:
         people = post.get("tag_string_character", "").split()
         if post.get("rating") != "g":
             continue
-        if "solo" not in general or (general | meta) & REJECT:
+        if "solo" not in general or (general | meta) & (REJECT | TEXTY):
             continue
         # Only this character: a second character tag is a crossover, a
         # duo, or a variant like sakura_miku riding on hatsune_miku.
@@ -214,8 +221,7 @@ def pick(posts, tag: str, want: int) -> list:
         if not url.lower().endswith(EMBEDDABLE):
             continue
         rank = ((2 if general & PLAIN else 0)
-                + (1 if "full_body" in general else 0)
-                - (3 if (general | meta) & TEXTY else 0))
+                + (1 if "full_body" in general else 0))
         scored.append((rank, int(post.get("score") or 0), post, url))
 
     scored.sort(key=lambda row: (row[0], row[1]), reverse=True)
@@ -278,6 +284,10 @@ def main():
     parser.add_argument("--out", default=OUT)
     parser.add_argument("--tags", default=TAGS)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--refilter", action="store_true",
+                        help="keep the tags already resolved and only fetch"
+                             " and re-filter their images, which skips two"
+                             " lookups per character")
     parser.add_argument("--every", type=int, default=100)
     args = parser.parse_args()
 
@@ -315,14 +325,26 @@ def main():
                 json.dump(data, handle, ensure_ascii=False)
             os.replace(tmp, path)
 
-    todo = [r for r in rows if key(r) not in art]
+    if args.refilter:
+        if not tags:
+            with io.open(args.tags, encoding="utf-8") as handle:
+                tags.update(json.load(handle))
+        # Characters whose name matched no tag last time will not match one
+        # now either; leave them empty rather than paying for the lookup.
+        art = {k: [] for k, tag in tags.items() if not tag}
+        todo = [r for r in rows if tags.get(key(r))]
+        print(f"re-filtering {len(todo):,} characters with a known tag")
+    else:
+        todo = [r for r in rows if key(r) not in art]
     print(f"{len(todo):,} to fetch of {len(rows):,} requested")
     started, found, images = time.time(), 0, 0
 
     for index, row in enumerate(todo, 1):
         try:
             urls, tag = art_for(row["name"], row.get("series", ""),
-                                args.per_character)
+                                args.per_character,
+                                known_tag=tags.get(key(row), "")
+                                if args.refilter else "")
         except KeyboardInterrupt:
             save()
             print(f"\nstopped; {len(art):,} saved")
