@@ -218,7 +218,12 @@ class GachaBot(commands.Bot):
                     name, _, series = key.partition("\x1f")
                     if name and urls:
                         entries.append((name, series, urls))
-                return self.db.add_art(entries), len(entries)
+                # Official art replaces the fan art the first collector
+                # shipped; both are the art file's to manage.
+                return self.db.add_art(
+                    entries, source="official",
+                    replace=("safebooru", "official"),
+                ), len(entries)
 
             added, characters = await asyncio.to_thread(apply)
             self.db.set_pref(0, "art_stamp", stamp)

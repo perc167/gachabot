@@ -872,7 +872,8 @@ class Database:
         """Bulk add. Returns how many were new."""
         return sum(1 for url in urls if url and self.add_image(character_id, url))
 
-    def add_art(self, entries) -> int:
+    def add_art(self, entries, source: str = "safebooru",
+                replace: tuple = ()) -> int:
         """Bulk-add album images, matching characters by name and series.
 
         `entries` are (name, series, urls). Written as one statement per URL
@@ -882,22 +883,34 @@ class Database:
         safe to run on every boot.
         """
         stamp = int(time.time())
+        # Seconds apart within a character, so an album keeps the order the
+        # collector ranked it in rather than sorting by URL.
         rows = [
-            (url, stamp, name, series)
+            (url, stamp + n, name, series)
             for name, series, urls in entries
-            for url in (urls or [])
+            for n, url in enumerate(urls or [])
             if url
         ]
-        if not rows:
+        if not rows and not replace:
             return 0
 
+        # The shipped art file is the whole truth for the sources it owns.
+        # Replacing them, rather than adding beside them, is what lets a
+        # better collector take the old images away - and it never touches
+        # the primary image or anything a server added by hand.
+        if replace:
+            marks = ",".join("?" * len(replace))
+            self.conn.execute(
+                f"DELETE FROM character_images WHERE source IN ({marks})",
+                tuple(replace),
+            )
         before = self.conn.execute(
             "SELECT COUNT(*) AS c FROM character_images"
         ).fetchone()["c"]
         self.conn.executemany(
             "INSERT OR IGNORE INTO character_images"
             " (character_id, url, source, added_at)"
-            " SELECT id, ?, 'safebooru', ? FROM characters"
+            f" SELECT id, ?, '{source}', ? FROM characters"
             "  WHERE name = ? AND series = ? AND guild_id = 0",
             rows,
         )

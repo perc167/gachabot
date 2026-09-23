@@ -2023,6 +2023,34 @@ async def main():
     check("biased rolls respect the claimed filter", unclaimed_only)
     wdb.close()
 
+    # 20z. Official art replaces the fan art rather than piling on beside it,
+    # and never touches the primary image or one a server added by hand.
+    adb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "art.db"))
+    adb.import_characters([{"name": "Ana", "series": "Show",
+                            "image_url": "https://e.invalid/primary.png"}])
+    ana = adb.find_characters_by_name("Ana")[0]["id"]
+    adb.add_image(ana, "https://e.invalid/mine.png", source="custom")
+    adb.add_art([("Ana", "Show", ["https://e.invalid/fan1.png",
+                                  "https://e.invalid/fan2.png"])])
+    adb.add_art([("Ana", "Show", ["https://e.invalid/off-b.png",
+                                  "https://e.invalid/off-a.png"])],
+                source="official", replace=("safebooru", "official"))
+    album = adb.images_for(ana)
+    check("official art replaces the fan art",
+          not any("fan" in u for u in album), str(album))
+    check("official art keeps the order it was ranked in",
+          album.index("https://e.invalid/off-b.png")
+          < album.index("https://e.invalid/off-a.png"), str(album))
+    check("replacing art keeps the primary and hand-added images",
+          "https://e.invalid/primary.png" in album
+          and "https://e.invalid/mine.png" in album, str(album))
+    adb.add_art([], source="official", replace=("safebooru", "official"))
+    check("an empty art file clears what it owned",
+          sorted(adb.images_for(ana)) == ["https://e.invalid/mine.png",
+                                          "https://e.invalid/primary.png"],
+          str(adb.images_for(ana)))
+    adb.close()
+
     # 21. Secret characters. They roll only through their own odds - never
     # out of the pool, where being unranked would hand them a fair share and
     # a non-AniList source would file them under games.
