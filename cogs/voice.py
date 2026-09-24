@@ -326,7 +326,8 @@ class Voice(commands.Cog):
                            allowed_mentions=discord.AllowedMentions.none())
 
     @vc.command(name="reject", aliases=["deny"])
-    @commands.bot_has_permissions(manage_roles=True, move_members=True)
+    @commands.bot_has_permissions(manage_roles=True)
+    @commands.bot_has_guild_permissions(move_members=True)
     async def vc_reject(self, ctx, member: discord.Member):
         """Take away someone's access and remove them if they're in."""
         channel = await self.room(ctx)
@@ -342,7 +343,8 @@ class Voice(commands.Cog):
                        allowed_mentions=discord.AllowedMentions.none())
 
     @vc.command(name="ban", aliases=["block"])
-    @commands.bot_has_permissions(manage_roles=True, move_members=True)
+    @commands.bot_has_permissions(manage_roles=True)
+    @commands.bot_has_guild_permissions(move_members=True)
     async def vc_ban(self, ctx, member: discord.Member):
         """Stop someone joining or seeing your channel at all."""
         channel = await self.room(ctx)
@@ -488,8 +490,11 @@ class Voice(commands.Cog):
 
     @vc.command(name="setup")
     @commands.has_permissions(manage_guild=True)
-    @commands.bot_has_permissions(manage_channels=True, move_members=True,
-                                  manage_roles=True)
+    @commands.bot_has_permissions(manage_channels=True, manage_roles=True)
+    # Server-wide, not in this channel: discord.py strips voice permissions
+    # like Move Members from every text channel, so a channel check on them
+    # fails for everyone, administrators included.
+    @commands.bot_has_guild_permissions(move_members=True)
     async def vc_setup(self, ctx, join: discord.VoiceChannel = None):
         """Make Join To Create. Or name an existing voice channel to use it."""
         guild = ctx.guild
