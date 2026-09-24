@@ -27,10 +27,26 @@ OUT = os.path.join(ROOT, "site", "index.html")
 # this file and the images it points at, under site/secret/.
 SECRET_DATA = os.path.join(ROOT, "data", "secret_characters.json")
 
-# The bot's invite link, which is public — $invite prints it in Discord.
-# --invite or YURI_INVITE overrides it.
-INVITE = ("https://discord.com/oauth2/authorize"
-          "?client_id=1550497695582519418&scope=bot&permissions=379904")
+# The bot's application id, which is public: it is in every invite link.
+# The permissions come from cogs/profile.py, the same list $invite uses.
+# --invite or YURI_INVITE overrides the whole link.
+CLIENT_ID = 1550497695582519418
+
+# The three parts of the bot, each with its own tab on the page. Sections
+# are named as they are in cogs/help.py; anything not listed is the gacha.
+# build() fails loudly if a name here stops matching, so renaming a help
+# section can't quietly move it to the wrong tab.
+AREAS = (
+    ("gacha", "Gacha"),
+    ("mod", "Moderation"),
+    ("voice", "Voice"),
+)
+AREA_OF = {
+    "Jail & mutes": "mod", "Warnings": "mod", "Kicks & bans": "mod",
+    "Cleaning up": "mod", "Records & names": "mod", "Mod setup": "mod",
+    "Staff points": "mod",
+    "Voice rooms": "voice", "Voice hours": "voice",
+}
 
 # How many characters the browser section carries. The whole roster is a
 # hundred thousand; a page does not need that to make the point.
@@ -60,6 +76,16 @@ async def collect():
     for cog in botmod.COGS:
         await client.load_extension(cog)
 
+    from cogs.profile import INVITE_PERMISSIONS
+
+    names = {name for _icon, name, _entries in helpmod.CATEGORIES}
+    stale = sorted(set(AREA_OF) - names)
+    if stale:
+        raise SystemExit("AREA_OF names help sections that no longer exist: "
+                         + ", ".join(stale))
+    invite = discord.utils.oauth_url(CLIENT_ID, permissions=INVITE_PERMISSIONS,
+                                     scopes=("bot",))
+
     sections = []
     for icon, name, entries in helpmod.CATEGORIES:
         items = []
@@ -71,11 +97,12 @@ async def collect():
                 "help": (found.help or "").strip().split("\n")[0] if found else "",
                 "aliases": sorted(found.aliases) if found else [],
             })
-        sections.append({"icon": icon, "name": name, "items": items})
+        sections.append({"icon": icon, "name": name, "items": items,
+                         "area": AREA_OF.get(name, "gacha")})
 
     total = len({c.qualified_name for c in client.walk_commands()})
     await client.close()
-    return sections, total
+    return sections, total, invite
 
 
 def characters():
@@ -228,6 +255,9 @@ h2{
   background:var(--raise);border:1px solid var(--line);border-radius:9px;
   width:36px;height:36px;display:grid;place-items:center;
 }
+/* Without this a grid column is as wide as its longest command line, and
+   on a phone that pushes the whole card off the side of the screen. */
+.step>div{min-width:0}
 .step h3{font-family:var(--display);font-weight:600;font-size:17px;margin:4px 0 6px}
 .step p{margin:0 0 10px;color:var(--dim);font-size:15px}
 .step p:last-child{margin-bottom:0}
@@ -283,6 +313,28 @@ code,kbd{
   margin-top:6px;overflow-wrap:anywhere;
 }
 #empty{color:var(--dim);display:none}
+.group{scroll-margin-top:80px}
+
+/* ---- tabs: one per part of the bot, shared by setup and commands ---- */
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tabs .chip{font-size:13px;padding:8px 16px}
+.jump{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 28px;
+  padding:12px 16px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;font-size:13.5px}
+.jump a{color:var(--dim);white-space:nowrap}
+.jump a:hover{color:var(--text)}
+.setup-tabs{margin-bottom:22px}
+
+/* ---- features: the three parts at a glance ---- */
+.features{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.feature{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:22px;display:flex;flex-direction:column}
+.feature .ic{font-size:22px;line-height:1;margin-bottom:12px}
+.feature h3{font-family:var(--display);font-weight:600;font-size:19px;margin:0 0 6px}
+.feature p{color:var(--dim);font-size:15px;margin:0 0 12px}
+.feature ul{margin:0 0 18px;padding-left:18px;color:var(--dim);font-size:14.5px}
+.feature li{margin-bottom:3px}
+.feature .go{margin-top:auto;display:flex;gap:16px;font-size:14px;font-weight:500}
 
 /* ---- characters ---- */
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(146px,1fr))}
@@ -346,6 +398,7 @@ footer p{margin:0 0 6px}
 
 <nav><div class="wrap nav-in">
   <a class="brand" href="#top"><span>Y</span>Yuri</a>
+  <a class="link" href="#features">Features</a>
   <a class="link" href="#setup">Setup</a>
   <a class="link" href="#commands">Commands</a>
   <a class="link" href="#characters">Characters</a>
@@ -353,11 +406,11 @@ footer p{margin:0 0 6px}
 
 <div id="top" class="wrap">
 <header>
-  <p class="eyebrow">Discord gacha</p>
-  <h1>Roll for <em>__TOTAL__</em> characters.<br>Claim the ones worth keeping.</h1>
-  <p class="lede">A gacha bot in the shape of Mudae, with its own roster and its
-  own currency. Every character is ranked on how many people have actually
-  favourited them — what somebody is worth is measured, not guessed.</p>
+  <p class="eyebrow">Gacha · Moderation · Voice</p>
+  <h1>Roll for <em>__TOTAL__</em> characters.<br>Run the server too.</h1>
+  <p class="lede">A gacha bot in the shape of Mudae, with its own roster and
+  currency, plus the moderation and voice rooms a server needs, so one bot
+  does the job of three.</p>
   <div class="cta">
     __INVITE__
     <a class="btn ghost" href="#setup">Set it up</a>
@@ -370,22 +423,30 @@ footer p{margin:0 0 6px}
   </div>
 </header>
 
+<section id="features">
+  <h2>What it does</h2>
+  <p class="sub">Three parts. Use all of them, or only the ones you need.</p>
+  <div class="features">__FEATURES_HTML__</div>
+</section>
+
 <section id="setup">
   <h2>Getting it working on your server</h2>
-  <p class="sub">Six steps, in order. The first two matter most — everything
-  after them is taste.</p>
-  <div class="steps">__STEPS_HTML__</div>
+  <p class="sub">Pick the part you're setting up. The steps are in order.</p>
+  <div class="tabs setup-tabs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
+  __SETUP_HTML__
 </section>
 
 <section id="commands">
   <h2>Every command</h2>
-  <p class="sub">__COMMANDS__ of them. Type <code>$help</code> in Discord and
-  the same list arrives by DM.</p>
+  <p class="sub">__COMMANDS__ of them, split by what they're for. Search looks
+  through all of them. Type <code>$help</code> in Discord and the same list
+  arrives by DM.</p>
   <div class="tools">
-    <input id="q" type="search" placeholder="Search commands, or what they do…"
+    <input id="q" type="search" placeholder="Search every command, or what it does…"
            autocomplete="off" aria-label="Search commands">
-    <button class="chip" id="all" aria-pressed="true">All</button>
+    <div class="tabs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
   </div>
+  __JUMP_HTML__
   <div id="groups">__COMMANDS_HTML__</div>
   <p id="empty">Nothing matches that.</p>
 </section>
@@ -417,33 +478,67 @@ footer p{margin:0 0 6px}
 
 <script>
 (function(){
+  // One part of the bot at a time, picked by the tabs in Setup and in
+  // Commands (they move together). Typing a search looks through every part.
   var q = document.getElementById("q");
-  var all = document.getElementById("all");
   var empty = document.getElementById("empty");
   var groups = Array.prototype.slice.call(
     document.querySelectorAll("#groups .group"));
+  var tabs = Array.prototype.slice.call(document.querySelectorAll("[data-tab]"));
+  var panels = Array.prototype.slice.call(document.querySelectorAll("[data-panel]"));
+  var jumps = Array.prototype.slice.call(document.querySelectorAll(".jump"));
+  var area = "gacha";
 
   function apply(){
     var needle = q.value.trim().toLowerCase();
     var anything = false;
     groups.forEach(function(group){
+      var mine = needle ? true : group.dataset.area === area;
       var shown = 0;
       Array.prototype.forEach.call(group.querySelectorAll(".cmd"), function(cmd){
         var hit = !needle || cmd.dataset.find.indexOf(needle) !== -1;
         cmd.hidden = !hit;
         if (hit) shown++;
       });
-      group.hidden = shown === 0;
-      if (shown) anything = true;
+      group.hidden = !mine || shown === 0;
+      if (!group.hidden) anything = true;
       var count = group.querySelector("h3 b");
       if (count) count.textContent = shown;
     });
+    jumps.forEach(function(jump){
+      jump.hidden = !!needle || jump.dataset.area !== area;
+    });
+    tabs.forEach(function(tab){
+      var on = tab.dataset.tab === area;
+      // In Commands, a search shows every part, so no tab is lit.
+      var inCommands = !!tab.closest("#commands");
+      tab.setAttribute("aria-pressed", on && !(inCommands && needle) ? "true" : "false");
+    });
+    panels.forEach(function(panel){ panel.hidden = panel.dataset.panel !== area; });
     empty.style.display = anything ? "none" : "block";
   }
 
+  function choose(next){
+    area = next;
+    q.value = "";
+    apply();
+  }
+
+  tabs.forEach(function(tab){
+    tab.addEventListener("click", function(){ choose(tab.dataset.tab); });
+  });
   q.addEventListener("input", apply);
-  all.addEventListener("click", function(){ q.value = ""; apply(); q.focus(); });
+
+  // Links like #commands-mod or #setup-voice open that part's tab.
+  function fromHash(){
+    var match = /^#(setup|commands)-(\w+)$/.exec(location.hash);
+    if (!match || !document.querySelector('[data-tab="' + match[2] + '"]')) return;
+    choose(match[2]);
+    document.getElementById(match[1]).scrollIntoView();
+  }
+  window.addEventListener("hashchange", fromHash);
   apply();
+  fromHash();
 })();
 
 (function(){
@@ -617,7 +712,7 @@ def secret_markup() -> tuple:
 
 
 def build(embed: int = 0, invite_url: str = ""):
-    sections, command_total = asyncio.run(collect())
+    sections, command_total, bot_invite = asyncio.run(collect())
     shown, total, series = characters()
 
     if embed:
@@ -636,11 +731,13 @@ def build(embed: int = 0, invite_url: str = ""):
     import tutorial
 
     esc = html.escape
-    steps = [
+    gacha_steps = [
         ("Add the bot", """
          <p>Run <code>$invite</code> in a server that already has it, or use
-         the button at the top of this page. It asks for permission to send
-         messages, embed links and attach files — nothing else.</p>"""),
+         the button at the top of this page. It asks for what all three parts
+         need: messages and embeds for the gacha, roles, kicks, bans and
+         timeouts for moderation, and moving members for voice. Untick
+         anything for a part you won't use.</p>"""),
         ("Give it one channel", """
          <p>Left alone the bot answers everywhere, which gets old fast in a
          busy server.</p>
@@ -673,6 +770,107 @@ def build(embed: int = 0, invite_url: str = ""):
          finishing each one. They learn the commands by using them rather
          than by reading a list.</p>"""),
     ]
+    mod_steps = [
+        ("Put the bot above your staff", """
+         <p>Server Settings → Roles: drag the bot's role above your staff
+         roles. It can only jail, mute or ban people whose top role is below
+         its own.</p>"""),
+        ("Give your staff their permissions", """
+         <p>The bot follows Discord's own permissions, so staff ranks are
+         just roles.</p>
+         <p><b>Trial Mods</b> need <code>Timeout Members</code>: jail,
+         timeouts, mutes and warnings.<br><b>Mods</b> also need
+         <code>Kick Members</code> and <code>Ban Members</code>.</p>"""),
+        ("Run setup", """
+         <p>Name your staff roles and the bot makes everything else: Jailed,
+         Image Muted and Reaction Muted roles, a <code>#jail</code> channel
+         and a <code>#mod-logs</code> channel only staff can see.</p>
+         <code class="cmdline">$setupmod @Mod @Trial Mod</code>"""),
+        ("Choose what happens automatically", """
+         <p>Optional. Punish people when they reach a number of warnings,
+         and word the bot's messages your own way.</p>
+         <code class="cmdline">$warnpunish add 3 timeout 1h
+$invoke set jail message {user.mention} is in jail: {reason}</code>"""),
+        ("Track who's ready for promotion", """
+         <p>Every jail and mute gives the staff member who did it a point.
+         Mods give points by hand for reports that end in a ban.</p>
+         <code class="cmdline">$point @trialmod ban
+$toppoints</code>
+         <p class="note"><code>$modhistory @trialmod</code> counts every
+         action someone has taken.</p>"""),
+    ]
+    voice_steps = [
+        ("Make Join To Create", """
+         <p>Makes a category with a <code>Join To Create</code> voice channel
+         and a <code>#vc-info</code> channel with the commands in it. To use
+         a voice channel you already have, give its id.</p>
+         <code class="cmdline">$vc setup
+$vc setup 123456789012345678</code>
+         <p class="note">Only let one bot run Join To Create, or both will
+         make a room every time someone joins.</p>"""),
+        ("Let people run their rooms", """
+         <p>Whoever joins gets their own channel, deleted when it empties.
+         They lock it, hide it, rename it and choose who gets in, from the
+         channel's own chat.</p>
+         <code class="cmdline">$vc lock · $vc permit @friend · $vc rename chill</code>
+         <p class="note"><code>$vc panel</code> posts the full command list
+         anywhere.</p>"""),
+        ("Reward time in voice", """
+         <p>Every minute in voice is counted, except in the AFK channel.
+         Hand out roles at milestones.</p>
+         <code class="cmdline">$vc hours add 10 @Regular
+$vc lb</code>"""),
+    ]
+    steps_by_area = {"gacha": gacha_steps, "mod": mod_steps,
+                     "voice": voice_steps}
+    labels = dict(AREAS)
+    subs = {
+        "gacha": "Six steps. The first two matter most, the rest is taste.",
+        "mod": "Five steps. After the third, every command works.",
+        "voice": "Three steps. The first one is all you need.",
+    }
+    tabs_html = "".join(
+        f'<button type="button" class="chip" data-tab="{key}"'
+        f' aria-pressed="false">{label}</button>' for key, label in AREAS)
+    setup_html = "\n".join(
+        f'<div data-panel="{key}"><p class="sub">{subs[key]}</p>'
+        f'<div class="steps">{step_html(steps_by_area[key])}</div></div>'
+        for key, _label in AREAS)
+
+    counts = {key: sum(len(sec["items"]) for sec in sections
+                       if sec["area"] == key) for key, _ in AREAS}
+    features = [
+        ("gacha", "\U0001f3b2", "Gacha",
+         f"Roll for {total:,} characters and claim the ones worth keeping.",
+         ["Wishlists, likes, trades and gifts",
+          "Karuda, a shop, badges and a tower",
+          "A tutorial that pays people to learn"]),
+        ("mod", "\U0001f6e1\ufe0f", "Moderation",
+         "Talk first, then decide. Every action is saved as a numbered case.",
+         ["Jail, timeouts, image and reaction mutes",
+          "Warnings with automatic punishments",
+          "Bans, hardbans, lockdowns and staff points"]),
+        ("voice", "\U0001f50a", "Voice",
+         "Rooms people make and run themselves, and hours spent in voice.",
+         ["Join To Create, deleted when empty",
+          "Lock, hide, rename, permit, ban, transfer",
+          "Hour leaderboard and hour roles"]),
+    ]
+    features_html = "\n".join(
+        f'<div class="feature"><div class="ic">{icon}</div><h3>{name}</h3>'
+        f'<p>{esc(blurb)}</p><ul>{"".join(f"<li>{esc(x)}</li>" for x in points)}</ul>'
+        f'<div class="go"><a href="#setup-{key}">Set it up</a>'
+        f'<a href="#commands-{key}">{counts[key]} commands</a></div></div>'
+        for key, icon, name, blurb, points in features)
+
+    def slug(name):
+        return "g-" + "".join(c if c.isalnum() else "-" for c in name.lower())
+
+    jump_html = "\n".join(
+        f'<nav class="jump" data-area="{key}" aria-label="{label} sections">'
+        + "".join(f'<a href="#{slug(sec["name"])}">{esc(sec["name"])}</a>'
+                  for sec in sections if sec["area"] == key)
+        + "</nav>" for key, label in AREAS)
 
     groups = []
     for section in sections:
@@ -689,7 +887,9 @@ def build(embed: int = 0, invite_url: str = ""):
                 f'<span class="b">{esc(item["blurb"])}</span>{aliases}</div>'
             )
         groups.append(
-            f'<div class="group"><h3>{section["icon"]} {esc(section["name"])}'
+            f'<div class="group" id="{slug(section["name"])}"'
+            f' data-area="{section["area"]}">'
+            f'<h3>{section["icon"]} {esc(section["name"])}'
             f'<b>{len(cards)}</b></h3>'
             f'<div class="cmds">{"".join(cards)}</div></div>'
         )
@@ -709,7 +909,7 @@ def build(embed: int = 0, invite_url: str = ""):
 
     secret_button, secret_html = secret_markup()
 
-    link = invite_url or INVITE
+    link = invite_url or bot_invite
     invite = (f'<a class="btn" href="{esc(link)}">Add Yuri to your server</a>'
               if link else
               '<a class="btn ghost" href="#setup">Run $invite for the link</a>')
@@ -721,7 +921,10 @@ def build(embed: int = 0, invite_url: str = ""):
             .replace("__STEPS__", str(tutorial.TOTAL_STEPS))
             .replace("__SHOWN__", f"{len(shown):,}")
             .replace("__INVITE__", invite)
-            .replace("__STEPS_HTML__", step_html(steps))
+            .replace("__FEATURES_HTML__", features_html)
+            .replace("__TABS_HTML__", tabs_html)
+            .replace("__SETUP_HTML__", setup_html)
+            .replace("__JUMP_HTML__", jump_html)
             .replace("__COMMANDS_HTML__", "\n".join(groups))
             .replace("__CHARACTERS_HTML__", "\n".join(cards))
             .replace("__SECRET_BUTTON__", secret_button)
@@ -757,9 +960,6 @@ def main():
     print(f"  showcase: {shown} characters"
           + (" (art inlined)" if args.embed else " with linkable art"))
     print(f"  page: {len(page) / 1024:.0f} KB")
-    if not (args.invite or INVITE):
-        print("  no invite link - the button points at the setup section;"
-              " pass --invite URL")
     print(f"\nWrote {args.out}")
     return 0
 

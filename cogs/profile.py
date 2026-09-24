@@ -14,6 +14,33 @@ RPS = {"rock": "scissors", "paper": "rock", "scissors": "paper"}
 RPS_ICON = {"rock": "\U0001faa8", "paper": "\U0001f4c4", "scissors": "✂️"}
 
 
+# What the invite link asks for, here and on the website (tools/build_site.py
+# reads it), so the two can't drift apart. A server owner can untick whatever
+# part of the bot they won't use.
+INVITE_PERMISSIONS = discord.Permissions(
+    # The gacha. view_channel because the setup guide tells servers to give
+    # the bot its own channel, and a locked one is invisible without it.
+    view_channel=True,
+    send_messages=True,
+    embed_links=True,
+    attach_files=True,
+    read_message_history=True,
+    use_external_emojis=True,
+    # Moderation: jail and mute roles, kicks, bans, timeouts, purge, lockdown.
+    manage_roles=True,
+    manage_channels=True,
+    kick_members=True,
+    ban_members=True,
+    moderate_members=True,
+    manage_messages=True,
+    manage_nicknames=True,
+    view_audit_log=True,
+    # Voice: Join To Create makes channels and moves people into them.
+    connect=True,
+    move_members=True,
+)
+
+
 class Profile(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -114,18 +141,8 @@ class Profile(commands.Cog):
         if not ctx.bot.user:
             await ctx.send("Not logged in yet.")
             return
-        permissions = discord.Permissions(
-            # view_channel because the setup guide tells servers to give the
-            # bot its own channel, and a locked one is invisible without it.
-            view_channel=True,
-            send_messages=True,
-            embed_links=True,
-            attach_files=True,
-            read_message_history=True,
-            use_external_emojis=True,
-        )
         url = discord.utils.oauth_url(
-            ctx.bot.user.id, permissions=permissions, scopes=("bot",)
+            ctx.bot.user.id, permissions=INVITE_PERMISSIONS, scopes=("bot",)
         )
         await ctx.send(f"<{url}>")
 
