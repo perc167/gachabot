@@ -16,7 +16,7 @@ KINDS = ("message", "dm")
 
 
 class ModSettings(commands.Cog):
-    staff_cog = True  # see cogs/modtools.py
+    works_everywhere = True  # see cogs/modtools.py
 
     def __init__(self, bot):
         self.bot = bot

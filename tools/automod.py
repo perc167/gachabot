@@ -54,9 +54,9 @@ async def every_name() -> list:
         await client.load_extension(cog)
     names = set()
     for command in client.walk_commands():
-        # Staff commands ($jail, $ban...) have to work in every channel, so
-        # they are never blocked.
-        if getattr(command.cog, "staff_cog", False):
+        # Staff and voice commands ($jail, $vc...) have to work in every
+        # channel, so they are never blocked.
+        if getattr(command.cog, "works_everywhere", False):
             continue
         names.add(command.name.lower())
         names.update(alias.lower() for alias in command.aliases)

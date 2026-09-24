@@ -24,7 +24,7 @@ def colour_for(db, guild_id: int) -> int:
 
 class StaffPoints(commands.Cog):
     # Staff commands work in every channel; see cogs/modtools.py.
-    staff_cog = True
+    works_everywhere = True
 
     def __init__(self, bot):
         self.bot = bot

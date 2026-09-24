@@ -46,6 +46,7 @@ COGS = [
     "cogs.staffpoints",
     "cogs.modtools",
     "cogs.modsettings",
+    "cogs.voice",
     "cogs.aliases",
     "cogs.tea",
     "cogs.leaderboards",
@@ -130,11 +131,12 @@ class GachaBot(commands.Bot):
         if ctx.author.id in config.OWNERS:
             return True
 
-        # Staff commands work everywhere: a server that keeps the gacha to
-        # one channel still needs $jail in general.
-        staff = getattr(ctx.cog, "staff_cog", False)
+        # Staff and voice commands work everywhere: a server that keeps the
+        # gacha to one channel still needs $jail in general and $vc lock in
+        # the voice channel's own chat.
+        anywhere = getattr(ctx.cog, "works_everywhere", False)
         allowed = self.db.allowed_channels(ctx.guild.id)
-        if allowed and ctx.channel.id not in allowed and not staff:
+        if allowed and ctx.channel.id not in allowed and not anywhere:
             return False
         if ctx.command and ctx.command.name in self.db.disabled_commands(ctx.guild.id):
             raise commands.DisabledCommand()

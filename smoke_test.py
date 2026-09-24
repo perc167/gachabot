@@ -91,6 +91,19 @@ async def main():
           and db.get_mod_config(GUILD, "jail_role") == 5)
     db.clear_cases(GUILD, ALICE, "jail")
 
+    # Voice time: a session banks when it ends, and counts while it's open.
+    db.start_vc_session(GUILD, ALICE, at=1000)
+    db.start_vc_session(GUILD, ALICE, at=5000)
+    check("joining twice doesn't restart the clock",
+          db.vc_seconds(GUILD, ALICE, now=1600) == 600)
+    check("leaving banks the time", db.end_vc_session(GUILD, ALICE, at=4600) == 3600
+          and db.vc_seconds(GUILD, ALICE, now=99999) == 3600)
+    db.start_vc_session(GUILD, BOB, at=0)
+    check("the leaderboard counts the session you're in",
+          [r["user_id"] for r in db.top_vc(GUILD, now=7200)] == [BOB, ALICE])
+    db.drop_vc_session(GUILD, BOB)
+    check("a dropped session banks nothing", db.vc_seconds(GUILD, BOB) == 0)
+
     # 2. Seed import path.
     import json
 
@@ -1586,8 +1599,8 @@ async def main():
     # only stays useful while it lists every command.
     every = set()
     for command in b.walk_commands():
-        # Staff commands work in every channel, so they stay off the list.
-        if getattr(command.cog, "staff_cog", False):
+        # Staff and voice commands work in every channel, so they stay off.
+        if getattr(command.cog, "works_everywhere", False):
             continue
         every.add(command.name.lower())
         every.update(alias.lower() for alias in command.aliases)

@@ -146,9 +146,9 @@ def blocker(ctx, member) -> str:
 
 
 class ModTools(commands.Cog):
-    # Read by the channel gate in bot.py and by tools/automod.py: staff
+    # Read by the channel gate in bot.py and by tools/automod.py: these
     # commands work everywhere and are never on the AutoMod block list.
-    staff_cog = True
+    works_everywhere = True
 
     def __init__(self, bot):
         self.bot = bot

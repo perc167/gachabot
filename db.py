@@ -307,6 +307,45 @@ CREATE TABLE IF NOT EXISTS invoke_messages (
     PRIMARY KEY (guild_id, action, kind)
 );
 
+-- Voice: where Join To Create is, and the channels it has made.
+CREATE TABLE IF NOT EXISTS vc_settings (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS temp_vcs (
+    channel_id INTEGER PRIMARY KEY,
+    guild_id   INTEGER NOT NULL,
+    owner_id   INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+);
+
+-- Time spent in voice. A session is open while someone is in a channel and
+-- is added to their total when they leave.
+CREATE TABLE IF NOT EXISTS vc_time (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    seconds  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS vc_sessions (
+    guild_id  INTEGER NOT NULL,
+    user_id   INTEGER NOT NULL,
+    joined_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+-- Roles handed out for reaching so many hours in voice.
+CREATE TABLE IF NOT EXISTS vc_hour_roles (
+    guild_id INTEGER NOT NULL,
+    hours    INTEGER NOT NULL,
+    role_id  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, hours)
+);
+
 -- The roles a jailed member had, so unjailing hands them back. A row here is
 -- also what re-jails someone who leaves and rejoins to escape.
 CREATE TABLE IF NOT EXISTS jailed (
@@ -688,6 +727,107 @@ class Database:
             return self._delete("invoke_messages", guild_id=guild_id,
                                 action=action, kind=kind)
         return self._delete("invoke_messages", guild_id=guild_id, action=action)
+
+    # ---------- voice ----------
+
+    def get_vc_setting(self, guild_id: int, key: str) -> int:
+        rows = self._select("vc_settings", guild_id=guild_id, key=key)
+        return rows[0]["value"] if rows else 0
+
+    def set_vc_setting(self, guild_id: int, key: str, value: int):
+        self._upsert("vc_settings",
+                     {"guild_id": guild_id, "key": key, "value": int(value)})
+
+    def clear_vc_settings(self, guild_id: int) -> int:
+        return self._delete("vc_settings", guild_id=guild_id)
+
+    def add_temp_vc(self, guild_id: int, channel_id: int, owner_id: int):
+        self._upsert("temp_vcs", {
+            "channel_id": channel_id, "guild_id": guild_id,
+            "owner_id": owner_id, "created_at": int(time.time())})
+
+    def temp_vc(self, channel_id: int):
+        rows = self._select("temp_vcs", channel_id=channel_id)
+        return rows[0] if rows else None
+
+    def temp_vc_of(self, guild_id: int, owner_id: int):
+        rows = self._select("temp_vcs", guild_id=guild_id, owner_id=owner_id)
+        return rows[0] if rows else None
+
+    def temp_vcs_in(self, guild_id: int) -> list:
+        return self._select("temp_vcs", guild_id=guild_id)
+
+    def set_temp_vc_owner(self, channel_id: int, owner_id: int):
+        self.conn.execute("UPDATE temp_vcs SET owner_id = ? WHERE channel_id = ?",
+                          (owner_id, channel_id))
+        self.conn.commit()
+
+    def remove_temp_vc(self, channel_id: int) -> int:
+        return self._delete("temp_vcs", channel_id=channel_id)
+
+    def start_vc_session(self, guild_id: int, user_id: int, at: int = None):
+        """Start counting, unless a session is already open."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO vc_sessions (guild_id, user_id, joined_at)"
+            " VALUES (?, ?, ?)", (guild_id, user_id, int(time.time()) if at is None else at))
+        self.conn.commit()
+
+    def end_vc_session(self, guild_id: int, user_id: int, at: int = None) -> int:
+        """Stop counting and bank the time. Returns the seconds added."""
+        rows = self._select("vc_sessions", guild_id=guild_id, user_id=user_id)
+        if not rows:
+            return 0
+        spent = max(0, (int(time.time()) if at is None else at)
+                    - rows[0]["joined_at"])
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM vc_sessions WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id))
+            self.conn.execute(
+                "INSERT INTO vc_time (guild_id, user_id, seconds) VALUES (?, ?, ?)"
+                " ON CONFLICT (guild_id, user_id)"
+                " DO UPDATE SET seconds = seconds + excluded.seconds",
+                (guild_id, user_id, spent))
+        return spent
+
+    def drop_vc_session(self, guild_id: int, user_id: int) -> int:
+        """Forget an open session without banking it."""
+        return self._delete("vc_sessions", guild_id=guild_id, user_id=user_id)
+
+    def vc_sessions_in(self, guild_id: int) -> list:
+        return self._select("vc_sessions", guild_id=guild_id)
+
+    def vc_seconds(self, guild_id: int, user_id: int, now: int = None) -> int:
+        """Banked time plus the session they're in right now."""
+        now = int(time.time()) if now is None else now
+        row = self.conn.execute(
+            "SELECT COALESCE((SELECT seconds FROM vc_time"
+            "  WHERE guild_id = ? AND user_id = ?), 0)"
+            " + COALESCE((SELECT ? - joined_at FROM vc_sessions"
+            "  WHERE guild_id = ? AND user_id = ?), 0) AS total",
+            (guild_id, user_id, now, guild_id, user_id)).fetchone()
+        return max(0, row["total"])
+
+    def top_vc(self, guild_id: int, limit: int = 10, now: int = None) -> list:
+        now = int(time.time()) if now is None else now
+        return self.conn.execute(
+            "SELECT user_id, SUM(seconds) AS seconds FROM ("
+            "  SELECT user_id, seconds FROM vc_time WHERE guild_id = ?"
+            "  UNION ALL"
+            "  SELECT user_id, ? - joined_at FROM vc_sessions WHERE guild_id = ?"
+            ") GROUP BY user_id HAVING SUM(seconds) > 0"
+            " ORDER BY seconds DESC LIMIT ?",
+            (guild_id, now, guild_id, limit)).fetchall()
+
+    def set_hour_role(self, guild_id: int, hours: int, role_id: int):
+        self._upsert("vc_hour_roles",
+                     {"guild_id": guild_id, "hours": hours, "role_id": role_id})
+
+    def remove_hour_role(self, guild_id: int, hours: int) -> int:
+        return self._delete("vc_hour_roles", guild_id=guild_id, hours=hours)
+
+    def hour_roles_of(self, guild_id: int) -> list:
+        return self._select("vc_hour_roles", "hours", guild_id=guild_id)
 
     # ---------- characters ----------
 
