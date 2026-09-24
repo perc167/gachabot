@@ -43,6 +43,8 @@ COGS = [
     "cogs.fun",
     "cogs.notes",
     "cogs.moderation",
+    "cogs.staffpoints",
+    "cogs.modtools",
     "cogs.aliases",
     "cogs.tea",
     "cogs.leaderboards",
@@ -78,6 +80,13 @@ def suggestion_for(typed: str, names, cutoff: float = SUGGEST_CUTOFF) -> str:
     if not close or close[0] == typed:
         return ""
     return close[0]
+
+
+def permission_names(missing) -> str:
+    """['manage_guild', 'ban_members'] -> 'Manage Server and Ban Members'."""
+    names = [p.replace("guild", "server").replace("_", " ").title()
+             for p in missing]
+    return " and ".join(names)
 
 
 class GachaBot(commands.Bot):
@@ -120,8 +129,11 @@ class GachaBot(commands.Bot):
         if ctx.author.id in config.OWNERS:
             return True
 
+        # Staff commands work everywhere: a server that keeps the gacha to
+        # one channel still needs $jail in general.
+        staff = getattr(ctx.cog, "staff_cog", False)
         allowed = self.db.allowed_channels(ctx.guild.id)
-        if allowed and ctx.channel.id not in allowed:
+        if allowed and ctx.channel.id not in allowed and not staff:
             return False
         if ctx.command and ctx.command.name in self.db.disabled_commands(ctx.guild.id):
             raise commands.DisabledCommand()
@@ -314,7 +326,17 @@ class GachaBot(commands.Bot):
             await self.suggest_command(ctx)
             return
         if isinstance(error, commands.MissingPermissions):
-            await ctx.send("You need Manage Server for that.")
+            await ctx.send(f"You need {permission_names(error.missing_permissions)}"
+                           " for that.")
+            return
+        if isinstance(error, commands.BotMissingPermissions):
+            await ctx.send(f"I need {permission_names(error.missing_permissions)}"
+                           " to do that. Check my role in Server Settings.")
+            return
+        if (isinstance(error, commands.CommandInvokeError)
+                and isinstance(error.original, discord.Forbidden)):
+            await ctx.send("Discord wouldn't let me do that. My role needs to"
+                           " be above the roles of whoever I'm acting on.")
             return
         if isinstance(error, commands.NotOwner):
             await ctx.send("Owner-only command.")

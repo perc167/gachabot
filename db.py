@@ -222,6 +222,49 @@ CREATE TABLE IF NOT EXISTS shard_pulls (
     count    INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id, shard)
 );
+
+-- Staff points, one row per point, so every one keeps who gave it and why.
+-- Nothing to do with the gacha: no reset command touches this table.
+CREATE TABLE IF NOT EXISTS staff_points (
+    id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    given_by INTEGER NOT NULL,
+    reason   TEXT NOT NULL DEFAULT '',
+    given_at INTEGER NOT NULL
+);
+
+-- Every moderation action, one row each. Warnings are cases too, so a
+-- member's history is one query rather than several stitched together.
+CREATE TABLE IF NOT EXISTS mod_cases (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id   INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    mod_id     INTEGER NOT NULL,
+    action     TEXT NOT NULL,
+    reason     TEXT NOT NULL DEFAULT '',
+    duration   INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+);
+
+-- The roles and channels $setupmod made. Its own table rather than
+-- guild_settings, which $fullreset wipes along with the gacha.
+CREATE TABLE IF NOT EXISTS mod_config (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+
+-- The roles a jailed member had, so unjailing hands them back. A row here is
+-- also what re-jails someone who leaves and rejoins to escape.
+CREATE TABLE IF NOT EXISTS jailed (
+    guild_id  INTEGER NOT NULL,
+    user_id   INTEGER NOT NULL,
+    role_ids  TEXT NOT NULL DEFAULT '',
+    jailed_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
 """
 
 
@@ -347,6 +390,137 @@ class Database:
 
     def close(self):
         self.conn.close()
+
+    # ---------- staff points ----------
+
+    def add_staff_point(self, guild_id: int, user_id: int, given_by: int,
+                        reason: str) -> int:
+        """Give one point. Returns its id, which is what removing it takes."""
+        cur = self.conn.execute(
+            "INSERT INTO staff_points (guild_id, user_id, given_by, reason,"
+            " given_at) VALUES (?, ?, ?, ?, ?)",
+            (guild_id, user_id, given_by, reason, int(time.time())),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def staff_points_of(self, guild_id: int, user_id: int) -> list:
+        """Every point one person has here, newest first."""
+        return self.conn.execute(
+            "SELECT * FROM staff_points WHERE guild_id = ? AND user_id = ?"
+            " ORDER BY given_at DESC, id DESC",
+            (guild_id, user_id),
+        ).fetchall()
+
+    def remove_staff_point(self, guild_id: int, point_id: int):
+        """Take one point back. Returns the row it was, or None."""
+        row = self.conn.execute(
+            "SELECT * FROM staff_points WHERE guild_id = ? AND id = ?",
+            (guild_id, point_id),
+        ).fetchone()
+        if row:
+            self.conn.execute("DELETE FROM staff_points WHERE id = ?", (point_id,))
+            self.conn.commit()
+        return row
+
+    def clear_staff_points(self, guild_id: int, user_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM staff_points WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def top_staff_points(self, guild_id: int, limit: int = 25) -> list:
+        return self.conn.execute(
+            "SELECT user_id, COUNT(*) AS points FROM staff_points"
+            " WHERE guild_id = ? GROUP BY user_id"
+            " ORDER BY points DESC, MIN(given_at) LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+
+    # ---------- moderation ----------
+
+    def add_case(self, guild_id: int, user_id: int, mod_id: int, action: str,
+                 reason: str = "", duration: int = 0) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO mod_cases (guild_id, user_id, mod_id, action, reason,"
+            " duration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (guild_id, user_id, mod_id, action, reason, duration,
+             int(time.time())),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def cases_for(self, guild_id: int, user_id: int, action: str = None) -> list:
+        """Every case against one member, newest first."""
+        sql = "SELECT * FROM mod_cases WHERE guild_id = ? AND user_id = ?"
+        args = [guild_id, user_id]
+        if action:
+            sql += " AND action = ?"
+            args.append(action)
+        return self.conn.execute(
+            sql + " ORDER BY id DESC", args).fetchall()
+
+    def cases_by(self, guild_id: int, mod_id: int) -> list:
+        """Every case one moderator has issued, newest first."""
+        return self.conn.execute(
+            "SELECT * FROM mod_cases WHERE guild_id = ? AND mod_id = ?"
+            " ORDER BY id DESC", (guild_id, mod_id)).fetchall()
+
+    def delete_case(self, guild_id: int, case_id: int, action: str):
+        """Remove one case of the given kind. Returns the row, or None."""
+        row = self.conn.execute(
+            "SELECT * FROM mod_cases WHERE guild_id = ? AND id = ? AND action = ?",
+            (guild_id, case_id, action)).fetchone()
+        if row:
+            self.conn.execute("DELETE FROM mod_cases WHERE id = ?", (case_id,))
+            self.conn.commit()
+        return row
+
+    def clear_cases(self, guild_id: int, user_id: int, action: str) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM mod_cases WHERE guild_id = ? AND user_id = ?"
+            " AND action = ?", (guild_id, user_id, action))
+        self.conn.commit()
+        return cur.rowcount
+
+    def get_mod_config(self, guild_id: int, key: str) -> int:
+        row = self.conn.execute(
+            "SELECT value FROM mod_config WHERE guild_id = ? AND key = ?",
+            (guild_id, key)).fetchone()
+        return row["value"] if row else 0
+
+    def set_mod_config(self, guild_id: int, key: str, value: int):
+        self.conn.execute(
+            "INSERT INTO mod_config (guild_id, key, value) VALUES (?, ?, ?)"
+            " ON CONFLICT (guild_id, key) DO UPDATE SET value = excluded.value",
+            (guild_id, key, int(value)))
+        self.conn.commit()
+
+    def jail_record(self, guild_id: int, user_id: int):
+        return self.conn.execute(
+            "SELECT * FROM jailed WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id)).fetchone()
+
+    def save_jail(self, guild_id: int, user_id: int, role_ids: list):
+        self.conn.execute(
+            "INSERT OR REPLACE INTO jailed (guild_id, user_id, role_ids,"
+            " jailed_at) VALUES (?, ?, ?, ?)",
+            (guild_id, user_id, ",".join(str(r) for r in role_ids),
+             int(time.time())))
+        self.conn.commit()
+
+    def release_jail(self, guild_id: int, user_id: int) -> list:
+        """Forget a jailing. Returns the role ids they had before it."""
+        row = self.jail_record(guild_id, user_id)
+        if not row:
+            return []
+        self.conn.execute(
+            "DELETE FROM jailed WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id))
+        self.conn.commit()
+        return [int(r) for r in row["role_ids"].split(",") if r]
 
     # ---------- characters ----------
 

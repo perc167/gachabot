@@ -48,6 +48,49 @@ async def main():
     cd = b.cooldowns
     GUILD, ALICE, BOB = 1, 100, 200
 
+    # Staff points: one row each, removable by number, never by another server.
+    first = db.add_staff_point(GUILD, ALICE, BOB, "reported a raider")
+    db.add_staff_point(GUILD, ALICE, BOB, "")
+    db.add_staff_point(GUILD, BOB, ALICE, "")
+    check("points add up", len(db.staff_points_of(GUILD, ALICE)) == 2)
+    check("most points tops the board",
+          db.top_staff_points(GUILD)[0]["user_id"] == ALICE)
+    check("another server can't remove a point",
+          db.remove_staff_point(GUILD + 1, first) is None)
+    check("a point comes off by its number",
+          db.remove_staff_point(GUILD, first)["user_id"] == ALICE
+          and len(db.staff_points_of(GUILD, ALICE)) == 1)
+    check("clearing points is per person",
+          db.clear_staff_points(GUILD, ALICE) == 1
+          and len(db.staff_points_of(GUILD, BOB)) == 1)
+    db.clear_staff_points(GUILD, BOB)
+
+    # Moderation: durations, cases, and a jailing that remembers roles.
+    from cogs import modtools
+    check("durations parse",
+          modtools.parse_duration("1h30m") == 5400
+          and modtools.parse_duration("5 m") == 300
+          and modtools.parse_duration("rude") == 0
+          and modtools.parse_duration("10mins") == 0)
+    warned = db.add_case(GUILD, ALICE, BOB, "warn", "spam")
+    jailed = db.add_case(GUILD, ALICE, BOB, "jail")
+    check("a history is newest first",
+          [r["id"] for r in db.cases_for(GUILD, ALICE)] == [jailed, warned])
+    check("removing a warning can't remove a jail",
+          db.delete_case(GUILD, jailed, "warn") is None
+          and db.delete_case(GUILD, warned, "warn")["id"] == warned)
+    check("a mod's history is theirs", len(db.cases_by(GUILD, BOB)) == 1
+          and not db.cases_by(GUILD, ALICE))
+    db.save_jail(GUILD, ALICE, [11, 22])
+    check("unjailing hands back the saved roles",
+          db.release_jail(GUILD, ALICE) == [11, 22]
+          and db.jail_record(GUILD, ALICE) is None)
+    check("mod setup survives a full reset",
+          db.set_mod_config(GUILD, "jail_role", 5) is None
+          and db.reset_guild(GUILD) is not None
+          and db.get_mod_config(GUILD, "jail_role") == 5)
+    db.clear_cases(GUILD, ALICE, "jail")
+
     # 2. Seed import path.
     import json
 
@@ -1543,6 +1586,9 @@ async def main():
     # only stays useful while it lists every command.
     every = set()
     for command in b.walk_commands():
+        # Staff commands work in every channel, so they stay off the list.
+        if getattr(command.cog, "staff_cog", False):
+            continue
         every.add(command.name.lower())
         every.update(alias.lower() for alias in command.aliases)
     check("the command list fits Discord's keyword limit",
