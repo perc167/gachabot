@@ -256,6 +256,57 @@ CREATE TABLE IF NOT EXISTS mod_config (
     PRIMARY KEY (guild_id, key)
 );
 
+-- Bans that come back: unbanning one of these by hand is undone at once.
+CREATE TABLE IF NOT EXISTS hardbans (
+    guild_id   INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    mod_id     INTEGER NOT NULL,
+    reason     TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+-- A nickname staff have pinned on someone. Changing it puts it straight back.
+CREATE TABLE IF NOT EXISTS forced_nicks (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    nick     TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+-- Channels "$lockdown all" leaves alone.
+CREATE TABLE IF NOT EXISTS lockdown_ignore (
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, channel_id)
+);
+
+-- Which roles count as staff: they see the jail and the log, and are what
+-- $staffstrip takes away.
+CREATE TABLE IF NOT EXISTS staff_roles (
+    guild_id INTEGER NOT NULL,
+    role_id  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+);
+
+-- What happens automatically when someone reaches so many warnings.
+CREATE TABLE IF NOT EXISTS warn_punishments (
+    guild_id  INTEGER NOT NULL,
+    threshold INTEGER NOT NULL,
+    action    TEXT NOT NULL,
+    duration  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, threshold)
+);
+
+-- A server's own wording for what the bot says, or DMs, after an action.
+CREATE TABLE IF NOT EXISTS invoke_messages (
+    guild_id INTEGER NOT NULL,
+    action   TEXT NOT NULL,
+    kind     TEXT NOT NULL,
+    content  TEXT NOT NULL,
+    PRIMARY KEY (guild_id, action, kind)
+);
+
 -- The roles a jailed member had, so unjailing hands them back. A row here is
 -- also what re-jails someone who leaves and rejoins to escape.
 CREATE TABLE IF NOT EXISTS jailed (
@@ -521,6 +572,122 @@ class Database:
             (guild_id, user_id))
         self.conn.commit()
         return [int(r) for r in row["role_ids"].split(",") if r]
+
+    def jailed_in(self, guild_id: int) -> list:
+        return self.conn.execute(
+            "SELECT * FROM jailed WHERE guild_id = ? ORDER BY jailed_at",
+            (guild_id,)).fetchall()
+
+    def clear_mod_config(self, guild_id: int) -> int:
+        cur = self.conn.execute(
+            "DELETE FROM mod_config WHERE guild_id = ?", (guild_id,))
+        self.conn.commit()
+        return cur.rowcount
+
+    # A handful of small keyed tables share these rather than each getting
+    # four near-identical methods. Table names are fixed strings from this
+    # file, never user input.
+
+    def _upsert(self, table: str, row: dict):
+        columns = ", ".join(row)
+        marks = ", ".join("?" for _ in row)
+        self.conn.execute(
+            f"INSERT OR REPLACE INTO {table} ({columns}) VALUES ({marks})",
+            tuple(row.values()))
+        self.conn.commit()
+
+    def _delete(self, table: str, **where) -> int:
+        clause = " AND ".join(f"{column} = ?" for column in where)
+        cur = self.conn.execute(
+            f"DELETE FROM {table} WHERE {clause}", tuple(where.values()))
+        self.conn.commit()
+        return cur.rowcount
+
+    def _select(self, table: str, order: str = "rowid", **where) -> list:
+        clause = " AND ".join(f"{column} = ?" for column in where)
+        return self.conn.execute(
+            f"SELECT * FROM {table} WHERE {clause} ORDER BY {order}",
+            tuple(where.values())).fetchall()
+
+    def add_hardban(self, guild_id, user_id, mod_id, reason):
+        self._upsert("hardbans", {
+            "guild_id": guild_id, "user_id": user_id, "mod_id": mod_id,
+            "reason": reason, "created_at": int(time.time())})
+
+    def hardban_of(self, guild_id, user_id):
+        rows = self._select("hardbans", guild_id=guild_id, user_id=user_id)
+        return rows[0] if rows else None
+
+    def hardbans_in(self, guild_id):
+        return self._select("hardbans", "created_at", guild_id=guild_id)
+
+    def remove_hardban(self, guild_id, user_id) -> int:
+        return self._delete("hardbans", guild_id=guild_id, user_id=user_id)
+
+    def force_nick(self, guild_id, user_id, nick):
+        self._upsert("forced_nicks",
+                     {"guild_id": guild_id, "user_id": user_id, "nick": nick})
+
+    def forced_nick_of(self, guild_id, user_id):
+        rows = self._select("forced_nicks", guild_id=guild_id, user_id=user_id)
+        return rows[0]["nick"] if rows else None
+
+    def unforce_nick(self, guild_id, user_id) -> int:
+        return self._delete("forced_nicks", guild_id=guild_id, user_id=user_id)
+
+    def ignore_lockdown(self, guild_id, channel_id):
+        self._upsert("lockdown_ignore",
+                     {"guild_id": guild_id, "channel_id": channel_id})
+
+    def unignore_lockdown(self, guild_id, channel_id) -> int:
+        return self._delete("lockdown_ignore", guild_id=guild_id,
+                            channel_id=channel_id)
+
+    def lockdown_ignored(self, guild_id) -> list:
+        return [row["channel_id"] for row in
+                self._select("lockdown_ignore", guild_id=guild_id)]
+
+    def add_staff_role(self, guild_id, role_id):
+        self._upsert("staff_roles", {"guild_id": guild_id, "role_id": role_id})
+
+    def remove_staff_role(self, guild_id, role_id) -> int:
+        return self._delete("staff_roles", guild_id=guild_id, role_id=role_id)
+
+    def staff_roles_of(self, guild_id) -> list:
+        return [row["role_id"] for row in
+                self._select("staff_roles", guild_id=guild_id)]
+
+    def set_warn_punishment(self, guild_id, threshold, action, duration=0):
+        self._upsert("warn_punishments", {
+            "guild_id": guild_id, "threshold": threshold, "action": action,
+            "duration": duration})
+
+    def remove_warn_punishment(self, guild_id, threshold) -> int:
+        return self._delete("warn_punishments", guild_id=guild_id,
+                            threshold=threshold)
+
+    def warn_punishments_of(self, guild_id) -> list:
+        return self._select("warn_punishments", "threshold", guild_id=guild_id)
+
+    def set_invoke(self, guild_id, action, kind, content):
+        self._upsert("invoke_messages", {
+            "guild_id": guild_id, "action": action, "kind": kind,
+            "content": content})
+
+    def invoke_of(self, guild_id, action, kind):
+        rows = self._select("invoke_messages", guild_id=guild_id,
+                            action=action, kind=kind)
+        return rows[0]["content"] if rows else None
+
+    def invokes_in(self, guild_id) -> list:
+        return self._select("invoke_messages", "action, kind",
+                            guild_id=guild_id)
+
+    def reset_invoke(self, guild_id, action, kind=None) -> int:
+        if kind:
+            return self._delete("invoke_messages", guild_id=guild_id,
+                                action=action, kind=kind)
+        return self._delete("invoke_messages", guild_id=guild_id, action=action)
 
     # ---------- characters ----------
 

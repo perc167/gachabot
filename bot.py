@@ -45,6 +45,7 @@ COGS = [
     "cogs.moderation",
     "cogs.staffpoints",
     "cogs.modtools",
+    "cogs.modsettings",
     "cogs.aliases",
     "cogs.tea",
     "cogs.leaderboards",
