@@ -47,6 +47,7 @@ COGS = [
     "cogs.modtools",
     "cogs.modsettings",
     "cogs.voice",
+    "cogs.levels",
     "cogs.aliases",
     "cogs.tea",
     "cogs.leaderboards",

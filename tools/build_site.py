@@ -40,12 +40,14 @@ AREAS = (
     ("gacha", "Gacha"),
     ("mod", "Moderation"),
     ("voice", "Voice"),
+    ("levels", "Levels"),
 )
 AREA_OF = {
     "Jail & mutes": "mod", "Warnings": "mod", "Kicks & bans": "mod",
     "Cleaning up": "mod", "Records & names": "mod", "Mod setup": "mod",
     "Staff points": "mod",
     "Voice rooms": "voice", "Voice hours": "voice",
+    "Levels": "levels", "Level setup": "levels",
 }
 
 # How many characters the browser section carries. The whole roster is a
@@ -406,11 +408,11 @@ footer p{margin:0 0 6px}
 
 <div id="top" class="wrap">
 <header>
-  <p class="eyebrow">Gacha · Moderation · Voice</p>
+  <p class="eyebrow">Gacha · Moderation · Voice · Levels</p>
   <h1>Roll for <em>__TOTAL__</em> characters.<br>Run the server too.</h1>
   <p class="lede">A gacha bot in the shape of Mudae, with its own roster and
-  currency, plus the moderation and voice rooms a server needs, so one bot
-  does the job of three.</p>
+  currency, plus the moderation, voice rooms and levels a server needs, so
+  one bot does the job of four.</p>
   <div class="cta">
     __INVITE__
     <a class="btn ghost" href="#setup">Set it up</a>
@@ -425,7 +427,7 @@ footer p{margin:0 0 6px}
 
 <section id="features">
   <h2>What it does</h2>
-  <p class="sub">Three parts. Use all of them, or only the ones you need.</p>
+  <p class="sub">Four parts. Use all of them, or only the ones you need.</p>
   <div class="features">__FEATURES_HTML__</div>
 </section>
 
@@ -821,13 +823,35 @@ $vc setup 123456789012345678</code>
          <code class="cmdline">$vc hours add 10 @Regular
 $vc lb</code>"""),
     ]
+    level_steps = [
+        ("Nothing to switch on", """
+         <p>Levels start counting the moment the bot is in your server.
+         Chatting earns XP once a minute, and voice earns it too when
+         there's someone to talk to.</p>
+         <code class="cmdline">$rank · $levels</code>"""),
+        ("Reward the milestones", """
+         <p>Hand out roles at levels. Anyone already past a level gets the
+         role with one command.</p>
+         <code class="cmdline">$levels role add 10 @Active
+$levels sync</code>"""),
+        ("Tidy it up", """
+         <p>Choose where level-ups are announced, and keep spam or bot
+         channels from earning XP.</p>
+         <code class="cmdline">$levels channel #level-ups
+$levels ignore #bot-spam</code>
+         <p class="note">Every 5 levels pays a little karuda, 100 by
+         default, and only once per milestone, so it never outpaces
+         <code>$daily</code>. <code>$levels karuda 0</code> turns it
+         off.</p>"""),
+    ]
     steps_by_area = {"gacha": gacha_steps, "mod": mod_steps,
-                     "voice": voice_steps}
+                     "voice": voice_steps, "levels": level_steps}
     labels = dict(AREAS)
     subs = {
         "gacha": "Six steps. The first two matter most, the rest is taste.",
         "mod": "Five steps. After the third, every command works.",
         "voice": "Three steps. The first one is all you need.",
+        "levels": "It works out of the box. These are the extras.",
     }
     tabs_html = "".join(
         f'<button type="button" class="chip" data-tab="{key}"'
@@ -855,6 +879,11 @@ $vc lb</code>"""),
          ["Join To Create, deleted when empty",
           "Lock, hide, rename, permit, ban, transfer",
           "Hour leaderboard and hour roles"]),
+        ("levels", "\U0001f4c8", "Levels",
+         "XP for chatting and for time in voice, with roles at milestones.",
+         ["Rank cards and a leaderboard",
+          "Spam-proof: one message a minute counts",
+          "A little karuda every 5 levels"]),
     ]
     features_html = "\n".join(
         f'<div class="feature"><div class="ic">{icon}</div><h3>{name}</h3>'

@@ -346,6 +346,39 @@ CREATE TABLE IF NOT EXISTS vc_hour_roles (
     PRIMARY KEY (guild_id, hours)
 );
 
+-- Levels. paid_through is the highest level whose karuda has been paid, and
+-- a reset leaves it alone, so grinding the same levels twice pays once.
+CREATE TABLE IF NOT EXISTS levels (
+    guild_id     INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    xp           INTEGER NOT NULL DEFAULT 0,
+    level        INTEGER NOT NULL DEFAULT 0,
+    paid_through INTEGER NOT NULL DEFAULT 0,
+    voice_day    INTEGER NOT NULL DEFAULT 0,
+    voice_today  INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS level_settings (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS level_roles (
+    guild_id INTEGER NOT NULL,
+    level    INTEGER NOT NULL,
+    role_id  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, level)
+);
+
+CREATE TABLE IF NOT EXISTS level_ignored (
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, channel_id)
+);
+
 -- The roles a jailed member had, so unjailing hands them back. A row here is
 -- also what re-jails someone who leaves and rejoins to escape.
 CREATE TABLE IF NOT EXISTS jailed (
@@ -828,6 +861,70 @@ class Database:
 
     def hour_roles_of(self, guild_id: int) -> list:
         return self._select("vc_hour_roles", "hours", guild_id=guild_id)
+
+    # ---------- levels ----------
+
+    def level_row(self, guild_id: int, user_id: int):
+        """One member's levels row, made on first sight."""
+        self.conn.execute(
+            "INSERT OR IGNORE INTO levels (guild_id, user_id) VALUES (?, ?)",
+            (guild_id, user_id))
+        self.conn.commit()
+        return self._select("levels", guild_id=guild_id, user_id=user_id)[0]
+
+    def update_level_row(self, guild_id: int, user_id: int, **fields):
+        self.level_row(guild_id, user_id)
+        sets = ", ".join(f"{column} = ?" for column in fields)
+        self.conn.execute(
+            f"UPDATE levels SET {sets} WHERE guild_id = ? AND user_id = ?",
+            (*fields.values(), guild_id, user_id))
+        self.conn.commit()
+
+    def top_levels(self, guild_id: int, limit: int = 100) -> list:
+        return self.conn.execute(
+            "SELECT * FROM levels WHERE guild_id = ? AND xp > 0"
+            " ORDER BY xp DESC LIMIT ?", (guild_id, limit)).fetchall()
+
+    def level_rank(self, guild_id: int, user_id: int) -> int:
+        """1 for the most XP on the server. 0 for no XP at all."""
+        row = self.conn.execute(
+            "SELECT xp FROM levels WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id)).fetchone()
+        if not row or row["xp"] <= 0:
+            return 0
+        return self.conn.execute(
+            "SELECT COUNT(*) + 1 AS r FROM levels WHERE guild_id = ? AND xp > ?",
+            (guild_id, row["xp"])).fetchone()["r"]
+
+    def get_level_setting(self, guild_id: int, key: str, default: int) -> int:
+        rows = self._select("level_settings", guild_id=guild_id, key=key)
+        return rows[0]["value"] if rows else default
+
+    def set_level_setting(self, guild_id: int, key: str, value: int):
+        self._upsert("level_settings",
+                     {"guild_id": guild_id, "key": key, "value": int(value)})
+
+    def set_level_role(self, guild_id: int, level: int, role_id: int):
+        self._upsert("level_roles",
+                     {"guild_id": guild_id, "level": level, "role_id": role_id})
+
+    def remove_level_role(self, guild_id: int, level: int) -> int:
+        return self._delete("level_roles", guild_id=guild_id, level=level)
+
+    def level_roles_of(self, guild_id: int) -> list:
+        return self._select("level_roles", "level", guild_id=guild_id)
+
+    def ignore_level_channel(self, guild_id: int, channel_id: int):
+        self._upsert("level_ignored",
+                     {"guild_id": guild_id, "channel_id": channel_id})
+
+    def unignore_level_channel(self, guild_id: int, channel_id: int) -> int:
+        return self._delete("level_ignored", guild_id=guild_id,
+                            channel_id=channel_id)
+
+    def level_ignored_in(self, guild_id: int) -> list:
+        return [row["channel_id"] for row in
+                self._select("level_ignored", guild_id=guild_id)]
 
     # ---------- characters ----------
 

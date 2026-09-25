@@ -104,6 +104,15 @@ async def main():
     db.drop_vc_session(GUILD, BOB)
     check("a dropped session banks nothing", db.vc_seconds(GUILD, BOB) == 0)
 
+    # Levels: the curve, and a reset that keeps what was already paid.
+    from cogs import levels as levelsmod
+    check("level curve", levelsmod.level_for(levelsmod.total_for(10))[0] == 10
+          and levelsmod.level_for(levelsmod.total_for(10) - 1)[0] == 9)
+    db.update_level_row(GUILD, ALICE, xp=5000, level=10, paid_through=10)
+    db.update_level_row(GUILD, ALICE, xp=0, level=0)
+    check("a level reset keeps what was paid",
+          db.level_row(GUILD, ALICE)["paid_through"] == 10)
+
     # 2. Seed import path.
     import json
 
