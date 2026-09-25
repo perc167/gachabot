@@ -366,6 +366,14 @@ CREATE TABLE IF NOT EXISTS level_settings (
     PRIMARY KEY (guild_id, key)
 );
 
+-- Level settings that are words rather than numbers: the level-up message.
+CREATE TABLE IF NOT EXISTS level_texts (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    TEXT NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+
 CREATE TABLE IF NOT EXISTS level_roles (
     guild_id INTEGER NOT NULL,
     level    INTEGER NOT NULL,
@@ -903,6 +911,36 @@ class Database:
     def set_level_setting(self, guild_id: int, key: str, value: int):
         self._upsert("level_settings",
                      {"guild_id": guild_id, "key": key, "value": int(value)})
+
+    def get_level_text(self, guild_id: int, key: str, default: str) -> str:
+        rows = self._select("level_texts", guild_id=guild_id, key=key)
+        return rows[0]["value"] if rows else default
+
+    def set_level_text(self, guild_id: int, key: str, value):
+        """Save a text setting. None goes back to the default."""
+        if value is None:
+            self._delete("level_texts", guild_id=guild_id, key=key)
+        else:
+            self._upsert("level_texts",
+                         {"guild_id": guild_id, "key": key, "value": value})
+
+    def replace_level_roles(self, guild_id: int, pairs):
+        """Swap the whole level-role list at once, as the dashboard saves it."""
+        with self.conn:
+            self.conn.execute("DELETE FROM level_roles WHERE guild_id = ?",
+                              (guild_id,))
+            self.conn.executemany(
+                "INSERT INTO level_roles (guild_id, level, role_id)"
+                " VALUES (?, ?, ?)",
+                [(guild_id, level, role_id) for level, role_id in pairs])
+
+    def replace_level_ignored(self, guild_id: int, channel_ids):
+        with self.conn:
+            self.conn.execute("DELETE FROM level_ignored WHERE guild_id = ?",
+                              (guild_id,))
+            self.conn.executemany(
+                "INSERT INTO level_ignored (guild_id, channel_id) VALUES (?, ?)",
+                [(guild_id, channel_id) for channel_id in channel_ids])
 
     def set_level_role(self, guild_id: int, level: int, role_id: int):
         self._upsert("level_roles",

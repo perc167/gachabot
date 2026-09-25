@@ -350,6 +350,13 @@ CATEGORIES = [
         ("levels ignore remove", "count it again"),
         ("levels set", "set someone's level"),
         ("levels import", "bring levels over"),
+        ("levels xp", "XP per message"),
+        ("levels cooldown", "time between counted"),
+        ("levels voicexp", "voice XP a minute"),
+        ("levels voicecap", "voice XP a day"),
+        ("levels stack", "keep lower roles"),
+        ("levels message", "level-up wording"),
+        ("dashboard", "settings on the web"),
         ("levels reset", "back to level 0"),
     ]),
     ("\U0001f50a", "Voice rooms", [

@@ -1,11 +1,17 @@
 """Levels: XP for chatting and for time in voice.
 
-Chatting pays 15-25 XP, at most once a minute, so a wall of spam earns the
-same as one message. Commands don't count; nobody should level up by rolling.
+By default chatting pays 15-25 XP, at most once a minute, so a wall of spam
+earns the same as one message. Commands don't count; nobody should level up
+by rolling.
 
-Voice pays 10 XP a minute, but only with someone else in the channel, not
-deafened, and not in the AFK channel, and at most VOICE_DAILY_CAP a day, so
-sitting in a call all day can't outrun the people talking.
+Voice pays 10 XP a minute by default, but only with someone else in the
+channel, not deafened, and not in the AFK channel, and only up to a daily
+cap, so sitting in a call all day can't outrun the people talking.
+
+Every one of those numbers is a server setting, within the limits in
+SETTINGS. The $levels commands and the web dashboard (cogs/dashboard.py) both
+save through save_settings(), so neither can store something the other
+would reject.
 
 Each level needs a bit more than the last, on MEE6's curve: level 5 is about
 an hour of steady chat, level 50 is months.
@@ -26,14 +32,47 @@ import config
 import utils
 from views import Confirm, Paginator
 
-MESSAGE_XP = (15, 25)
-MESSAGE_COOLDOWN = 60
-VOICE_XP = 10               # per minute
-VOICE_DAILY_CAP = 600       # an hour's worth
 KARUDA_EVERY = 5            # levels between karuda payouts
-DEFAULT_KARUDA = 100
-MAX_KARUDA = 250
 MAX_LEVEL = 500
+
+# key: (default, lowest, highest, what it is)
+SETTINGS = {
+    "msg_min": (15, 0, 100, "Least XP a message gives"),
+    "msg_max": (25, 0, 100, "Most XP a message gives"),
+    "cooldown": (60, 0, 3600, "Seconds before someone's next message counts"),
+    "voice": (1, 0, 1, "XP for time in voice"),
+    "voice_xp": (10, 0, 100, "Voice XP per minute"),
+    "voice_cap": (600, 0, 10_000, "Most voice XP a day"),
+    # Kept small on purpose: a daily pays more than a milestone does.
+    "karuda": (100, 0, 250, f"Karuda every {KARUDA_EVERY} levels"),
+    "stack": (1, 0, 1, "Keep lower level roles"),
+    # A channel id, 0 for wherever they levelled up, -1 for nowhere.
+    "channel": (0, -1, 2 ** 63 - 1, "Where level-ups are announced"),
+}
+DEFAULT_MESSAGE = "\U0001f389 {user} reached **level {level}**!"
+MESSAGE_VARIABLES = ("{user}", "{user.name}", "{level}", "{server}")
+MESSAGE_LIMIT = 500
+
+
+def validate(key: str, value) -> str:
+    """Why this value can't be saved for this setting, or ''."""
+    if key not in SETTINGS:
+        return f"There's no level setting called `{key}`."
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return f"{SETTINGS[key][3]} has to be a whole number."
+    _default, low, high, label = SETTINGS[key]
+    if not low <= value <= high:
+        return f"{label} has to be from {low:,} to {high:,}."
+    return ""
+
+
+def render_message(template: str, member, level: int) -> str:
+    return (template.replace("{user.name}", member.display_name)
+            .replace("{user}", member.mention)
+            .replace("{level}", str(level))
+            .replace("{server}", member.guild.name))[:1800]
 
 
 def xp_to_next(level: int) -> int:
@@ -145,8 +184,28 @@ class Levels(commands.Cog):
     def colour(self, guild_id: int) -> int:
         return self.db.get_pref(guild_id, "cardcolour", config.CARD_COLOUR)
 
-    def setting(self, guild_id: int, key: str, default: int) -> int:
-        return self.db.get_level_setting(guild_id, key, default)
+    def setting(self, guild_id: int, key: str) -> int:
+        return self.db.get_level_setting(guild_id, key, SETTINGS[key][0])
+
+    def settings_of(self, guild_id: int) -> dict:
+        return {key: self.setting(guild_id, key) for key in SETTINGS}
+
+    def message_of(self, guild_id: int) -> str:
+        return self.db.get_level_text(guild_id, "message", DEFAULT_MESSAGE)
+
+    def save_settings(self, guild_id: int, changes: dict) -> list:
+        """Check every change, then save them all or none. Returns problems."""
+        problems = [p for key, value in changes.items()
+                    if (p := validate(key, value))]
+        if not problems:
+            merged = {**self.settings_of(guild_id), **changes}
+            if int(merged["msg_min"]) > int(merged["msg_max"]):
+                problems.append("The least XP a message gives can't be more"
+                                " than the most.")
+        if not problems:
+            for key, value in changes.items():
+                self.db.set_level_setting(guild_id, key, int(value))
+        return problems
 
     # ------------------------------------------------------------ earning
 
@@ -167,7 +226,7 @@ class Levels(commands.Cog):
         await self.sync_roles(member, new)
 
         # Karuda for each milestone crossed that has never been paid before.
-        reward = self.setting(guild.id, "karuda", DEFAULT_KARUDA)
+        reward = self.setting(guild.id, "karuda")
         milestones = [n for n in range(max(old, paid_through) + 1, new + 1)
                       if n % KARUDA_EVERY == 0]
         paid = reward * len(milestones) if reward else 0
@@ -177,13 +236,13 @@ class Levels(commands.Cog):
             self.db.update_level_row(guild.id, member.id,
                                      paid_through=max(milestones[-1], paid_through))
 
-        where = self.setting(guild.id, "channel", 0)
+        where = self.setting(guild.id, "channel")
         if where == -1:          # announcements off
             return
         target = guild.get_channel(where) if where else channel
         if not target:
             return
-        text = f"\U0001f389 {member.mention} reached **level {new}**!"
+        text = render_message(self.message_of(guild.id), member, new)
         if paid:
             text += f" +{paid:,} {config.CURRENCY}"
         try:
@@ -193,18 +252,29 @@ class Levels(commands.Cog):
             pass
 
     async def sync_roles(self, member, level: int):
-        """Give every level role at or below their level that they lack."""
-        due = [member.guild.get_role(row["role_id"])
-               for row in self.db.level_roles_of(member.guild.id)
-               if row["level"] <= level]
-        top = member.guild.me.top_role
-        missing = [r for r in due if r and r not in member.roles
-                   and r < top and not r.managed]
-        if missing:
-            try:
+        """Give the level roles they've earned. With stacking off, only the
+        highest one they've reached is kept."""
+        guild = member.guild
+        top = guild.me.top_role
+        usable = {row["level"]: guild.get_role(row["role_id"])
+                  for row in self.db.level_roles_of(guild.id)}
+        usable = {n: r for n, r in usable.items()
+                  if r and r < top and not r.managed}
+        earned = [r for n, r in sorted(usable.items()) if n <= level]
+        extra = []
+        if earned and not self.setting(guild.id, "stack"):
+            keep = earned[-1]
+            extra = [r for r in usable.values() if r != keep and r in member.roles]
+            earned = [keep]
+        missing = [r for r in earned if r not in member.roles]
+        try:
+            if missing:
                 await member.add_roles(*missing, reason=f"Reached level {level}")
-            except discord.HTTPException:
-                pass
+            if extra:
+                await member.remove_roles(
+                    *extra, reason="Only the highest level role is kept")
+        except discord.HTTPException:
+            pass
 
     @commands.Cog.listener()
     async def on_message(self, message):
@@ -215,20 +285,24 @@ class Levels(commands.Cog):
             return
         key = (guild.id, message.author.id)
         now = time.time()
-        if now - self.last_counted.get(key, 0) < MESSAGE_COOLDOWN:
+        if now - self.last_counted.get(key, 0) < self.setting(guild.id, "cooldown"):
             return
         ctx = await self.bot.get_context(message)
         if ctx.valid:
             return
         self.last_counted[key] = now
-        await self.give_xp(message.author, random.randint(*MESSAGE_XP),
-                           message.channel)
+        low = self.setting(guild.id, "msg_min")
+        high = self.setting(guild.id, "msg_max")
+        amount = random.randint(min(low, high), max(low, high))
+        if amount:
+            await self.give_xp(message.author, amount, message.channel)
 
     @tasks.loop(minutes=1)
     async def voice_xp(self):
         day = today()
         for guild in self.bot.guilds:
-            if not self.setting(guild.id, "voice", 1):
+            if not (self.setting(guild.id, "voice")
+                    and self.setting(guild.id, "voice_xp")):
                 continue
             for channel in guild.voice_channels:
                 if channel == guild.afk_channel:
@@ -246,7 +320,8 @@ class Levels(commands.Cog):
     async def give_voice_xp(self, member, day: int):
         row = self.db.level_row(member.guild.id, member.id)
         spent = row["voice_today"] if row["voice_day"] == day else 0
-        amount = min(VOICE_XP, VOICE_DAILY_CAP - spent)
+        amount = min(self.setting(member.guild.id, "voice_xp"),
+                     self.setting(member.guild.id, "voice_cap") - spent)
         if amount <= 0:
             return
         self.db.update_level_row(member.guild.id, member.id, voice_day=day,
@@ -312,25 +387,36 @@ class Levels(commands.Cog):
     async def levels_settings(self, ctx):
         """How levelling is set up here."""
         gid = ctx.guild.id
-        where = self.setting(gid, "channel", 0)
-        karuda = self.setting(gid, "karuda", DEFAULT_KARUDA)
+        c = self.settings_of(gid)
+        where = c["channel"]
         ignored = self.db.level_ignored_in(gid)
         roles = self.db.level_roles_of(gid)
         lines = [
-            "**Level-up messages:** "
-            + ("off" if where == -1 else f"<#{where}>" if where
+            f"**Messages:** {c['msg_min']}-{c['msg_max']} XP, one every"
+            f" {c['cooldown']}s",
+            "**Voice:** " + (f"{c['voice_xp']} XP a minute, up to"
+                             f" {c['voice_cap']:,} a day" if c["voice"] else "off"),
+            f"**Karuda:** {c['karuda']:,} every {KARUDA_EVERY} levels"
+            if c["karuda"] else "**Karuda:** off",
+            "**Level-ups announced:** "
+            + ("nowhere" if where == -1 else f"<#{where}>" if where
                else "where they levelled up"),
-            f"**Karuda:** {karuda:,} every {KARUDA_EVERY} levels" if karuda
-            else "**Karuda:** off",
-            "**Voice XP:** " + ("on" if self.setting(gid, "voice", 1) else "off")
-            + f" ({VOICE_XP} a minute, up to {VOICE_DAILY_CAP} a day)",
-            "**No XP in:** " + (" ".join(f"<#{c}>" for c in ignored) or "nowhere"),
-            "**Roles:** " + (", ".join(f"{r['level']} → <@&{r['role_id']}>"
-                                       for r in roles) or "none"),
+            f"**Message:** {self.message_of(gid)[:200]}",
+            "**No XP in:** " + (" ".join(f"<#{cid}>" for cid in ignored)
+                                or "nowhere"),
+            "**Roles** (" + ("all kept" if c["stack"] else "highest only") + "): "
+            + (", ".join(f"{r['level']} → <@&{r['role_id']}>" for r in roles)
+               or "none"),
         ]
-        await ctx.send(embed=discord.Embed(
-            title="Level settings", description="\n".join(lines),
-            colour=self.colour(gid)))
+        embed = discord.Embed(title="Level settings", description="\n".join(lines),
+                              colour=self.colour(gid))
+        embed.set_footer(text=f"Change them here, or on the web with {ctx.prefix}dashboard")
+        await ctx.send(embed=embed)
+
+    async def save_one(self, ctx, changes: dict, done: str):
+        """Save through save_settings() and say what happened."""
+        problems = self.save_settings(ctx.guild.id, changes)
+        await ctx.send("\n".join(problems) if problems else done)
 
     @levels.group(name="role", aliases=["roles"], invoke_without_command=True)
     async def levels_role(self, ctx):
@@ -372,15 +458,14 @@ class Levels(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     @commands.bot_has_permissions(manage_roles=True)
     async def levels_sync(self, ctx):
-        """Give everyone the level roles they've already earned."""
-        given = 0
+        """Bring everyone's level roles up to date."""
+        checked = 0
         for row in self.db.top_levels(ctx.guild.id, limit=100_000):
             member = ctx.guild.get_member(row["user_id"])
             if member:
-                before = len(member.roles)
                 await self.sync_roles(member, level_for(row["xp"])[0])
-                given += len(member.roles) - before
-        await ctx.send(f"Handed out **{given}** level roles.")
+                checked += 1
+        await ctx.send(f"Level roles are up to date for **{checked}** members.")
 
     @levels.command(name="channel")
     @commands.has_permissions(manage_guild=True)
@@ -398,21 +483,33 @@ class Levels(commands.Cog):
                 await ctx.send("Name a channel, or say `here` or `off`.")
                 return
             value, said = channel.id, channel.mention
-        self.db.set_level_setting(ctx.guild.id, "channel", value)
-        await ctx.send(f"Level-ups will be announced {said}.")
+        await self.save_one(ctx, {"channel": value},
+                            f"Level-ups will be announced {said}.")
 
     @levels.command(name="karuda", aliases=["reward"])
     @commands.has_permissions(manage_guild=True)
     async def levels_karuda(self, ctx, amount: int):
-        """Karuda paid every 5 levels. 0 turns it off."""
-        if not 0 <= amount <= MAX_KARUDA:
-            await ctx.send(f"Pick from 0 (off) to {MAX_KARUDA}. It's kept small"
-                           f" on purpose, so levels don't outpace {ctx.prefix}daily.")
-            return
-        self.db.set_level_setting(ctx.guild.id, "karuda", amount)
-        await ctx.send(f"Every {KARUDA_EVERY} levels pays **{amount:,}**"
-                       f" {config.CURRENCY}." if amount
-                       else "Levels no longer pay karuda.")
+        """Karuda paid every 5 levels, up to 250. 0 turns it off."""
+        await self.save_one(
+            ctx, {"karuda": amount},
+            f"Every {KARUDA_EVERY} levels pays **{amount:,}** {config.CURRENCY}."
+            if amount else "Levels no longer pay karuda.")
+
+    @levels.command(name="xp")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_xp(self, ctx, least: int, most: int = None):
+        """XP a message gives: a range, e.g. `15 25`, or one number."""
+        most = least if most is None else most
+        await self.save_one(ctx, {"msg_min": least, "msg_max": most},
+                            f"Messages give **{least}-{most}** XP."
+                            if least != most else f"Messages give **{least}** XP.")
+
+    @levels.command(name="cooldown")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_cooldown(self, ctx, seconds: int):
+        """Seconds before someone's next message earns XP again."""
+        await self.save_one(ctx, {"cooldown": seconds},
+                            f"One message every **{seconds}s** earns XP.")
 
     @levels.command(name="voice")
     @commands.has_permissions(manage_guild=True)
@@ -422,8 +519,59 @@ class Levels(commands.Cog):
         if state not in ("on", "off"):
             await ctx.send("Say `on` or `off`.")
             return
-        self.db.set_level_setting(ctx.guild.id, "voice", 1 if state == "on" else 0)
-        await ctx.send(f"Voice XP is **{state}**.")
+        await self.save_one(ctx, {"voice": 1 if state == "on" else 0},
+                            f"Voice XP is **{state}**.")
+
+    @levels.command(name="voicexp")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_voicexp(self, ctx, per_minute: int):
+        """Voice XP per minute."""
+        await self.save_one(ctx, {"voice_xp": per_minute},
+                            f"Voice gives **{per_minute}** XP a minute.")
+
+    @levels.command(name="voicecap")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_voicecap(self, ctx, per_day: int):
+        """The most voice XP anyone can earn in a day."""
+        await self.save_one(ctx, {"voice_cap": per_day},
+                            f"Voice XP stops at **{per_day:,}** a day.")
+
+    @levels.command(name="stack")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_stack(self, ctx, state: str):
+        """`on` keeps every level role earned; `off` keeps only the highest."""
+        state = state.lower()
+        if state not in ("on", "off"):
+            await ctx.send("Say `on` or `off`.")
+            return
+        await self.save_one(
+            ctx, {"stack": 1 if state == "on" else 0},
+            "People keep every level role they earn." if state == "on" else
+            "People keep only their highest level role. Run"
+            f" `{ctx.prefix}levels sync` to tidy up existing ones.")
+
+    @levels.command(name="message")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_message(self, ctx, *, text: str = None):
+        """The level-up message. Use {user}, {user.name}, {level} and
+        {server}. `reset` goes back to the default."""
+        gid = ctx.guild.id
+        if not text:
+            await ctx.send(f"Now: {self.message_of(gid)}\nVariables: "
+                           + " ".join(f"`{v}`" for v in MESSAGE_VARIABLES),
+                           allowed_mentions=discord.AllowedMentions.none())
+            return
+        if text.lower() == "reset":
+            self.db.set_level_text(gid, "message", None)
+            await ctx.send("The level-up message is back to the default.")
+            return
+        if len(text) > MESSAGE_LIMIT:
+            await ctx.send(f"Keep it under {MESSAGE_LIMIT} characters.")
+            return
+        self.db.set_level_text(gid, "message", text)
+        await ctx.send("Saved. It'll look like this:\n"
+                       + render_message(text, ctx.author, 10),
+                       allowed_mentions=discord.AllowedMentions.none())
 
     @levels.group(name="ignore", invoke_without_command=True)
     @commands.has_permissions(manage_guild=True)

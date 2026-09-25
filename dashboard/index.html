@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
+<title>Levels dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{
+  --ink:#0D0B14; --panel:#171324; --raise:#1F1A30; --line:#2C2444;
+  --text:#ECE8F7; --dim:#948CAE; --faint:#6B6484;
+  --accent:#7C6BF0; --accent-soft:#9C8FF5; --gold:#E5C55A; --rose:#EE7FA8;
+  --ok:#43B581; --bad:#E0525F;
+  --display:"Sora","Segoe UI",system-ui,sans-serif;
+  --body:"Zen Kaku Gothic New","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--ink);color:var(--text);font-family:var(--body);
+  font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-bottom:96px}
+.wrap{max-width:860px;margin:0 auto;padding-inline:16px}
+header{display:flex;align-items:center;gap:14px;padding:28px 0 22px;
+  border-bottom:1px solid var(--line);margin-bottom:24px}
+header img,header .noicon{width:52px;height:52px;border-radius:14px;flex:none;
+  background:var(--raise);display:grid;place-items:center;font-family:var(--display);
+  font-weight:700;font-size:20px;object-fit:cover}
+h1{font-family:var(--display);font-weight:700;font-size:22px;margin:0;letter-spacing:-.02em}
+header p{margin:2px 0 0;color:var(--dim);font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px 22px;margin-bottom:16px}
+.card h2{font-family:var(--display);font-weight:600;font-size:17px;margin:0 0 4px}
+.card>p.sub{color:var(--dim);margin:0 0 16px;font-size:14px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+label.f{display:block;font-size:13px;color:var(--dim);margin-bottom:6px}
+input[type=number],input[type=text],select,textarea{
+  width:100%;background:var(--ink);color:var(--text);border:1px solid var(--line);
+  border-radius:9px;padding:9px 11px;font:inherit;font-size:14.5px}
+textarea{min-height:74px;resize:vertical;font-family:var(--mono);font-size:13.5px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.hint{font-size:13px;color:var(--faint);margin:8px 0 0}
+.switch{display:flex;align-items:center;gap:10px;cursor:pointer;margin:2px 0 14px;
+  font-size:14.5px;user-select:none}
+.switch input{width:18px;height:18px;accent-color:var(--accent)}
+.lr{display:grid;grid-template-columns:110px 1fr 38px;gap:8px;align-items:center;
+  margin-bottom:8px}
+.lr .x{background:transparent;border:1px solid var(--line);color:var(--dim);
+  border-radius:9px;height:38px;cursor:pointer;font-size:16px}
+.lr .x:hover{border-color:var(--bad);color:var(--bad)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+.btn{font-family:var(--display);font-weight:600;font-size:14px;padding:9px 16px;
+  border-radius:9px;border:1px solid transparent;background:var(--accent);
+  color:#0C0A14;cursor:pointer}
+.btn:hover{background:var(--accent-soft)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn.ghost:hover{border-color:var(--accent);background:var(--raise)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-family:var(--mono);font-size:12px;background:var(--raise);
+  border:1px solid var(--line);color:var(--gold);border-radius:999px;
+  padding:3px 10px;cursor:pointer}
+.preview{margin-top:12px;background:var(--ink);border:1px solid var(--line);
+  border-radius:10px;padding:10px 13px;font-size:14.5px;overflow-wrap:anywhere}
+.preview b{font-weight:700}
+.mention{background:rgba(124,107,240,.25);color:#C9C1FF;border-radius:4px;padding:0 3px}
+.chans{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;
+  padding:6px 10px;margin-top:10px}
+.chans .cat{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint);margin:10px 0 4px}
+.chans label{display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer}
+.chans input{accent-color:var(--accent)}
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(13,11,20,.94);
+  backdrop-filter:blur(10px);border-top:1px solid var(--line);z-index:10}
+.bar .wrap{display:flex;align-items:center;gap:12px;padding-block:14px;flex-wrap:wrap}
+.bar .msg{margin-right:auto;font-size:14px;color:var(--dim)}
+.bar .msg.dirty{color:var(--gold)}
+.bar .msg.ok{color:var(--ok)}
+.errors{background:rgba(224,82,95,.1);border:1px solid var(--bad);border-radius:10px;
+  padding:10px 14px;margin-bottom:16px;color:#F3A5AC;font-size:14px}
+.errors ul{margin:4px 0 0;padding-left:18px}
+.center{text-align:center;padding:80px 16px;color:var(--dim)}
+.center h1{margin-bottom:8px;color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="center" id="loading"><h1>Loading…</h1></div>
+<div class="center" id="denied" hidden><h1>This link doesn't work</h1>
+  <p id="denied-why"></p></div>
+
+<main class="wrap" id="app" hidden>
+  <header>
+    <img id="icon" alt="" hidden><div class="noicon" id="noicon"></div>
+    <div><h1 id="gname"></h1><p>Levels dashboard · changes save for the whole server</p></div>
+  </header>
+
+  <div class="errors" id="errors" hidden><b>Nothing was saved:</b><ul></ul></div>
+
+  <section class="card">
+    <h2>XP from messages</h2>
+    <p class="sub">Each counted message gives a random amount in this range.
+      Messages sent during the cooldown earn nothing, so spam doesn't pay.</p>
+    <div class="row">
+      <div><label class="f" for="msg_min">Least XP</label><input id="msg_min" type="number"></div>
+      <div><label class="f" for="msg_max">Most XP</label><input id="msg_max" type="number"></div>
+      <div><label class="f" for="cooldown">Cooldown (seconds)</label><input id="cooldown" type="number"></div>
+    </div>
+    <p class="hint" id="pace"></p>
+  </section>
+
+  <section class="card">
+    <h2>XP from voice</h2>
+    <p class="sub">Counted every minute, only with someone else in the channel,
+      not deafened, and not in the AFK channel.</p>
+    <label class="switch"><input id="voice" type="checkbox"> Give XP for time in voice</label>
+    <div class="row" id="voice-fields">
+      <div><label class="f" for="voice_xp">XP per minute</label><input id="voice_xp" type="number"></div>
+      <div><label class="f" for="voice_cap">Most voice XP a day</label><input id="voice_cap" type="number"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Level roles</h2>
+    <p class="sub">Roles people get when they reach a level. Only roles below the
+      bot's own role can be given.</p>
+    <div id="lr-list"></div>
+    <div class="actions">
+      <button class="btn ghost" id="lr-add" type="button">+ Add a level role</button>
+      <button class="btn ghost" id="sync" type="button">Give everyone their roles now</button>
+    </div>
+    <label class="switch" style="margin-top:16px"><input id="stack" type="checkbox">
+      Keep lower level roles when someone reaches a higher one</label>
+  </section>
+
+  <section class="card">
+    <h2>Level-up messages</h2>
+    <p class="sub">Where the bot announces a level-up, and what it says.</p>
+    <label class="f" for="channel">Announce in</label>
+    <select id="channel"></select>
+    <label class="f" for="message" style="margin-top:14px">Message</label>
+    <textarea id="message"></textarea>
+    <div class="chips" id="vars"></div>
+    <div class="preview" id="preview"></div>
+  </section>
+
+  <section class="card">
+    <h2>Karuda reward</h2>
+    <p class="sub" id="karuda-sub"></p>
+    <div class="row"><div><label class="f" for="karuda">Karuda per milestone</label>
+      <input id="karuda" type="number"></div></div>
+  </section>
+
+  <section class="card">
+    <h2>No-XP channels</h2>
+    <p class="sub">Messages in these channels earn nothing. Good for spam and bot channels.</p>
+    <input id="chan-filter" type="text" placeholder="Filter channels…" aria-label="Filter channels">
+    <div class="chans" id="chans"></div>
+  </section>
+</main>
+
+<div class="bar" id="bar" hidden><div class="wrap">
+  <span class="msg" id="status">All changes saved.</span>
+  <button class="btn ghost" id="discard" type="button" disabled>Discard</button>
+  <button class="btn" id="save" type="button" disabled>Save changes</button>
+</div></div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var NUMBERS = ["msg_min","msg_max","cooldown","voice_xp","voice_cap","karuda"];
+  var token = "", state = null;
+
+  // The token arrives after #. Keep it for reloads in this tab only, and take
+  // it out of the address bar so it isn't left on screen or in history.
+  try {
+    token = location.hash.replace(/^#/, "") || sessionStorage.getItem("yuri-dash") || "";
+    if (location.hash) {
+      sessionStorage.setItem("yuri-dash", token);
+      history.replaceState(null, "", location.pathname);
+    }
+  } catch (e) { token = location.hash.replace(/^#/, ""); }
+
+  function api(method, path, body){
+    return fetch(path, {
+      method: method,
+      headers: {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function(r){
+      return r.json().catch(function(){ return {}; }).then(function(data){
+        return {ok: r.ok, status: r.status, data: data};
+      });
+    });
+  }
+
+  function deny(why){
+    $("loading").hidden = true; $("app").hidden = true; $("bar").hidden = true;
+    $("denied").hidden = false; $("denied-why").textContent = why;
+  }
+
+  function option(value, text){
+    var o = document.createElement("option"); o.value = value; o.textContent = text; return o;
+  }
+
+  // ---- level roles
+  function roleSelect(chosen){
+    var s = document.createElement("select");
+    s.appendChild(option("", "Pick a role…"));
+    state.roles.forEach(function(r){
+      var o = option(r.id, r.name + (r.usable ? "" : "  (above the bot, can't give)"));
+      o.disabled = !r.usable && r.id !== chosen;
+      s.appendChild(o);
+    });
+    s.value = chosen || "";
+    return s;
+  }
+  function addRow(level, role){
+    var row = document.createElement("div"); row.className = "lr";
+    var n = document.createElement("input"); n.type = "number";
+    n.min = 1; n.max = state.max_level; n.value = level || ""; n.placeholder = "Level";
+    n.setAttribute("aria-label", "Level");
+    var s = roleSelect(role); s.setAttribute("aria-label", "Role");
+    var x = document.createElement("button"); x.type = "button"; x.className = "x";
+    x.textContent = "×"; x.setAttribute("aria-label", "Remove this level role");
+    x.addEventListener("click", function(){ row.remove(); changed(); });
+    [n, s].forEach(function(el){ el.addEventListener("input", changed); });
+    row.append(n, s, x);
+    $("lr-list").appendChild(row);
+  }
+
+  // ---- channels
+  function fillChannels(){
+    var sel = $("channel"); sel.textContent = "";
+    sel.appendChild(option("0", "Wherever they levelled up"));
+    sel.appendChild(option("-1", "Nowhere (level up quietly)"));
+    var box = $("chans"); box.textContent = "";
+    var lastCat = null;
+    state.channels.forEach(function(c){
+      sel.appendChild(option(c.id, "#" + c.name + (c.category ? "  ·  " + c.category : "")));
+      if (c.category !== lastCat) {
+        var h = document.createElement("div"); h.className = "cat";
+        h.textContent = c.category || "No category"; box.appendChild(h); lastCat = c.category;
+      }
+      var l = document.createElement("label");
+      var cb = document.createElement("input"); cb.type = "checkbox"; cb.value = c.id;
+      cb.addEventListener("change", changed);
+      var t = document.createElement("span"); t.textContent = "#" + c.name;
+      l.append(cb, t); l.dataset.name = c.name.toLowerCase(); box.appendChild(l);
+    });
+  }
+
+  // ---- preview and hints
+  function preview(){
+    var text = $("message").value || state.default_message;
+    var box = $("preview"); box.textContent = "";
+    // Shown as Discord would: {user} as a mention, **bold** as bold.
+    var parts = text.replace(/\{user\.name\}/g, "Yuri fan")
+                    .replace(/\{level\}/g, "10")
+                    .replace(/\{server\}/g, state.guild.name)
+                    .split(/(\{user\}|\*\*[^*]+\*\*)/);
+    parts.forEach(function(p){
+      if (p === "{user}") { var m = document.createElement("span"); m.className = "mention"; m.textContent = "@Yuri fan"; box.appendChild(m); }
+      else if (/^\*\*[^*]+\*\*$/.test(p)) { var b = document.createElement("b"); b.textContent = p.slice(2, -2); box.appendChild(b); }
+      else box.appendChild(document.createTextNode(p));
+    });
+    var k = +$("karuda").value;
+    if (k > 0) box.appendChild(document.createTextNode(" +" + k + " karuda (on milestone levels)"));
+  }
+  function pace(){
+    var lo = +$("msg_min").value, hi = +$("msg_max").value, cd = +$("cooldown").value;
+    var avg = (lo + hi) / 2;
+    if (!avg) { $("pace").textContent = "Messages give no XP at these settings."; return; }
+    var need = function(level){ return Math.ceil(state.curve[level] / avg); };
+    $("pace").textContent = "At these settings, level 5 takes about " + need(5) +
+      " counted messages, level 10 about " + need(10) + ", and level 30 about " +
+      need(30) + (cd ? " (at most one every " + cd + "s)." : ".");
+  }
+  function voiceFields(){ $("voice-fields").hidden = !$("voice").checked; }
+
+  // ---- load, compare, save
+  function fill(s){
+    state = s;
+    $("gname").textContent = s.guild.name;
+    if (s.guild.icon) { $("icon").src = s.guild.icon; $("icon").hidden = false; $("noicon").hidden = true; }
+    else $("noicon").textContent = s.guild.name.slice(0, 1);
+    NUMBERS.forEach(function(k){
+      var el = $(k), lim = s.limits[k];
+      el.min = lim.min; el.max = lim.max; el.value = s.settings[k];
+      el.title = lim.label + " (" + lim.min + "–" + lim.max + ")";
+    });
+    $("voice").checked = !!s.settings.voice;
+    $("stack").checked = !!s.settings.stack;
+    fillChannels();
+    $("channel").value = s.settings.channel;
+    if ($("channel").value !== s.settings.channel) $("channel").value = "0";
+    $("message").value = s.message; $("message").maxLength = s.message_limit;
+    $("lr-list").textContent = "";
+    s.level_roles.forEach(function(r){ addRow(r.level, r.role); });
+    var ignored = new Set(s.ignored);
+    document.querySelectorAll("#chans input").forEach(function(cb){ cb.checked = ignored.has(cb.value); });
+    $("karuda-sub").textContent = "Paid once for every " + s.karuda_every +
+      " levels someone reaches, and never twice for the same level. Kept small on purpose, up to " +
+      s.limits.karuda.max + ", so levels never outpace $daily. 0 turns it off.";
+    var vars = $("vars"); vars.textContent = "";
+    s.variables.forEach(function(v){
+      var c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.textContent = v;
+      c.addEventListener("click", function(){
+        var m = $("message"), at = m.selectionStart || m.value.length;
+        m.value = m.value.slice(0, at) + v + m.value.slice(m.selectionEnd || at);
+        m.focus(); changed();
+      });
+      vars.appendChild(c);
+    });
+    voiceFields(); pace(); preview();
+    snapshot = JSON.stringify(collect());
+    changed();
+  }
+
+  function collect(){
+    var settings = {};
+    NUMBERS.forEach(function(k){ settings[k] = $(k).value === "" ? "" : Number($(k).value); });
+    settings.voice = $("voice").checked ? 1 : 0;
+    settings.stack = $("stack").checked ? 1 : 0;
+    settings.channel = $("channel").value;
+    var rows = [];
+    document.querySelectorAll("#lr-list .lr").forEach(function(row){
+      var level = row.querySelector("input").value, role = row.querySelector("select").value;
+      if (level !== "" || role !== "") rows.push({level: level === "" ? "" : Number(level), role: role});
+    });
+    return {
+      settings: settings,
+      message: $("message").value,
+      level_roles: rows,
+      ignored: Array.prototype.map.call(document.querySelectorAll("#chans input:checked"), function(cb){ return cb.value; })
+    };
+  }
+
+  var snapshot = "";
+  function changed(){
+    voiceFields(); pace(); preview();
+    var dirty = JSON.stringify(collect()) !== snapshot;
+    $("save").disabled = !dirty; $("discard").disabled = !dirty;
+    var st = $("status");
+    st.className = "msg" + (dirty ? " dirty" : "");
+    st.textContent = dirty ? "You have unsaved changes." : "All changes saved.";
+  }
+
+  function showErrors(list){
+    var box = $("errors"), ul = box.querySelector("ul"); ul.textContent = "";
+    (list || []).forEach(function(p){ var li = document.createElement("li"); li.textContent = p; ul.appendChild(li); });
+    box.hidden = !list || !list.length;
+    if (!box.hidden) box.scrollIntoView({behavior: "smooth", block: "center"});
+  }
+
+  $("save").addEventListener("click", function(){
+    $("save").disabled = true; $("status").textContent = "Saving…";
+    api("POST", "/api/levels", collect()).then(function(r){
+      if (r.status === 401 || r.status === 403) return deny(r.data.problems[0]);
+      if (!r.ok) { showErrors(r.data.problems || ["Something went wrong. Try again."]); changed(); return; }
+      showErrors([]); fill(r.data);
+      $("status").className = "msg ok"; $("status").textContent = "Saved.";
+    }).catch(function(){ showErrors(["Couldn't reach the bot. Check your connection and try again."]); changed(); });
+  });
+  $("discard").addEventListener("click", function(){ showErrors([]); fill(state); });
+  $("lr-add").addEventListener("click", function(){ addRow("", ""); changed(); });
+  $("sync").addEventListener("click", function(){
+    var b = $("sync"); b.disabled = true; b.textContent = "Giving roles…";
+    api("POST", "/api/levels/sync").then(function(r){
+      b.disabled = false;
+      b.textContent = r.ok ? "Done: " + r.data.checked + " members checked" : "Give everyone their roles now";
+      if (!r.ok) showErrors(r.data.problems);
+    });
+  });
+  $("chan-filter").addEventListener("input", function(){
+    var q = this.value.trim().toLowerCase();
+    document.querySelectorAll("#chans label").forEach(function(l){ l.hidden = q && l.dataset.name.indexOf(q) === -1; });
+  });
+  ["msg_min","msg_max","cooldown","voice_xp","voice_cap","karuda","message","channel","voice","stack"]
+    .forEach(function(id){ $(id).addEventListener("input", changed); $(id).addEventListener("change", changed); });
+  window.addEventListener("beforeunload", function(e){
+    if (!$("save").disabled) { e.preventDefault(); e.returnValue = ""; }
+  });
+
+  if (!token) { deny("Run $dashboard in Discord to get your own link."); return; }
+  api("GET", "/api/levels").then(function(r){
+    if (!r.ok) return deny((r.data.problems || ["Something went wrong."])[0]);
+    $("loading").hidden = true; $("app").hidden = false; $("bar").hidden = false;
+    fill(r.data);
+  }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+})();
+</script>
+</body>
+</html>

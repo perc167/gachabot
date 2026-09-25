@@ -834,6 +834,13 @@ $vc lb</code>"""),
          role with one command.</p>
          <code class="cmdline">$levels role add 10 @Active
 $levels sync</code>"""),
+        ("Change it on the web", """
+         <p>Run <code>$dashboard</code> and the bot DMs you a private link to
+         a dashboard: XP per message and per minute in voice, level roles,
+         the level-up message and where it goes, and channels that earn
+         nothing. The link works only for you, for an hour.</p>
+         <p class="note">Every setting is a command too: <code>$levels
+         settings</code> shows them all.</p>"""),
         ("Tidy it up", """
          <p>Choose where level-ups are announced, and keep spam or bot
          channels from earning XP.</p>
@@ -851,7 +858,7 @@ $levels ignore #bot-spam</code>
         "gacha": "Six steps. The first two matter most, the rest is taste.",
         "mod": "Five steps. After the third, every command works.",
         "voice": "Three steps. The first one is all you need.",
-        "levels": "It works out of the box. These are the extras.",
+        "levels": "It works out of the box. The rest is up to you.",
     }
     tabs_html = "".join(
         f'<button type="button" class="chip" data-tab="{key}"'
