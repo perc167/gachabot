@@ -349,6 +349,7 @@ CATEGORIES = [
         ("levels ignore", "no XP in a channel"),
         ("levels ignore remove", "count it again"),
         ("levels set", "set someone's level"),
+        ("levels import", "bring levels over"),
         ("levels reset", "back to level 0"),
     ]),
     ("\U0001f50a", "Voice rooms", [

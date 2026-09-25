@@ -14,16 +14,17 @@ Karuda is deliberately scarce: a flat amount every KARUDA_EVERY levels and
 nothing in between, paid once per milestone for good. A daily already pays
 more than a milestone does, so levels are a thank-you, not an income.
 """
+import difflib
 import random
+import re
 import time
-from typing import Optional
 
 import discord
 from discord.ext import commands, tasks
 
 import config
 import utils
-from views import Paginator
+from views import Confirm, Paginator
 
 MESSAGE_XP = (15, 25)
 MESSAGE_COOLDOWN = 60
@@ -61,6 +62,62 @@ def bar(done: int, whole: int, width: int = 14) -> str:
 
 def today() -> int:
     return int(time.time() // 86400)
+
+
+IMPORT_LINE = re.compile(r"^\s*(?:#?\d+[.)]?\s+)?@?(\S+?)[\s,;:|]+(?:level\s*)?(\d+)\b",
+                         re.IGNORECASE)
+
+
+def parse_import(text: str) -> list:
+    """[(username, level), ...] from lines like `1. @name 32` or `name,32`.
+
+    Order is kept: it's the old bot's ranking, best first.
+    """
+    rows, seen = [], set()
+    for line in (text or "").splitlines():
+        match = IMPORT_LINE.match(line)
+        if not match:
+            continue
+        name, level = match.group(1).lower(), int(match.group(2))
+        if name in seen or not 0 <= level <= MAX_LEVEL:
+            continue
+        seen.add(name)
+        rows.append((name, level))
+    return rows
+
+
+def rows_index(rows: list, name: str) -> int:
+    return next(i for i, (n, _level) in enumerate(rows) if n == name)
+
+
+def match_members(rows: list, members) -> tuple:
+    """Pair imported usernames with members.
+
+    Returns (exact, guessed, missing): exact and guessed are lists of
+    (name, member, level). A guess is a close spelling that points at one
+    member only, for names read off a screenshot a letter wrong; they're
+    shown to whoever is importing before anything changes.
+    """
+    people = [m for m in members if not m.bot]
+    by_name = {m.name.lower(): m for m in people}
+    exact, guessed, missing, taken = [], [], [], set()
+    for name, level in rows:
+        member = by_name.get(name)
+        if member and member.id not in taken:
+            exact.append((name, member, level))
+            taken.add(member.id)
+    for name, level in rows:
+        if name in by_name:
+            continue
+        free = [n for n, m in by_name.items() if m.id not in taken]
+        close = difflib.get_close_matches(name, free, n=2, cutoff=0.85)
+        if len(close) == 1:
+            member = by_name[close[0]]
+            guessed.append((name, member, level))
+            taken.add(member.id)
+        else:
+            missing.append(name)
+    return exact, guessed, missing
 
 
 class Levels(commands.Cog):
@@ -414,6 +471,68 @@ class Levels(commands.Cog):
         self.db.update_level_row(ctx.guild.id, member.id, xp=0, level=0)
         await ctx.send(f"**{member.display_name}** is back to level 0.",
                        allowed_mentions=discord.AllowedMentions.none())
+
+    @levels.command(name="import")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_import(self, ctx, *, text: str = ""):
+        """Carry levels over from another bot. Attach a text file with one
+        `username level` per line, best first. Shows who matched before it
+        changes anything, and pays no karuda."""
+        if ctx.message.attachments:
+            raw = await ctx.message.attachments[0].read()
+            text = raw.decode("utf-8", errors="replace")
+        rows = parse_import(text)
+        if not rows:
+            await ctx.send("Attach a text file with one `username level` per"
+                           " line, e.g. `kingnoaglazer 32`.")
+            return
+
+        exact, guessed, missing = match_members(rows, ctx.guild.members)
+        matched = exact + guessed
+        lines = [f"**{len(exact)}** matched by username."]
+        if guessed:
+            lines.append(f"**{len(guessed)}** matched by a close spelling,"
+                         " check these:")
+            lines += [f"　`{name}` → {member.mention}"
+                      for name, member, _level in guessed[:15]]
+        if missing:
+            shown = ", ".join(f"`{name}`" for name in missing[:30])
+            more = f" and {len(missing) - 30} more" if len(missing) > 30 else ""
+            lines.append(f"**{len(missing)}** not found (left the server, or"
+                         f" renamed): {shown}{more}")
+        lines.append("\nNobody who already has more XP here is lowered, and"
+                     " imported levels pay no karuda.")
+        if not matched:
+            await ctx.send("\n".join(lines))
+            return
+
+        view = Confirm([ctx.author.id])
+        view.message = await ctx.send(
+            "\n".join(lines) + f"\n**Import {len(matched)} levels?**",
+            view=view, allowed_mentions=discord.AllowedMentions.none())
+        await view.wait()
+        if view.declined_by or ctx.author.id not in view.accepted:
+            await ctx.send("Left alone.")
+            return
+
+        # Rows come best first. Inside one level, a few XP of lead keeps them
+        # in that order on $levels, without ever tipping into the next level.
+        raised = 0
+        for position, (_name, member, level) in enumerate(
+                sorted(matched, key=lambda m: rows_index(rows, m[0]))):
+            lead = min(len(rows) - position, xp_to_next(level) - 1)
+            xp = total_for(level) + max(lead, 0)
+            row = self.db.level_row(ctx.guild.id, member.id)
+            if row["xp"] >= xp:
+                continue
+            self.db.update_level_row(
+                ctx.guild.id, member.id, xp=xp, level=level_for(xp)[0],
+                paid_through=max(row["paid_through"], level))
+            await self.sync_roles(member, level)
+            raised += 1
+        await ctx.send(f"Imported **{raised}** levels."
+                       + (f" {len(matched) - raised} already had more XP here."
+                          if len(matched) > raised else ""))
 
 
 async def setup(bot):
