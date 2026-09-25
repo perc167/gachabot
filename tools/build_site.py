@@ -32,6 +32,13 @@ SECRET_DATA = os.path.join(ROOT, "data", "secret_characters.json")
 # --invite or YURI_INVITE overrides the whole link.
 CLIENT_ID = 1550497695582519418
 
+# The bot's public list of servers, for the scrolling strip under the stats.
+# The page fetches it live, so it stays current without a rebuild; if the
+# bot can't be reached the strip simply doesn't appear. YURI_API overrides.
+SERVERS_API = os.getenv(
+    "YURI_API", "https://gachabot-production-fbd6.up.railway.app").rstrip("/") \
+    + "/api/servers"
+
 # The three parts of the bot, each with its own tab on the page. Sections
 # are named as they are in cogs/help.py; anything not listed is the gacha.
 # build() fails loudly if a name here stops matching, so renaming a help
@@ -317,26 +324,84 @@ code,kbd{
 #empty{color:var(--dim);display:none}
 .group{scroll-margin-top:80px}
 
-/* ---- tabs: one per part of the bot, shared by setup and commands ---- */
-.tabs{display:flex;flex-wrap:wrap;gap:8px}
-.tabs .chip{font-size:13px;padding:8px 16px}
+/* ---- the parts of the bot: big buttons that are also the tabs ---- */
+.features{display:grid;gap:14px;grid-template-columns:repeat(4,1fr)}
+@media(max-width:980px){.features{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.features{grid-template-columns:1fr}}
+.feature{
+  position:relative;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px;display:flex;flex-direction:column;overflow:hidden;
+  transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;
+}
+.feature::before{
+  content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--accent);
+  transform:scaleX(0);transform-origin:left;transition:transform .2s;
+}
+.feature:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px)}
+.feature.on{border-color:var(--accent);background:var(--raise);
+  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(124,107,240,.55)}
+.feature.on::before{transform:scaleX(1)}
+/* The title is the button; this stretches it over the whole card, so the
+   card clicks as one without a list and paragraph inside a <button>. */
+.feature .pick{all:unset;cursor:pointer}
+.feature .pick::after{content:"";position:absolute;inset:0;border-radius:14px}
+.feature .pick:focus-visible::after{outline:2px solid var(--accent-soft);outline-offset:2px}
+.feature .ic{font-size:22px;line-height:1;margin-bottom:12px}
+.feature h3{font-family:var(--display);font-weight:600;font-size:18px;margin:0 0 6px}
+.feature p{color:var(--dim);font-size:14.5px;margin:0 0 12px}
+.feature ul{margin:0 0 16px;padding-left:18px;color:var(--dim);font-size:14px}
+.feature li{margin-bottom:3px}
+.feature .go{margin-top:auto;font-family:var(--mono);font-size:12.5px;
+  color:var(--accent-soft)}
+.feature.on .go{color:var(--text)}
+
+.segs{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);margin-bottom:22px}
+@media(max-width:620px){.segs{grid-template-columns:repeat(2,1fr)}}
+.seg{
+  font:inherit;color:var(--dim);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:9px;padding:14px 12px;border-radius:12px;
+  background:var(--panel);border:1px solid var(--line);
+  font-family:var(--display);font-weight:600;font-size:15px;
+  transition:border-color .15s,background .15s,color .15s;
+}
+.seg:hover{border-color:var(--accent);background:var(--raise);color:var(--text)}
+.seg[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
+  color:#0C0A14}
+
+.cmd-area{margin-top:30px;padding-top:26px;border-top:1px dashed var(--line);
+  scroll-margin-top:70px}
+.cmd-area h3.area-title{font-family:var(--display);font-weight:600;font-size:20px;
+  margin:0 0 4px}
 .jump{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 28px;
   padding:12px 16px;background:var(--panel);border:1px solid var(--line);
   border-radius:12px;font-size:13.5px}
 .jump a{color:var(--dim);white-space:nowrap}
 .jump a:hover{color:var(--text)}
-.setup-tabs{margin-bottom:22px}
 
-/* ---- features: the three parts at a glance ---- */
-.features{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-.feature{background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:22px;display:flex;flex-direction:column}
-.feature .ic{font-size:22px;line-height:1;margin-bottom:12px}
-.feature h3{font-family:var(--display);font-weight:600;font-size:19px;margin:0 0 6px}
-.feature p{color:var(--dim);font-size:15px;margin:0 0 12px}
-.feature ul{margin:0 0 18px;padding-left:18px;color:var(--dim);font-size:14.5px}
-.feature li{margin-bottom:3px}
-.feature .go{margin-top:auto;display:flex;gap:16px;font-size:14px;font-weight:500}
+/* ---- servers: a slow strip of everyone using the bot ---- */
+#servers{padding-block:34px 38px;text-align:center}
+#servers .count{color:var(--dim);font-size:16px;margin:0 0 22px}
+#servers .count b{color:var(--text);font-family:var(--display);font-weight:600}
+.marquee{overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent)}
+.track{display:flex;gap:46px;width:max-content;padding-inline:23px}
+.marquee.moving .track{animation:drift var(--dur,60s) linear infinite}
+.marquee.moving:hover .track{animation-play-state:paused}
+.marquee.still .track{margin-inline:auto}
+@keyframes drift{to{transform:translateX(-50%)}}
+@media(prefers-reduced-motion:reduce){
+  .marquee.moving .track{animation:none}
+  .marquee{overflow-x:auto}
+}
+.srv{display:flex;align-items:center;gap:13px;text-align:left;flex:none}
+.srv img,.srv .ph{width:52px;height:52px;border-radius:50%;flex:none;
+  background:var(--raise);object-fit:cover;display:grid;place-items:center;
+  font-family:var(--display);font-weight:700;color:var(--dim)}
+.srv b{display:block;font-family:var(--display);font-weight:600;font-size:15.5px;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv i{font-style:normal;font-size:13px;color:var(--faint)}
 
 /* ---- characters ---- */
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(146px,1fr))}
@@ -401,8 +466,8 @@ footer p{margin:0 0 6px}
 <nav><div class="wrap nav-in">
   <a class="brand" href="#top"><span>Y</span>Yuri</a>
   <a class="link" href="#features">Features</a>
-  <a class="link" href="#setup">Setup</a>
   <a class="link" href="#commands">Commands</a>
+  <a class="link" href="#setup">Setup</a>
   <a class="link" href="#characters">Characters</a>
 </div></nav>
 
@@ -425,32 +490,37 @@ footer p{margin:0 0 6px}
   </div>
 </header>
 
+<section id="servers" hidden aria-label="Servers using Yuri">
+  <p class="count">Powering <b id="srv-users"></b> users across
+  <b id="srv-count"></b> <span id="srv-word">communities</span></p>
+  <div class="marquee"><div class="track" id="srv-track"></div></div>
+</section>
+
 <section id="features">
   <h2>What it does</h2>
-  <p class="sub">Four parts. Use all of them, or only the ones you need.</p>
-  <div class="features">__FEATURES_HTML__</div>
+  <p class="sub">Four parts. Pick one to see everything it can do, or search
+  all __COMMANDS__ commands at once.</p>
+  <div class="features" role="group" aria-label="Part of the bot">__FEATURES_HTML__</div>
+
+  <div class="cmd-area" id="commands">
+    <h3 class="area-title" id="area-title"></h3>
+    <p class="sub">Type <code>$help</code> in Discord and the same list arrives
+    by DM.</p>
+    <div class="tools">
+      <input id="q" type="search" placeholder="Search every command, or what it does…"
+             autocomplete="off" aria-label="Search commands">
+    </div>
+    __JUMP_HTML__
+    <div id="groups">__COMMANDS_HTML__</div>
+    <p id="empty">Nothing matches that.</p>
+  </div>
 </section>
 
 <section id="setup">
   <h2>Getting it working on your server</h2>
   <p class="sub">Pick the part you're setting up. The steps are in order.</p>
-  <div class="tabs setup-tabs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
+  <div class="segs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
   __SETUP_HTML__
-</section>
-
-<section id="commands">
-  <h2>Every command</h2>
-  <p class="sub">__COMMANDS__ of them, split by what they're for. Search looks
-  through all of them. Type <code>$help</code> in Discord and the same list
-  arrives by DM.</p>
-  <div class="tools">
-    <input id="q" type="search" placeholder="Search every command, or what it does…"
-           autocomplete="off" aria-label="Search commands">
-    <div class="tabs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
-  </div>
-  __JUMP_HTML__
-  <div id="groups">__COMMANDS_HTML__</div>
-  <p id="empty">Nothing matches that.</p>
 </section>
 
 <section id="characters">
@@ -480,8 +550,9 @@ footer p{margin:0 0 6px}
 
 <script>
 (function(){
-  // One part of the bot at a time, picked by the tabs in Setup and in
-  // Commands (they move together). Typing a search looks through every part.
+  // One part of the bot at a time, picked by its card in What it does or
+  // its button in Setup (they move together). Searching looks through every
+  // part at once.
   var q = document.getElementById("q");
   var empty = document.getElementById("empty");
   var groups = Array.prototype.slice.call(
@@ -490,6 +561,9 @@ footer p{margin:0 0 6px}
   var panels = Array.prototype.slice.call(document.querySelectorAll("[data-panel]"));
   var jumps = Array.prototype.slice.call(document.querySelectorAll(".jump"));
   var area = "gacha";
+  var title = document.getElementById("area-title");
+  var names = {};
+  tabs.forEach(function(tab){ names[tab.dataset.tab] = tab.dataset.name; });
 
   function apply(){
     var needle = q.value.trim().toLowerCase();
@@ -512,10 +586,13 @@ footer p{margin:0 0 6px}
     });
     tabs.forEach(function(tab){
       var on = tab.dataset.tab === area;
-      // In Commands, a search shows every part, so no tab is lit.
-      var inCommands = !!tab.closest("#commands");
-      tab.setAttribute("aria-pressed", on && !(inCommands && needle) ? "true" : "false");
+      // A search shows every part, so no card is lit while it's typed.
+      var isCard = tab.classList.contains("pick");
+      var lit = on && !(isCard && needle);
+      tab.setAttribute("aria-pressed", lit ? "true" : "false");
+      if (isCard) tab.closest(".feature").classList.toggle("on", lit);
     });
+    title.textContent = needle ? "Search results" : names[area] + " commands";
     panels.forEach(function(panel){ panel.hidden = panel.dataset.panel !== area; });
     empty.style.display = anything ? "none" : "block";
   }
@@ -538,9 +615,63 @@ footer p{margin:0 0 6px}
     choose(match[2]);
     document.getElementById(match[1]).scrollIntoView();
   }
+  // A card click brings its commands into view, unless they already are.
+  tabs.forEach(function(tab){
+    if (!tab.classList.contains("pick")) return;
+    tab.addEventListener("click", function(){
+      var box = document.getElementById("commands").getBoundingClientRect();
+      if (box.top > window.innerHeight * 0.7)
+        document.getElementById("commands").scrollIntoView({behavior: "smooth"});
+    });
+  });
   window.addEventListener("hashchange", fromHash);
   apply();
   fromHash();
+})();
+
+(function(){
+  // Servers using the bot, fetched live from the bot so the list is always
+  // current. Built with textContent: server names are other people's words.
+  var section = document.getElementById("servers");
+  var track = document.getElementById("srv-track");
+  if (!window.fetch) return;
+  fetch("__SERVERS_API__").then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(data){
+      if (!data || !data.list || !data.list.length) return;
+      document.getElementById("srv-users").textContent = data.users.toLocaleString("en");
+      document.getElementById("srv-count").textContent = data.servers.toLocaleString("en");
+      if (data.servers === 1) document.getElementById("srv-word").textContent = "community";
+      function item(s, hidden){
+        var el = document.createElement("div"); el.className = "srv";
+        if (hidden) el.setAttribute("aria-hidden", "true");
+        var pic;
+        if (s.icon) {
+          pic = document.createElement("img"); pic.src = s.icon; pic.alt = "";
+          pic.loading = "lazy"; pic.width = 52; pic.height = 52;
+        } else {
+          pic = document.createElement("span"); pic.className = "ph";
+          pic.textContent = (s.name || "?").trim().charAt(0).toUpperCase();
+        }
+        var text = document.createElement("span");
+        var name = document.createElement("b"); name.textContent = s.name;
+        var count = document.createElement("i");
+        count.textContent = s.members.toLocaleString("en") + " members";
+        text.append(name, count); el.append(pic, text);
+        return el;
+      }
+      data.list.forEach(function(s){ track.appendChild(item(s)); });
+      section.hidden = false;
+      var marquee = track.parentNode;
+      // Only scroll when there's more than fits; a copy of the list follows
+      // the first so the loop has no seam.
+      if (track.scrollWidth > marquee.clientWidth) {
+        data.list.forEach(function(s){ track.appendChild(item(s, true)); });
+        marquee.style.setProperty("--dur", Math.max(25, track.scrollWidth / 2 / 35) + "s");
+        marquee.classList.add("moving");
+      } else {
+        marquee.classList.add("still");
+      }
+    }).catch(function(){});
 })();
 
 (function(){
@@ -860,9 +991,12 @@ $levels ignore #bot-spam</code>
         "voice": "Three steps. The first one is all you need.",
         "levels": "It works out of the box. The rest is up to you.",
     }
+    icons = {"gacha": "\U0001f3b2", "mod": "\U0001f6e1\ufe0f",
+             "voice": "\U0001f50a", "levels": "\U0001f4c8"}
     tabs_html = "".join(
-        f'<button type="button" class="chip" data-tab="{key}"'
-        f' aria-pressed="false">{label}</button>' for key, label in AREAS)
+        f'<button type="button" class="seg" data-tab="{key}" data-name="{label}"'
+        f' aria-pressed="false"><span aria-hidden="true">{icons[key]}</span>'
+        f'{label}</button>' for key, label in AREAS)
     setup_html = "\n".join(
         f'<div data-panel="{key}"><p class="sub">{subs[key]}</p>'
         f'<div class="steps">{step_html(steps_by_area[key])}</div></div>'
@@ -893,10 +1027,12 @@ $levels ignore #bot-spam</code>
           "A little karuda every 5 levels"]),
     ]
     features_html = "\n".join(
-        f'<div class="feature"><div class="ic">{icon}</div><h3>{name}</h3>'
+        f'<div class="feature"><span class="ic" aria-hidden="true">{icon}</span>'
+        f'<h3><button type="button" class="pick" data-tab="{key}"'
+        f' data-name="{name}" aria-pressed="false" aria-controls="commands">'
+        f'{name}</button></h3>'
         f'<p>{esc(blurb)}</p><ul>{"".join(f"<li>{esc(x)}</li>" for x in points)}</ul>'
-        f'<div class="go"><a href="#setup-{key}">Set it up</a>'
-        f'<a href="#commands-{key}">{counts[key]} commands</a></div></div>'
+        f'<span class="go">{counts[key]} commands \u2192</span></div>'
         for key, icon, name, blurb, points in features)
 
     def slug(name):
@@ -958,6 +1094,7 @@ $levels ignore #bot-spam</code>
             .replace("__SHOWN__", f"{len(shown):,}")
             .replace("__INVITE__", invite)
             .replace("__FEATURES_HTML__", features_html)
+            .replace("__SERVERS_API__", SERVERS_API)
             .replace("__TABS_HTML__", tabs_html)
             .replace("__SETUP_HTML__", setup_html)
             .replace("__JUMP_HTML__", jump_html)

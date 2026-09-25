@@ -357,6 +357,7 @@ CATEGORIES = [
         ("levels stack", "keep lower roles"),
         ("levels message", "level-up wording"),
         ("dashboard", "settings on the web"),
+        ("sitelist", "show on the website"),
         ("levels reset", "back to level 0"),
     ]),
     ("\U0001f50a", "Voice rooms", [

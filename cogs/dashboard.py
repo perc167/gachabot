@@ -16,6 +16,10 @@ the service's Settings > Networking > Generate Domain.
 
 Everything saved here goes through the same checks as the $levels commands:
 Levels.save_settings() and the limits in cogs/levels.py.
+
+It also serves /api/servers, the public list of servers the bot is in, for
+the scrolling strip on the website. Only a server's name, icon and member
+count go out, and any server can leave the list with `$sitelist off`.
 """
 import os
 import secrets
@@ -33,6 +37,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "dashboard", "index.html")
 LINK_LIFETIME = 3600
 MAX_LEVEL_ROLES = 100
+SHOWCASE_CACHE = 300        # seconds the public server list is reused for
+SHOWCASE_LIMIT = 60
 
 HEADERS = {
     "Cache-Control": "no-store",
@@ -62,6 +68,7 @@ class Dashboard(commands.Cog):
         self.bot = bot
         self.links = {}  # token -> {"guild", "user", "expires"}
         self.runner = None
+        self.showcase_cache = (0, None)  # (when, response body)
 
     async def cog_load(self):
         port = os.getenv("PORT")
@@ -73,6 +80,7 @@ class Dashboard(commands.Cog):
         app.router.add_get("/api/levels", self.api_get)
         app.router.add_post("/api/levels", self.api_save)
         app.router.add_post("/api/levels/sync", self.api_sync)
+        app.router.add_get("/api/servers", self.api_servers)
         self.runner = web.AppRunner(app, access_log=None)
         await self.runner.setup()
         await web.TCPSite(self.runner, "0.0.0.0", int(port)).start()
@@ -122,6 +130,58 @@ class Dashboard(commands.Cog):
                            " try again.")
             return
         await ctx.send("Sent you the link in DMs.")
+
+    # ---------------------------------------------------------- showcase
+
+    def shown(self, guild) -> bool:
+        return bool(self.bot.db.get_pref(guild.id, "showcase", 1))
+
+    @commands.command(name="sitelist", aliases=["website"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    async def sitelist(self, ctx, state: str = None):
+        """Whether this server appears in the list on the bot's website."""
+        if state is None:
+            await ctx.send("This server is "
+                           + ("shown" if self.shown(ctx.guild) else "hidden")
+                           + f" on the bot's website. `{ctx.prefix}sitelist off`"
+                           f" hides it, `{ctx.prefix}sitelist on` shows it.")
+            return
+        state = state.lower()
+        if state not in ("on", "off"):
+            await ctx.send("Say `on` or `off`.")
+            return
+        self.bot.db.set_pref(ctx.guild.id, "showcase", 1 if state == "on" else 0)
+        self.showcase_cache = (0, None)
+        await ctx.send("This server is " + ("back on" if state == "on" else "off")
+                       + " the bot's website. It updates within a few minutes.")
+
+    def showcase_body(self) -> dict:
+        guilds = [g for g in self.bot.guilds if self.shown(g)]
+        guilds.sort(key=lambda g: g.member_count or 0, reverse=True)
+        return {
+            # Totals cover every server, listed or not: they say nothing
+            # about any one of them.
+            "users": sum(g.member_count or 0 for g in self.bot.guilds),
+            "servers": len(self.bot.guilds),
+            "list": [{"name": g.name,
+                      "icon": g.icon.with_size(128).url if g.icon else None,
+                      "members": g.member_count or 0}
+                     for g in guilds[:SHOWCASE_LIMIT]],
+        }
+
+    async def api_servers(self, request):
+        """Public, read-only, and the same for everyone, so any site may read
+        it and it's rebuilt at most every few minutes."""
+        when, body = self.showcase_cache
+        if body is None or time.time() - when > SHOWCASE_CACHE:
+            body = self.showcase_body()
+            self.showcase_cache = (time.time(), body)
+        return web.json_response(body, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Cache-Control": f"public, max-age={SHOWCASE_CACHE}",
+            "X-Content-Type-Options": "nosniff",
+        })
 
     def who(self, request):
         """(guild, member, Levels cog) for a request's link, or an error."""
