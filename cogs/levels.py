@@ -52,6 +52,7 @@ SETTINGS = {
     # Kept small on purpose: a daily pays more than a milestone does.
     "karuda": (100, 0, 250, f"Karuda every {KARUDA_EVERY} levels"),
     "stack": (1, 0, 1, "Keep lower level roles"),
+    "levelup_card": (1, 0, 1, "Show the rank card with level-ups"),
     # A channel id, 0 for wherever they levelled up, -1 for nowhere.
     "channel": (0, -1, 2 ** 63 - 1, "Where level-ups are announced"),
 }
@@ -238,6 +239,28 @@ class Levels(commands.Cog):
             await self.levelled_up(member, row["level"], level,
                                    row["paid_through"], channel)
 
+    async def card_file(self, member):
+        """A member's rank card as a file to send, or None if it can't be
+        drawn. Used by $rank and under level-up messages."""
+        gid = member.guild.id
+        try:
+            row = self.db.level_row(gid, member.id)
+            level, into, needed = level_for(row["xp"])
+            place = self.db.level_rank(gid, member.id)
+            background = None
+            if self.db.is_premium(gid):
+                background = (self.db.rank_background(gid, member.id)
+                              or self.db.rank_background(gid, 0))
+            avatar = await member.display_avatar.replace(size=256, format="png").read()
+            # Drawing takes a moment; keep it off the bot's main loop.
+            png = await asyncio.to_thread(
+                rankcard.render, member.display_name, avatar, level, into, needed,
+                place, row["xp"], self.colour(gid), background, member.name)
+        except Exception:  # noqa: BLE001 - a card must never cost the message
+            logging.getLogger("levels").exception("rank card failed")
+            return None
+        return discord.File(io.BytesIO(png), filename="rank.png")
+
     async def levelled_up(self, member, old: int, new: int, paid_through: int,
                           channel=None):
         guild = member.guild
@@ -263,9 +286,11 @@ class Levels(commands.Cog):
         text = render_message(self.message_of(guild.id), member, new)
         if paid:
             text += f" +{paid:,} {config.CURRENCY}"
+        # The rank card goes under the message, showing the new level.
+        card = await self.card_file(member) if self.setting(guild.id, "levelup_card") else None
         try:
             await target.send(text, allowed_mentions=discord.AllowedMentions(
-                users=[member]))
+                users=[member]), **({"file": card} if card else {}))
         except discord.HTTPException:
             pass
 
@@ -373,22 +398,11 @@ class Levels(commands.Cog):
         row = self.db.level_row(ctx.guild.id, member.id)
         level, into, needed = level_for(row["xp"])
         place = self.db.level_rank(ctx.guild.id, member.id)
-        try:
-            gid = ctx.guild.id
-            background = None
-            if self.db.is_premium(gid):
-                background = (self.db.rank_background(gid, member.id)
-                              or self.db.rank_background(gid, 0))
-            avatar = await member.display_avatar.replace(size=256, format="png").read()
-            # Drawing takes a moment; keep it off the bot's main loop.
-            png = await asyncio.to_thread(
-                rankcard.render, member.display_name, avatar, level, into, needed,
-                place, row["xp"], self.colour(gid), background, member.name)
-            await ctx.send(file=discord.File(io.BytesIO(png), filename="rank.png"))
+        card = await self.card_file(member)
+        if card:
+            await ctx.send(file=card)
             return
-        except (discord.HTTPException, OSError, ValueError):
-            # The card is a nicety: if it can't be drawn, the numbers still go out.
-            logging.getLogger("levels").exception("rank card failed")
+        # The card is a nicety: if it can't be drawn, the numbers still go out.
         embed = discord.Embed(title=member.display_name,
                               colour=self.colour(ctx.guild.id))
         embed.set_thumbnail(url=member.display_avatar.url)
@@ -630,6 +644,18 @@ class Levels(commands.Cog):
             "People keep every level role they earn." if state == "on" else
             "People keep only their highest level role. Run"
             f" `{ctx.prefix}levels sync` to tidy up existing ones.")
+
+    @levels.command(name="levelcard", aliases=["upcard"])
+    @commands.has_permissions(manage_guild=True)
+    async def levels_levelcard(self, ctx, state: str):
+        """`on` or `off`: the rank card under each level-up message."""
+        state = state.lower()
+        if state not in ("on", "off"):
+            await ctx.send("Say `on` or `off`.")
+            return
+        await self.save_one(ctx, {"levelup_card": 1 if state == "on" else 0},
+                            "Level-ups show the rank card." if state == "on"
+                            else "Level-ups are text only now.")
 
     @levels.command(name="message")
     @commands.has_permissions(manage_guild=True)

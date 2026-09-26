@@ -386,6 +386,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     <textarea id="message"></textarea>
     <div class="chips" id="vars"></div>
     <div class="preview" id="preview"></div>
+    <label class="switch" style="margin-top:14px"><input id="levelup_card" type="checkbox">
+      Show the member's rank card under the message</label>
   </section>
 
   <section class="card">
@@ -560,6 +562,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     });
     $("voice").checked = !!s.settings.voice;
     $("stack").checked = !!s.settings.stack;
+    $("levelup_card").checked = !!s.settings.levelup_card;
     fillChannels();
     $("channel").value = s.settings.channel;
     if ($("channel").value !== s.settings.channel) $("channel").value = "0";
@@ -614,6 +617,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     NUMBERS.forEach(function(k){ settings[k] = $(k).value === "" ? "" : Number($(k).value); });
     settings.voice = $("voice").checked ? 1 : 0;
     settings.stack = $("stack").checked ? 1 : 0;
+    settings.levelup_card = $("levelup_card").checked ? 1 : 0;
     settings.channel = $("channel").value;
     var rows = [];
     document.querySelectorAll("#lr-list .lr").forEach(function(row){
@@ -677,7 +681,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     var q = this.value.trim().toLowerCase();
     document.querySelectorAll("#chans label").forEach(function(l){ l.hidden = q && l.dataset.name.indexOf(q) === -1; });
   });
-  ["msg_min","msg_max","cooldown","voice_xp","voice_cap","karuda","message","channel","voice","stack"]
+  ["msg_min","msg_max","cooldown","voice_xp","voice_cap","karuda","message","channel","voice","stack","levelup_card"]
     .forEach(function(id){ $(id).addEventListener("input", changed); $(id).addEventListener("change", changed); });
   window.addEventListener("beforeunload", function(e){
     if (!$("save").disabled) { e.preventDefault(); e.returnValue = ""; }

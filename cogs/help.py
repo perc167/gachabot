@@ -356,6 +356,7 @@ CATEGORIES = [
         ("levels voicecap", "voice XP a day"),
         ("levels stack", "keep lower roles"),
         ("levels message", "level-up wording"),
+        ("levels levelcard", "card with level-ups"),
         ("dashboard", "settings on the web"),
         ("sitelist", "show on the website"),
         ("levels reset", "back to level 0"),
