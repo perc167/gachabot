@@ -45,6 +45,8 @@ SERVERS_API = BOT_URL + "/api/servers"
 # The dashboard lives on the bot, which holds the settings and the login.
 DASHBOARD_URL = BOT_URL + "/dashboard"
 COMMANDS_OUT = os.path.join(ROOT, "site", "commands.html")
+# The site's own address, for link previews, which need a full URL.
+SITE_URL = os.getenv("SITE_URL", "https://gachabot.perc-1fc.workers.dev").rstrip("/")
 
 # The three parts of the bot, each with its own tab on the page. Sections
 # are named as they are in cogs/help.py; anything not listed is the gacha.
@@ -252,11 +254,31 @@ nav{
   font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em;
   color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
 }
-.brand span{
-  width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
-  background:linear-gradient(140deg,var(--accent),var(--rose));
-  font-size:12px;color:#0D0B14;font-weight:700;
-}
+.brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
+  box-shadow:0 0 0 1px rgba(156,143,245,.45)}
+
+/* ---- the account chip, right of Dashboard ---- */
+.acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
+  padding:4px 12px 4px 4px;border-radius:999px;border:1px solid var(--line);
+  background:var(--panel);white-space:nowrap;max-width:190px}
+.acct:hover{border-color:var(--accent);text-decoration:none}
+.acct img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+.acct .nm{overflow:hidden;text-overflow:ellipsis}
+.acct.out{padding:6px 14px;font-family:var(--display);font-weight:600}
+@media(max-width:700px){.acct .nm{display:none}.acct{padding:3px}}
+
+/* ---- the hero's artwork ---- */
+.hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
+.hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:560/1285;
+  max-height:520px;justify-self:end;
+  box-shadow:0 30px 80px -30px rgba(124,107,240,.7),0 0 0 1px rgba(156,143,245,.25);
+  -webkit-mask-image:linear-gradient(#000 78%,transparent);
+  mask-image:linear-gradient(#000 78%,transparent)}
+.hero-art img{width:100%;height:100%;object-fit:cover;display:block;
+  animation:drift-art 14s ease-in-out infinite alternate}
+@keyframes drift-art{to{transform:scale(1.04) translateY(-6px)}}
+@media(max-width:880px){.hero{grid-template-columns:1fr}.hero-art{display:none}}
+@media(prefers-reduced-motion:reduce){.hero-art img{animation:none}}
 .nav-in a.link{color:var(--dim);font-size:14px;font-weight:500}
 .nav-in a.link:hover{color:var(--text);text-decoration:none}
 @media(max-width:700px){.nav-in a.link{display:none}}
@@ -440,6 +462,10 @@ code,kbd{
   font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
   border-radius:11px;transition:background .15s,transform .15s}
 .discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
+.premium-band{border-color:rgba(229,197,90,.45);
+  background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10))}
+.btn.gold{background:var(--gold);color:#1a1405}
+.btn.gold:hover{background:#f0d27a}
 .nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
   padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
 .nav-in .dash:hover{background:var(--accent-soft);text-decoration:none}
@@ -749,6 +775,44 @@ __BODY__<script>
 })();
 
 (function(){
+  // The account chip. The website and the dashboard live on different
+  // domains, so the site can't see the dashboard's login. Instead the
+  // dashboard hands over a display name and picture in the link (#me=...)
+  // when you log in or come back from it, and #me=out when you log out.
+  // It's only ever shown here, never trusted: faking it changes what one
+  // person sees in their own browser, nothing else.
+  var chip = document.getElementById("acct");
+  if (!chip) return;
+  var KEY = "paper-me", WEEK = 7 * 86400 * 1000, me = null;
+  var match = /[#&]me=([^&]+)/.exec(location.hash);
+  try {
+    if (match) {
+      if (match[1] === "out") localStorage.removeItem(KEY);
+      else {
+        var raw = JSON.parse(decodeURIComponent(escape(atob(
+          match[1].replace(/-/g, "+").replace(/_/g, "/")))));
+        localStorage.setItem(KEY, JSON.stringify({
+          n: String(raw.n || "").slice(0, 40), a: raw.a || "", until: Date.now() + WEEK}));
+      }
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    me = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (me && me.until < Date.now()) { localStorage.removeItem(KEY); me = null; }
+  } catch (e) { me = null; }
+  if (!me || !me.n) return;
+  chip.className = "acct";
+  chip.href = "__DASHBOARD__";
+  chip.textContent = "";
+  chip.title = "Signed in as " + me.n + ": open the dashboard";
+  if (/^https:\/\/cdn\.discordapp\.com\//.test(me.a)) {
+    var img = document.createElement("img"); img.src = me.a; img.alt = "";
+    chip.appendChild(img);
+  }
+  var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = me.n;
+  chip.appendChild(nm);
+})();
+
+(function(){
   // Sections fade up as they come into view. Without IntersectionObserver
   // they're simply shown, so nothing can stay invisible.
   var parts = document.querySelectorAll("section, footer");
@@ -845,15 +909,16 @@ __BODY__<script>
 
 
 HOME_BODY = r"""<nav><div class="wrap nav-in">
-  <a class="brand" href="./"><span>Y</span>Yuri</a>
+  <a class="brand" href="./"><img src="img/paper-180.png" alt="" width="26" height="26">Paper</a>
   <a class="link" href="./#setup">Setup</a>
   <a class="link" href="./#features">Features</a>
   <a class="link" href="commands.html">Commands</a>
   <a class="dash" href="__DASHBOARD__">Dashboard</a>
+  <a class="acct out" id="acct" href="__LOGIN__">Log in</a>
 </div></nav>
 
 <div id="top" class="wrap">
-<header>
+<header class="hero"><div>
   <p class="eyebrow">Gacha · Moderation · Voice · Levels</p>
   <h1>Roll for <em>__TOTAL__</em> characters.<br>Run the server too.</h1>
   <p class="lede">A gacha bot in the shape of Mudae, with its own roster and
@@ -869,9 +934,12 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
     <div class="stat"><b>__COMMANDS__</b><i>commands</i></div>
     <div class="stat"><b>__STEPS__</b><i>tutorial steps</i></div>
   </div>
+  </div>
+  <div class="hero-art" aria-hidden="true"><img src="img/paper-art.webp" alt=""
+    width="560" height="1285"></div>
 </header>
 
-<section id="servers" hidden aria-label="Servers using Yuri">
+<section id="servers" hidden aria-label="Servers using Paper">
   <p class="count">Powering <b id="srv-users"></b> users across
   <b id="srv-count"></b> <span id="srv-word">communities</span></p>
   <div class="marquee"><div class="track" id="srv-track"></div></div>
@@ -902,6 +970,18 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
     <a class="discord" href="__DASHBOARD__">Open the dashboard</a>
   </div>
 </section>
+
+<section id="premium">
+  <div class="band premium-band">
+    <div>
+      <h2>✨ Paper Premium</h2>
+      <p>Everything in Paper stays free. Premium adds extras for a server: XP
+      boost roles, up to 50 automatic warn punishments, moderation history as
+      a spreadsheet, and more on the way. It also keeps the bot running.</p>
+    </div>
+    <a class="btn gold" href="__DASHBOARD__">Get Premium</a>
+  </div>
+</section>
 <section id="characters">
   <div class="sec-row">
     <div>
@@ -911,7 +991,7 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
       same as how many have heard of them — so the top here is not the top of
       a popularity chart.</p>
       <p class="sub" id="secret-sub" hidden>Original characters from the
-      people around Yuri. Tap one to flip through their art.</p>
+      people around Paper. Tap one to flip through their art.</p>
     </div>
     __SECRET_BUTTON__
   </div>
@@ -920,7 +1000,7 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
 </section>
 
 <footer>
-  <p>Yuri runs on its own roster built from AniList, plus games and cartoons
+  <p>Paper runs on its own roster built from AniList, plus games and cartoons
   AniList does not carry.</p>
   <p>Character art belongs to its creators and is shown here for
   identification.</p>
@@ -930,11 +1010,12 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
 """
 
 COMMANDS_BODY = r"""<nav><div class="wrap nav-in">
-  <a class="brand" href="./"><span>Y</span>Yuri</a>
+  <a class="brand" href="./"><img src="img/paper-180.png" alt="" width="26" height="26">Paper</a>
   <a class="link" href="./#setup">Setup</a>
   <a class="link" href="./#features">Features</a>
   <a class="link" href="commands.html">Commands</a>
   <a class="dash" href="__DASHBOARD__">Dashboard</a>
+  <a class="acct out" id="acct" href="__LOGIN__">Log in</a>
 </div></nav>
 
 <div id="top" class="wrap">
@@ -958,7 +1039,7 @@ COMMANDS_BODY = r"""<nav><div class="wrap nav-in">
 </section>
 
 <footer>
-  <p><a href="./#setup">How to set Yuri up</a> · <a href="__DASHBOARD__">Dashboard</a></p>
+  <p><a href="./#setup">How to set Paper up</a> · <a href="__DASHBOARD__">Dashboard</a></p>
 </footer>
 </div>
 
@@ -985,9 +1066,13 @@ DOCUMENT = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Yuri is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
+<meta name="description" content="Paper is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
 <meta name="color-scheme" content="dark">
-<meta property="og:title" content="Yuri Gacha">
+<meta property="og:title" content="Paper">
+<meta property="og:image" content="__SITE_URL__/img/paper-512.png">
+<meta name="theme-color" content="#7C6BF0">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/paper-180.png">
 <meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">
 <meta property="og:type" content="website">
 __PAGE__
@@ -1291,7 +1376,7 @@ $levels ignore #bot-spam</code>
     secret_button, secret_html = secret_markup()
 
     link = invite_url or bot_invite
-    invite = (f'<a class="btn" href="{esc(link)}">Add Yuri to your server</a>'
+    invite = (f'<a class="btn" href="{esc(link)}">Add Paper to your server</a>'
               if link else
               '<a class="btn ghost" href="#setup">Run $invite for the link</a>')
 
@@ -1314,10 +1399,12 @@ $levels ignore #bot-spam</code>
             .replace("__CHARACTERS_HTML__", "\n".join(cards))
             .replace("__SECRET_BUTTON__", secret_button)
             .replace("__SECRET_HTML__", secret_html)
-            .replace("__DASHBOARD__", DASHBOARD_URL))
+            .replace("__DASHBOARD__", DASHBOARD_URL)
+            .replace("__LOGIN__", BOT_URL + "/login?next=site"))
 
-    page = render("Yuri Gacha", HOME_BODY)
-    commands_page = render("Commands · Yuri", COMMANDS_BODY)
+    page = render("Paper", HOME_BODY).replace("__SITE_URL__", SITE_URL)
+    commands_page = render("Commands · Paper", COMMANDS_BODY).replace(
+        "__SITE_URL__", SITE_URL)
     return page, commands_page, total, series, command_total, len(shown)
 
 

@@ -8,8 +8,8 @@ import discord
 from discord.ext import commands
 
 import config
-from cogs.modtools import (ACTIONS, VARIABLES, describe_duration,
-                           parse_duration, render)
+from cogs.modtools import (ACTIONS, FREE_WARN_PUNISHMENTS, VARIABLES,
+                           describe_duration, parse_duration, render)
 
 PUNISHMENTS = ("timeout", "jail", "kick", "ban")
 KINDS = ("message", "dm")
@@ -118,6 +118,13 @@ class ModSettings(commands.Cog):
             if seconds > 28 * 86400:
                 await ctx.send("Discord only allows timeouts of up to 28 days.")
                 return
+        others = [r for r in self.db.warn_punishments_of(ctx.guild.id)
+                  if r["threshold"] != threshold]
+        if len(others) >= FREE_WARN_PUNISHMENTS and not self.db.is_premium(ctx.guild.id):
+            await ctx.send(f"Free servers can have {FREE_WARN_PUNISHMENTS} warn"
+                           " punishments; Paper Premium allows up to 50."
+                           f" `{ctx.prefix}upgrade` to see how to get it.")
+            return
         self.db.set_warn_punishment(ctx.guild.id, threshold, action, seconds)
         await ctx.send(f"At **{threshold}** warnings, they'll be"
                        f" {ACTIONS[action][0].lower()}"

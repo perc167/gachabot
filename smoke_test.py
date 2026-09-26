@@ -104,6 +104,57 @@ async def main():
     db.drop_vc_session(GUILD, BOB)
     check("a dropped session banks nothing", db.vc_seconds(GUILD, BOB) == 0)
 
+    # Premium: only a webhook Stripe signed, recently, is believed; and
+    # premium runs to the end of what was paid for.
+    import billing
+    import hashlib
+    import hmac
+    import time
+    body = b'{"type": "customer.subscription.updated"}'
+    stamp = 1_700_000_000
+    signed = hmac.new(b"whsec_test", f"{stamp}.".encode() + body,
+                      hashlib.sha256).hexdigest()
+    header = f"t={stamp},v1={signed}"
+    check("a genuine Stripe webhook is accepted",
+          billing.verify(body, header, "whsec_test", now=stamp + 5)["type"]
+          == "customer.subscription.updated")
+
+    def refused(*args, **kwargs):
+        try:
+            billing.verify(*args, **kwargs)
+        except billing.BadSignature:
+            return True
+        return False
+    check("a webhook signed with another secret is refused",
+          refused(body, header, "whsec_other", now=stamp))
+    check("a tampered webhook is refused",
+          refused(body.replace(b"updated", b"deleted"), header, "whsec_test", now=stamp))
+    check("an old webhook replayed later is refused",
+          refused(body, header, "whsec_test", now=stamp + 3600))
+    check("an unsigned webhook is refused", refused(body, "", "whsec_test"))
+
+    future = int(time.time()) + 30 * 86400
+    billing.apply_subscription(db, {"id": "sub_1", "customer": "cus_1",
+                                    "status": "active", "current_period_end": future,
+                                    "metadata": {"guild_id": str(GUILD), "buyer_id": "7"}})
+    check("an active subscription makes the server premium", db.is_premium(GUILD)
+          and db.premium_of(GUILD)["customer"] == "cus_1")
+    billing.apply_subscription(db, {"id": "sub_1", "status": "active",
+                                    "items": {"data": [{"current_period_end": future}]},
+                                    "metadata": {"guild_id": str(GUILD)}})
+    check("the period end is found on newer Stripe versions, and the customer kept",
+          db.is_premium(GUILD) and db.premium_of(GUILD)["customer"] == "cus_1")
+    billing.apply_subscription(db, {"id": "sub_1", "status": "canceled",
+                                    "metadata": {"guild_id": str(GUILD)}})
+    check("an ended subscription ends premium", not db.is_premium(GUILD))
+    check("another server is never premium by accident", not db.is_premium(GUILD + 1))
+    billing.apply_subscription(db, {"id": "sub_2", "status": "active",
+                                    "current_period_end": future,
+                                    "metadata": {"guild_id": str(GUILD + 5),
+                                                 "buyer_id": "not a number"}})
+    check("a bad buyer note doesn't stop a paid server getting premium",
+          db.is_premium(GUILD + 5))
+
     # Levels: the curve, and a reset that keeps what was already paid.
     from cogs import levels as levelsmod
     check("level curve", levelsmod.level_for(levelsmod.total_for(10))[0] == 10

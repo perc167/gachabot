@@ -356,8 +356,12 @@ CATEGORIES = [
         ("levels voicecap", "voice XP a day"),
         ("levels stack", "keep lower roles"),
         ("levels message", "level-up wording"),
+        ("levels boost", "premium XP boosts"),
+        ("levels boost add", "boost a role"),
+        ("levels boost remove", "stop a boost"),
         ("dashboard", "settings on the web"),
         ("sitelist", "show on the website"),
+        ("upgrade", "Paper Premium"),
         ("levels reset", "back to level 0"),
     ]),
     ("\U0001f50a", "Voice rooms", [

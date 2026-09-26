@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="color-scheme" content="dark">
-<title>Yuri dashboard</title>
+<title>Paper dashboard</title>
+<link rel="icon" type="image/png" href="/paper.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
@@ -102,8 +103,8 @@ body{background:transparent}
 .top .wrap{display:flex;align-items:center;gap:14px;height:58px}
 .brand{font-family:var(--display);font-weight:700;font-size:17px;color:var(--text);
   display:flex;align-items:center;gap:9px;margin-right:auto;text-decoration:none}
-.brand span{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
-  background:linear-gradient(140deg,var(--accent),var(--rose));font-size:12px;color:#0D0B14}
+.brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
+  box-shadow:0 0 0 1px rgba(156,143,245,.45)}
 .me{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--dim)}
 .me img{width:28px;height:28px;border-radius:50%}
 .btn.small{padding:6px 12px;font-size:13px;white-space:nowrap}
@@ -121,9 +122,8 @@ body{background:transparent}
 .login{max-width:440px;margin:12vh auto 0;text-align:center;padding:36px 28px;
   background:rgba(23,19,36,.88);border:1px solid var(--line);border-radius:18px;
   animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
-.login .logo{width:58px;height:58px;border-radius:17px;margin:0 auto 16px;display:grid;
-  place-items:center;font-family:var(--display);font-weight:700;font-size:26px;
-  color:#0D0B14;background:linear-gradient(140deg,var(--accent),var(--rose))}
+.login .logo{width:84px;height:84px;border-radius:24px;margin:0 auto 16px;display:block;
+  object-fit:cover;box-shadow:0 14px 40px -12px rgba(124,107,240,.8),0 0 0 1px rgba(156,143,245,.4)}
 .login h1{font-size:24px;margin-bottom:8px}
 .login p{color:var(--dim);margin:0 0 22px}
 .discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
@@ -177,7 +177,32 @@ body{background:transparent}
 .part b{font-family:var(--display);font-size:19px;font-weight:600}
 .part span.l{font-size:14px;color:var(--dim)}
 .part .go{margin-top:10px;font-family:var(--mono);font-size:12.5px;color:var(--accent-soft)}
+/* ---- Paper Premium ---- */
+.prem{position:relative;overflow:hidden;border-radius:18px;padding:22px 24px;
+  margin-bottom:16px;border:1px solid rgba(229,197,90,.45);
+  background:linear-gradient(120deg,rgba(229,197,90,.14),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10));
+  animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
+.prem h2{font-family:var(--display);font-size:19px;margin:0 0 4px;display:flex;
+  align-items:center;gap:8px}
+.prem p{margin:0 0 12px;color:var(--dim)}
+.prem ul{margin:0 0 16px;padding-left:18px;color:var(--text);font-size:14.5px}
+.prem li{margin-bottom:3px}
+.prem .price{font-family:var(--display);font-weight:600;color:var(--gold)}
+.btn.gold{background:var(--gold);color:#1a1405}
+.btn.gold:hover{background:#f0d27a}
+.lock{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;
+  color:var(--gold);background:rgba(229,197,90,.08);border:1px solid rgba(229,197,90,.35);
+  border-radius:10px;padding:10px 13px;margin-bottom:12px}
+.lock a,.lock button{color:var(--gold);font-weight:600;background:none;border:0;
+  font:inherit;cursor:pointer;padding:0;text-decoration:underline}
+.brow{display:grid;grid-template-columns:1fr 130px 38px;gap:8px;align-items:center;
+  margin-bottom:8px}
+.thanks{border:1px solid var(--ok);background:rgba(67,181,129,.1);color:#9fe0c1;
+  border-radius:12px;padding:12px 16px;margin-bottom:16px}
 .home{color:var(--dim);font-size:14px;text-decoration:none}
+.prem-tag{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--gold);
+  border:1px solid rgba(229,197,90,.45);border-radius:999px;padding:2px 8px;margin-left:6px;
+  vertical-align:middle}
 .home:hover{color:var(--text)}
 .part-head{padding:6px 0 18px}
 .part-head h1{font-size:24px}
@@ -217,7 +242,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 <canvas id="sky" aria-hidden="true"></canvas>
 
 <div class="top" id="top" hidden><div class="wrap">
-  <a class="brand" href="/dashboard" id="home"><span>Y</span>Yuri<i class="wide"> dashboard</i></a>
+  <a class="brand" href="/dashboard" id="home"><img src="/paper.png" alt="">Paper<i class="wide"> dashboard</i></a>
   <a class="home" id="site" href="#">Home</a>
   <span class="me" id="me"></span>
   <button class="btn ghost small" id="logout" type="button">Log out</button>
@@ -230,8 +255,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 
 <div class="wrap" id="view-login" hidden>
   <div class="login">
-    <div class="logo">Y</div>
-    <h1>Yuri dashboard</h1>
+    <img class="logo" src="/paper.png" alt="">
+    <h1>Paper dashboard</h1>
     <p>Log in with Discord to change the settings of the servers you manage.</p>
     <p class="oops" id="login-oops" hidden>That login didn't go through. Try once more.</p>
     <a class="discord" href="/login" id="login-go">
@@ -239,7 +264,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       Log in with Discord</a>
     <p id="login-off" hidden>Logging in isn't switched on for this bot yet.
       Until it is, type <code>$dashboard</code> in your server for a private link.</p>
-    <small>Yuri only sees your username and which servers you're in.
+    <small>Paper only sees your username and which servers you're in.
       Not your messages, email or password.</small>
   </div>
 </div>
@@ -256,6 +281,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   <button class="back" id="ov-back" type="button">&larr; All servers</button>
   <div class="ov-head"><img id="ov-icon" alt="" hidden><div class="ph" id="ov-noicon"></div>
     <div><h1 id="ov-name"></h1><p>Pick what you want to set up.</p></div></div>
+  <div class="thanks" id="thanks" hidden>Thank you! Premium switches on as soon as
+    Stripe confirms the payment, usually within a few seconds.</div>
+  <div id="premium"></div>
   <div class="parts" id="parts"></div>
 </div>
 
@@ -323,6 +351,16 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   </section>
 
   <section class="card">
+    <h2>XP boosts <span class="prem-tag">✨ Premium</span></h2>
+    <p class="sub">Roles that earn extra XP, like 1.5x for Boosters. If someone has
+      more than one, the biggest boost counts.</p>
+    <div class="lock" id="boost-lock" hidden>✨ XP boosts come with Paper Premium.
+      <button type="button" id="boost-upgrade">See Premium</button></div>
+    <div id="boost-list"></div>
+    <div class="actions"><button class="btn ghost" id="boost-add" type="button">+ Add a boost</button></div>
+  </section>
+
+  <section class="card">
     <h2>Karuda reward</h2>
     <p class="sub" id="karuda-sub"></p>
     <div class="row"><div><label class="f" for="karuda">Karuda per milestone</label>
@@ -367,7 +405,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     var headers = {"Content-Type": "application/json"};
     if (token) headers["Authorization"] = "Bearer " + token;
     else {
-      headers["X-Yuri"] = "1";
+      headers["X-Paper"] = "1";
       if (guildId) path += (path.indexOf("?") < 0 ? "?" : "&") + "guild=" + guildId;
     }
     return fetch(path, {
@@ -448,12 +486,12 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     var text = $("message").value || state.default_message;
     var box = $("preview"); box.textContent = "";
     // Shown as Discord would: {user} as a mention, **bold** as bold.
-    var parts = text.replace(/\{user\.name\}/g, "Yuri fan")
+    var parts = text.replace(/\{user\.name\}/g, "Paper fan")
                     .replace(/\{level\}/g, "10")
                     .replace(/\{server\}/g, state.guild.name)
                     .split(/(\{user\}|\*\*[^*]+\*\*)/);
     parts.forEach(function(p){
-      if (p === "{user}") { var m = document.createElement("span"); m.className = "mention"; m.textContent = "@Yuri fan"; box.appendChild(m); }
+      if (p === "{user}") { var m = document.createElement("span"); m.className = "mention"; m.textContent = "@Paper fan"; box.appendChild(m); }
       else if (/^\*\*[^*]+\*\*$/.test(p)) { var b = document.createElement("b"); b.textContent = p.slice(2, -2); box.appendChild(b); }
       else box.appendChild(document.createTextNode(p));
     });
@@ -490,6 +528,10 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     $("message").value = s.message; $("message").maxLength = s.message_limit;
     $("lr-list").textContent = "";
     s.level_roles.forEach(function(r){ addRow(r.level, r.role); });
+    $("boost-list").textContent = "";
+    s.boosts.forEach(function(b){ addBoost(b.role, b.percent); });
+    $("boost-lock").hidden = !!s.premium;
+    $("boost-add").disabled = !s.premium;
     var ignored = new Set(s.ignored);
     document.querySelectorAll("#chans input").forEach(function(cb){ cb.checked = ignored.has(cb.value); });
     $("karuda-sub").textContent = "Paid once for every " + s.karuda_every +
@@ -510,6 +552,25 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     changed();
   }
 
+  function addBoost(role, percent){
+    var row = document.createElement("div"); row.className = "brow";
+    var s = document.createElement("select");
+    s.appendChild(option("", "Pick a role\u2026"));
+    state.roles.forEach(function(r){ s.appendChild(option(r.id, r.name)); });
+    s.value = role || ""; s.setAttribute("aria-label", "Role");
+    var n = document.createElement("input"); n.type = "number";
+    n.min = state.boost_range[0]; n.max = state.boost_range[1];
+    n.value = percent || 150; n.setAttribute("aria-label", "Percent of normal XP");
+    n.title = "Percent of normal XP: 150 is 1.5x";
+    var x = document.createElement("button"); x.type = "button"; x.className = "x";
+    x.textContent = "\u00D7"; x.setAttribute("aria-label", "Remove this boost");
+    x.addEventListener("click", function(){ row.remove(); changed(); });
+    [s, n].forEach(function(el){ el.addEventListener("input", changed); el.addEventListener("change", changed); });
+    if (!state.premium) { s.disabled = true; n.disabled = true; }
+    row.append(s, n, x);
+    $("boost-list").appendChild(row);
+  }
+
   function collect(){
     var settings = {};
     NUMBERS.forEach(function(k){ settings[k] = $(k).value === "" ? "" : Number($(k).value); });
@@ -525,6 +586,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       settings: settings,
       message: $("message").value,
       level_roles: rows,
+      boosts: Array.prototype.map.call(document.querySelectorAll("#boost-list .brow"), function(row){
+        return {role: row.querySelector("select").value, percent: Number(row.querySelector("input").value)};
+      }).filter(function(b){ return b.role; }),
       ignored: Array.prototype.map.call(document.querySelectorAll("#chans input:checked"), function(cb){ return cb.value; })
     };
   }
@@ -561,6 +625,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     showErrors([]); fill(state);
   });
   $("lr-add").addEventListener("click", function(){ addRow("", ""); changed(); });
+  $("boost-add").addEventListener("click", function(){ addBoost("", 150); changed(); });
+  $("boost-upgrade").addEventListener("click", function(){ go(""); });
   $("sync").addEventListener("click", function(){
     var b = $("sync"); b.disabled = true; b.textContent = "Giving roles…";
     api("POST", "/api/levels/sync").then(function(r){
@@ -625,6 +691,11 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       if (g.icon) { $("ov-icon").src = g.icon; $("ov-icon").hidden = false; $("ov-noicon").hidden = true; }
       else { $("ov-icon").hidden = true; $("ov-noicon").hidden = false; $("ov-noicon").textContent = g.name.charAt(0).toUpperCase(); }
       $("ov-back").hidden = !!token;
+      showPremium(r.data.premium);
+      if (/[?&]premium=thanks/.test(location.search) && !r.data.premium.active &&
+          (openOverview.tries = (openOverview.tries || 0) + 1) < 8)
+        setTimeout(openOverview, 2000);
+      $("thanks").hidden = !/[?&]premium=thanks/.test(location.search) || r.data.premium.active;
       var box = $("parts"); box.textContent = "";
       ["gacha", "mod", "voice", "levels"].forEach(function(key, i){
         var info = PARTS[key];
@@ -641,6 +712,46 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       only("view-overview");
       window.scrollTo(0, 0);
     }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  }
+
+  // ---- Paper Premium: what it is, and the one button that matters
+  function showPremium(p){
+    var box = $("premium"); box.textContent = "";
+    if (!p.active && !p.for_sale) return;
+    var panel = el("div", {cls: "prem"});
+    if (p.active) {
+      var until = new Date(p.until * 1000).toLocaleDateString(undefined,
+        {year: "numeric", month: "long", day: "numeric"});
+      panel.append(el("h2", {text: "✨ Paper Premium is on"}),
+        el("p", {text: (p.ending ? "It ends on " : "It renews by ") + until +
+          ". Thank you for supporting Paper."}));
+      if (p.billing) panel.appendChild(button("Manage billing", "btn ghost", "/api/premium/portal"));
+    } else {
+      panel.append(
+        el("h2", {text: "✨ Paper Premium"}),
+        el("p", {}, ["Everything in Paper stays free. Premium adds extras for this server",
+          p.price ? el("span", {}, [" for ", el("span", {cls: "price", text: p.price})]) : null, ":"]),
+        el("ul", {}, [
+          el("li", {text: "XP boost roles, like 1.5x XP for Boosters"}),
+          el("li", {text: "Up to 50 automatic warn punishments (free servers get 3)"}),
+          el("li", {text: "Download every moderation case as a spreadsheet"}),
+          el("li", {text: "More on the way: rank card backgrounds, custom level-up images and more"})
+        ]),
+        button("Upgrade this server", "btn gold", "/api/premium/checkout"));
+    }
+    box.appendChild(panel);
+  }
+  function button(label, cls, path){
+    var b = el("button", {type: "button", cls: cls, text: label});
+    b.addEventListener("click", function(){
+      b.disabled = true; b.textContent = "Opening Stripe…";
+      api("POST", path).then(function(r){
+        if (r.ok && r.data.url) { location.href = r.data.url; return; }
+        b.disabled = false; b.textContent = label;
+        alert((r.data.problems || ["Something went wrong. Try again."])[0]);
+      }).catch(function(){ b.disabled = false; b.textContent = label; alert("Couldn't reach the bot."); });
+    });
+    return b;
   }
 
   function openLevels(){
@@ -806,8 +917,26 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       var addP = el("button", {type: "button", cls: "btn ghost", text: "+ Add a punishment"});
       addP.addEventListener("click", function(){ punish.appendChild(punishRow({})); partChanged(); });
       form.appendChild(card("Warn punishments",
-        "What happens by itself when someone reaches a number of warnings. Timeouts take a length like 10m, 1h or 1d.",
+        "What happens by itself when someone reaches a number of warnings. Timeouts take a length like 10m, 1h or 1d." +
+        (d.premium ? "" : " Free servers can have " + d.free_punishments + "; Premium allows up to 50."),
         [punish, el("div", {cls: "actions"}, [addP])]));
+
+      var exportBtn = el("button", {type: "button", cls: "btn ghost", text: "Download case history (.csv)"});
+      exportBtn.disabled = !d.premium;
+      exportBtn.addEventListener("click", function(){
+        var headers = {"X-Paper": "1"};
+        if (token) headers["Authorization"] = "Bearer " + token;
+        fetch("/api/cases.csv" + (token ? "" : "?guild=" + guildId), {headers: headers, credentials: "same-origin"})
+          .then(function(r){ if (!r.ok) throw new Error(); return r.blob(); })
+          .then(function(blob){
+            var a = el("a", {href: URL.createObjectURL(blob), download: "paper-cases.csv"});
+            document.body.appendChild(a); a.click(); a.remove();
+          }).catch(function(){ alert("Couldn't download the case history."); });
+      });
+      form.appendChild(card("Case history",
+        "Every warning, jail, mute, kick and ban, with who did it and why, as a spreadsheet.",
+        [d.premium ? null : el("div", {cls: "lock"}, ["✨ Comes with Paper Premium."]),
+         el("div", {cls: "actions"}, [exportBtn])]));
 
       var lockRole = select([["", "@everyone"]].concat(d.roles.map(function(r){ return [r.id, r.name]; })), d.lock_role);
       var skip = checklist(channelItems(d.channels), d.lockdown_ignored);
@@ -899,7 +1028,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       var text = document.createElement("span");
       var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       var st = document.createElement("span"); st.className = "st";
-      st.textContent = s.has_bot ? "Manage →" : "Add Yuri →";
+      st.textContent = s.has_bot ? "Manage →" : "Add Paper →";
       text.append(nm, st); card.append(pic, text);
       if (s.has_bot) {
         card.type = "button";
@@ -955,9 +1084,18 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         if (me.user.avatar) { var img = document.createElement("img"); img.src = me.user.avatar; img.alt = ""; who.appendChild(img); }
         who.appendChild(el("span", {cls: "nm", text: me.user.name}));
         window.__me = me;
+        if (me.site) $("site").href = me.site + "#me=" + handover(me.user);
         show();
       })
       .catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  }
+
+  // The website can't see this login (it's another domain), so going Home
+  // tells it a display name and picture to show in its nav. See the site.
+  function handover(user){
+    var json = JSON.stringify({n: user.name, a: user.avatar || ""});
+    return btoa(unescape(encodeURIComponent(json)))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 
   function leave(then){
@@ -978,8 +1116,11 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   });
   $("logout").addEventListener("click", function(){
     leave(function(){
-      fetch("/logout", {method: "POST", headers: {"X-Yuri": "1"}, credentials: "same-origin"})
-        .then(function(){ location.href = "/dashboard"; });
+      fetch("/logout", {method: "POST", headers: {"X-Paper": "1"}, credentials: "same-origin"})
+        .then(function(){
+          var site = window.__me && window.__me.site;
+          location.href = site ? site + "#me=out" : "/dashboard";
+        });
     });
   });
   window.addEventListener("popstate", function(){ route(); });

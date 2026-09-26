@@ -11,7 +11,7 @@ hold exactly, and come back in as strings too.
 import discord
 
 import config
-from cogs.modtools import describe_duration, parse_duration
+from cogs.modtools import FREE_WARN_PUNISHMENTS, describe_duration, parse_duration
 from cogs.toggles import GROUPS, TOGGLES
 
 # How the gacha dials are grouped on the page. Any setting not named here
@@ -219,6 +219,8 @@ def mod_state(bot, guild) -> dict:
         "actions": list(PUNISHMENTS),
         "channels": _channels(guild),
         "roles": _roles(guild),
+        "premium": db.is_premium(gid),
+        "free_punishments": FREE_WARN_PUNISHMENTS,
     }
 
 
@@ -271,6 +273,10 @@ def mod_save(bot, guild, body) -> list:
                 continue
         seen.add(threshold)
         rows.append((threshold, action, seconds))
+
+    if len(rows) > FREE_WARN_PUNISHMENTS and not db.is_premium(guild.id):
+        problems.append(f"Free servers can have {FREE_WARN_PUNISHMENTS} warn"
+                        " punishments. Paper Premium allows up to 50.")
 
     ignored = []
     for value in body.get("lockdown_ignored") or []:

@@ -31,6 +31,7 @@ from views import Paginator
 REASON_LIMIT = 400
 MAX_TIMEOUT = 28 * 24 * 3600  # Discord will not go longer
 DEFAULT_TIMEOUT = 10 * 60
+FREE_WARN_PUNISHMENTS = 3   # Paper Premium lifts this to 50
 
 UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
 

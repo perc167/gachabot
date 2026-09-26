@@ -34,6 +34,7 @@ from views import Confirm, Paginator
 
 KARUDA_EVERY = 5            # levels between karuda payouts
 MAX_LEVEL = 500
+BOOST_RANGE = (105, 300)    # Premium XP boosts, as a percent
 
 # key: (default, lowest, highest, what it is)
 SETTINGS = {
@@ -209,6 +210,16 @@ class Levels(commands.Cog):
 
     # ------------------------------------------------------------ earning
 
+    def boosted(self, member, amount: int) -> int:
+        """Premium servers' boost roles: the best one a member has applies."""
+        guild_id = member.guild.id
+        if not self.db.is_premium(guild_id):
+            return amount
+        have = {r.id for r in getattr(member, "roles", [])}
+        best = max((row["percent"] for row in self.db.level_boosts_of(guild_id)
+                    if row["role_id"] in have), default=100)
+        return round(amount * best / 100)
+
     async def give_xp(self, member, amount: int, channel=None):
         """Add XP, and if that's a level up, pay out and announce it."""
         guild = member.guild
@@ -295,7 +306,8 @@ class Levels(commands.Cog):
         high = self.setting(guild.id, "msg_max")
         amount = random.randint(min(low, high), max(low, high))
         if amount:
-            await self.give_xp(message.author, amount, message.channel)
+            await self.give_xp(message.author, self.boosted(message.author, amount),
+                               message.channel)
 
     @tasks.loop(minutes=1)
     async def voice_xp(self):
@@ -326,7 +338,8 @@ class Levels(commands.Cog):
             return
         self.db.update_level_row(member.guild.id, member.id, voice_day=day,
                                  voice_today=spent + amount)
-        await self.give_xp(member, amount)
+        # The daily cap counts plain XP, so a boost can't reach it sooner.
+        await self.give_xp(member, self.boosted(member, amount))
 
     @voice_xp.before_loop
     async def before_voice_xp(self):
@@ -610,6 +623,48 @@ class Levels(commands.Cog):
                                  paid_through=max(row["paid_through"], level))
         await self.sync_roles(member, level)
         await ctx.send(f"**{member.display_name}** is level **{level}** now.",
+                       allowed_mentions=discord.AllowedMentions.none())
+
+    @levels.group(name="boost", aliases=["boosts"], invoke_without_command=True)
+    async def levels_boost(self, ctx):
+        """Premium: roles that earn extra XP."""
+        rows = self.db.level_boosts_of(ctx.guild.id)
+        lines = [f"<@&{r['role_id']}> earns **{r['percent'] / 100:g}x** XP" for r in rows]
+        note = "" if self.db.is_premium(ctx.guild.id) else (
+            "\n\n*XP boosts are a Paper Premium feature, so they're paused on"
+            f" this server. `{ctx.prefix}upgrade` to see how to get it.*")
+        await ctx.send(embed=discord.Embed(
+            title="XP boosts",
+            description=("\n".join(lines) or
+                         f"None yet. e.g. `{ctx.prefix}levels boost add @Booster 150`")
+            + note, colour=self.colour(ctx.guild.id)))
+
+    @levels_boost.command(name="add", aliases=["set"])
+    @commands.has_permissions(manage_guild=True)
+    async def levels_boost_add(self, ctx, role: discord.Role, percent: int):
+        """Premium: a role earns this percent of normal XP, e.g. 150 for 1.5x."""
+        if not self.db.is_premium(ctx.guild.id):
+            await ctx.send("XP boosts are a Paper Premium feature."
+                           f" `{ctx.prefix}upgrade` to see how to get it.")
+            return
+        low, high = BOOST_RANGE
+        if not low <= percent <= high:
+            await ctx.send(f"Pick from {low} (1.05x) to {high} (3x).")
+            return
+        if role.is_default():
+            await ctx.send("Pick a role other than @everyone.")
+            return
+        self.db.set_level_boost(ctx.guild.id, role.id, percent)
+        await ctx.send(f"**{role.name}** earns **{percent / 100:g}x** XP now.",
+                       allowed_mentions=discord.AllowedMentions.none())
+
+    @levels_boost.command(name="remove")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_boost_remove(self, ctx, role: discord.Role):
+        """Stop a role's XP boost."""
+        gone = self.db.remove_level_boost(ctx.guild.id, role.id)
+        await ctx.send(f"**{role.name}** earns normal XP again." if gone
+                       else f"**{role.name}** had no boost.",
                        allowed_mentions=discord.AllowedMentions.none())
 
     @levels.command(name="reset")

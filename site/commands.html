@@ -3,12 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Yuri is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
+<meta name="description" content="Paper is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
 <meta name="color-scheme" content="dark">
-<meta property="og:title" content="Yuri Gacha">
+<meta property="og:title" content="Paper">
+<meta property="og:image" content="https://gachabot.perc-1fc.workers.dev/img/paper-512.png">
+<meta name="theme-color" content="#7C6BF0">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/paper-180.png">
 <meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">
 <meta property="og:type" content="website">
-<title>Commands · Yuri</title>
+<title>Commands · Paper</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
@@ -88,11 +92,31 @@ nav{
   font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em;
   color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
 }
-.brand span{
-  width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
-  background:linear-gradient(140deg,var(--accent),var(--rose));
-  font-size:12px;color:#0D0B14;font-weight:700;
-}
+.brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
+  box-shadow:0 0 0 1px rgba(156,143,245,.45)}
+
+/* ---- the account chip, right of Dashboard ---- */
+.acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
+  padding:4px 12px 4px 4px;border-radius:999px;border:1px solid var(--line);
+  background:var(--panel);white-space:nowrap;max-width:190px}
+.acct:hover{border-color:var(--accent);text-decoration:none}
+.acct img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+.acct .nm{overflow:hidden;text-overflow:ellipsis}
+.acct.out{padding:6px 14px;font-family:var(--display);font-weight:600}
+@media(max-width:700px){.acct .nm{display:none}.acct{padding:3px}}
+
+/* ---- the hero's artwork ---- */
+.hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
+.hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:560/1285;
+  max-height:520px;justify-self:end;
+  box-shadow:0 30px 80px -30px rgba(124,107,240,.7),0 0 0 1px rgba(156,143,245,.25);
+  -webkit-mask-image:linear-gradient(#000 78%,transparent);
+  mask-image:linear-gradient(#000 78%,transparent)}
+.hero-art img{width:100%;height:100%;object-fit:cover;display:block;
+  animation:drift-art 14s ease-in-out infinite alternate}
+@keyframes drift-art{to{transform:scale(1.04) translateY(-6px)}}
+@media(max-width:880px){.hero{grid-template-columns:1fr}.hero-art{display:none}}
+@media(prefers-reduced-motion:reduce){.hero-art img{animation:none}}
 .nav-in a.link{color:var(--dim);font-size:14px;font-weight:500}
 .nav-in a.link:hover{color:var(--text);text-decoration:none}
 @media(max-width:700px){.nav-in a.link{display:none}}
@@ -276,6 +300,10 @@ code,kbd{
   font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
   border-radius:11px;transition:background .15s,transform .15s}
 .discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
+.premium-band{border-color:rgba(229,197,90,.45);
+  background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10))}
+.btn.gold{background:var(--gold);color:#1a1405}
+.btn.gold:hover{background:#f0d27a}
 .nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
   padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
 .nav-in .dash:hover{background:var(--accent-soft);text-decoration:none}
@@ -380,18 +408,19 @@ footer p{margin:0 0 6px}
 <canvas id="sky" aria-hidden="true"></canvas>
 
 <nav><div class="wrap nav-in">
-  <a class="brand" href="./"><span>Y</span>Yuri</a>
+  <a class="brand" href="./"><img src="img/paper-180.png" alt="" width="26" height="26">Paper</a>
   <a class="link" href="./#setup">Setup</a>
   <a class="link" href="./#features">Features</a>
   <a class="link" href="commands.html">Commands</a>
   <a class="dash" href="https://gachabot-production-fbd6.up.railway.app/dashboard">Dashboard</a>
+  <a class="acct out" id="acct" href="https://gachabot-production-fbd6.up.railway.app/login?next=site">Log in</a>
 </div></nav>
 
 <div id="top" class="wrap">
 <header class="page-head">
   <p class="eyebrow">Commands</p>
   <h1>Every command, by what it's for</h1>
-  <p class="lede">369 commands. Pick a part, or search them all.
+  <p class="lede">373 commands. Pick a part, or search them all.
   Type <code>$help</code> in Discord and the same list arrives by DM.</p>
 </header>
 
@@ -440,7 +469,7 @@ footer p{margin:0 0 6px}
 <div class="group" id="g-records---names" data-area="mod"><h3>📜 Records &amp; names<b>8</b></h3><div class="cmds"><div class="cmd" data-find="history someone&#x27;s record everything staff have done to someone. cases record"><span class="n">$history</span><span class="b">someone&#x27;s record</span><span class="a">also: $cases $record</span></div><div class="cmd" data-find="modhistory a mod&#x27;s actions everything a staff member has done, with a count of each. modstats staffhistory"><span class="n">$modhistory</span><span class="b">a mod&#x27;s actions</span><span class="a">also: $modstats $staffhistory</span></div><div class="cmd" data-find="audit the audit log the server&#x27;s latest audit log entries. auditlog"><span class="n">$audit</span><span class="b">the audit log</span><span class="a">also: $auditlog</span></div><div class="cmd" data-find="nickname change a nickname change someone&#x27;s nickname. leave the name out to reset it. nick setnick"><span class="n">$nickname</span><span class="b">change a nickname</span><span class="a">also: $nick $setnick</span></div><div class="cmd" data-find="nickname remove reset it reset someone&#x27;s nickname to their username. "><span class="n">$nickname remove</span><span class="b">reset it</span></div><div class="cmd" data-find="nickname force pin a nickname pin a nickname on someone. changing it puts it straight back. "><span class="n">$nickname force</span><span class="b">pin a nickname</span></div><div class="cmd" data-find="nickname force cancel unpin it stop forcing someone&#x27;s nickname. it stays until they change it. "><span class="n">$nickname force cancel</span><span class="b">unpin it</span></div><div class="cmd" data-find="forcenick pin or unpin force a nickname, or leave the name out to stop forcing it. forcenickname"><span class="n">$forcenick</span><span class="b">pin or unpin</span><span class="a">also: $forcenickname</span></div></div></div>
 <div class="group" id="g-mod-setup" data-area="mod"><h3>🛡️ Mod setup<b>13</b></h3><div class="cmds"><div class="cmd" data-find="setupmod jail, roles, log make the jail, the mute roles and the mod log. name your staff roles. modsetup"><span class="n">$setupmod</span><span class="b">jail, roles, log</span><span class="a">also: $modsetup</span></div><div class="cmd" data-find="setupmod reset start over forget the jail, roles and log so $setupmod starts fresh. "><span class="n">$setupmod reset</span><span class="b">start over</span></div><div class="cmd" data-find="modlog pick the log channel choose the channel every mod action is posted to. setmodlog"><span class="n">$modlog</span><span class="b">pick the log channel</span><span class="a">also: $setmodlog</span></div><div class="cmd" data-find="staffroles staff roles the roles that count as staff. staff staffrole"><span class="n">$staffroles</span><span class="b">staff roles</span><span class="a">also: $staff $staffrole</span></div><div class="cmd" data-find="staffroles add make a role staff make a role staff: it can see the jail and mod log. "><span class="n">$staffroles add</span><span class="b">make a role staff</span></div><div class="cmd" data-find="staffroles list see them the roles that count as staff. "><span class="n">$staffroles list</span><span class="b">see them</span></div><div class="cmd" data-find="staffroles remove unmake one stop a role counting as staff. "><span class="n">$staffroles remove</span><span class="b">unmake one</span></div><div class="cmd" data-find="invoke custom messages your own wording for what the bot says after an action. "><span class="n">$invoke</span><span class="b">custom messages</span></div><div class="cmd" data-find="invoke set write one e.g. $invoke set jail message {user.mention} is in jail: {reason} "><span class="n">$invoke set</span><span class="b">write one</span></div><div class="cmd" data-find="invoke view read one show the saved wording for one action. "><span class="n">$invoke view</span><span class="b">read one</span></div><div class="cmd" data-find="invoke list see them all every action with its own wording, and the variables you can use. "><span class="n">$invoke list</span><span class="b">see them all</span></div><div class="cmd" data-find="invoke reset back to default go back to the default wording for an action. "><span class="n">$invoke reset</span><span class="b">back to default</span></div><div class="cmd" data-find="invoke test preview one preview an action&#x27;s wording, with you as the member. "><span class="n">$invoke test</span><span class="b">preview one</span></div></div></div>
 <div class="group" id="g-levels" data-area="levels"><h3>📈 Levels<b>5</b></h3><div class="cmds"><div class="cmd" data-find="rank your level your level, how close the next one is, and your place here. level lvl xp"><span class="n">$rank</span><span class="b">your level</span><span class="a">also: $level $lvl $xp</span></div><div class="cmd" data-find="levels level leaderboard the server&#x27;s level leaderboard. levelboard toplevels"><span class="n">$levels</span><span class="b">level leaderboard</span><span class="a">also: $levelboard $toplevels</span></div><div class="cmd" data-find="levels settings how it&#x27;s set up how levelling is set up here. config"><span class="n">$levels settings</span><span class="b">how it&#x27;s set up</span><span class="a">also: $config</span></div><div class="cmd" data-find="levels role level roles the roles handed out at each level. roles"><span class="n">$levels role</span><span class="b">level roles</span><span class="a">also: $roles</span></div><div class="cmd" data-find="levels ignore list no-xp channels channels that don&#x27;t earn xp. "><span class="n">$levels ignore list</span><span class="b">no-XP channels</span></div></div></div>
-<div class="group" id="g-level-setup" data-area="levels"><h3>🔧 Level setup<b>19</b></h3><div class="cmds"><div class="cmd" data-find="levels role add role at a level give a role at a level. members already past it get it next time set"><span class="n">$levels role add</span><span class="b">role at a level</span><span class="a">also: $set</span></div><div class="cmd" data-find="levels role remove drop one stop giving a role at a level. nobody loses it. "><span class="n">$levels role remove</span><span class="b">drop one</span></div><div class="cmd" data-find="levels sync hand out earned roles bring everyone&#x27;s level roles up to date. "><span class="n">$levels sync</span><span class="b">hand out earned roles</span></div><div class="cmd" data-find="levels channel where level-ups go where level-ups are announced: a channel, `here` for wherever they "><span class="n">$levels channel</span><span class="b">where level-ups go</span></div><div class="cmd" data-find="levels karuda karuda per 5 levels karuda paid every 5 levels, up to 250. 0 turns it off. reward"><span class="n">$levels karuda</span><span class="b">karuda per 5 levels</span><span class="a">also: $reward</span></div><div class="cmd" data-find="levels voice voice xp on or off turn xp for time in voice `on` or `off`. "><span class="n">$levels voice</span><span class="b">voice XP on or off</span></div><div class="cmd" data-find="levels ignore no xp in a channel no xp for messages in a channel, like a spam or bot channel. "><span class="n">$levels ignore</span><span class="b">no XP in a channel</span></div><div class="cmd" data-find="levels ignore remove count it again let a channel earn xp again. "><span class="n">$levels ignore remove</span><span class="b">count it again</span></div><div class="cmd" data-find="levels set set someone&#x27;s level put someone at a level, e.g. to carry levels over from another "><span class="n">$levels set</span><span class="b">set someone&#x27;s level</span></div><div class="cmd" data-find="levels import bring levels over carry levels over from another bot. attach a text file with one "><span class="n">$levels import</span><span class="b">bring levels over</span></div><div class="cmd" data-find="levels xp xp per message xp a message gives: a range, e.g. `15 25`, or one number. "><span class="n">$levels xp</span><span class="b">XP per message</span></div><div class="cmd" data-find="levels cooldown time between counted seconds before someone&#x27;s next message earns xp again. "><span class="n">$levels cooldown</span><span class="b">time between counted</span></div><div class="cmd" data-find="levels voicexp voice xp a minute voice xp per minute. "><span class="n">$levels voicexp</span><span class="b">voice XP a minute</span></div><div class="cmd" data-find="levels voicecap voice xp a day the most voice xp anyone can earn in a day. "><span class="n">$levels voicecap</span><span class="b">voice XP a day</span></div><div class="cmd" data-find="levels stack keep lower roles `on` keeps every level role earned; `off` keeps only the highest. "><span class="n">$levels stack</span><span class="b">keep lower roles</span></div><div class="cmd" data-find="levels message level-up wording the level-up message. use {user}, {user.name}, {level} and "><span class="n">$levels message</span><span class="b">level-up wording</span></div><div class="cmd" data-find="dashboard settings on the web dms you a private link to change level settings on the web. dash"><span class="n">$dashboard</span><span class="b">settings on the web</span><span class="a">also: $dash</span></div><div class="cmd" data-find="sitelist show on the website whether this server appears in the list on the bot&#x27;s website. website"><span class="n">$sitelist</span><span class="b">show on the website</span><span class="a">also: $website</span></div><div class="cmd" data-find="levels reset back to level 0 take someone back to level 0. their roles stay. "><span class="n">$levels reset</span><span class="b">back to level 0</span></div></div></div>
+<div class="group" id="g-level-setup" data-area="levels"><h3>🔧 Level setup<b>23</b></h3><div class="cmds"><div class="cmd" data-find="levels role add role at a level give a role at a level. members already past it get it next time set"><span class="n">$levels role add</span><span class="b">role at a level</span><span class="a">also: $set</span></div><div class="cmd" data-find="levels role remove drop one stop giving a role at a level. nobody loses it. "><span class="n">$levels role remove</span><span class="b">drop one</span></div><div class="cmd" data-find="levels sync hand out earned roles bring everyone&#x27;s level roles up to date. "><span class="n">$levels sync</span><span class="b">hand out earned roles</span></div><div class="cmd" data-find="levels channel where level-ups go where level-ups are announced: a channel, `here` for wherever they "><span class="n">$levels channel</span><span class="b">where level-ups go</span></div><div class="cmd" data-find="levels karuda karuda per 5 levels karuda paid every 5 levels, up to 250. 0 turns it off. reward"><span class="n">$levels karuda</span><span class="b">karuda per 5 levels</span><span class="a">also: $reward</span></div><div class="cmd" data-find="levels voice voice xp on or off turn xp for time in voice `on` or `off`. "><span class="n">$levels voice</span><span class="b">voice XP on or off</span></div><div class="cmd" data-find="levels ignore no xp in a channel no xp for messages in a channel, like a spam or bot channel. "><span class="n">$levels ignore</span><span class="b">no XP in a channel</span></div><div class="cmd" data-find="levels ignore remove count it again let a channel earn xp again. "><span class="n">$levels ignore remove</span><span class="b">count it again</span></div><div class="cmd" data-find="levels set set someone&#x27;s level put someone at a level, e.g. to carry levels over from another "><span class="n">$levels set</span><span class="b">set someone&#x27;s level</span></div><div class="cmd" data-find="levels import bring levels over carry levels over from another bot. attach a text file with one "><span class="n">$levels import</span><span class="b">bring levels over</span></div><div class="cmd" data-find="levels xp xp per message xp a message gives: a range, e.g. `15 25`, or one number. "><span class="n">$levels xp</span><span class="b">XP per message</span></div><div class="cmd" data-find="levels cooldown time between counted seconds before someone&#x27;s next message earns xp again. "><span class="n">$levels cooldown</span><span class="b">time between counted</span></div><div class="cmd" data-find="levels voicexp voice xp a minute voice xp per minute. "><span class="n">$levels voicexp</span><span class="b">voice XP a minute</span></div><div class="cmd" data-find="levels voicecap voice xp a day the most voice xp anyone can earn in a day. "><span class="n">$levels voicecap</span><span class="b">voice XP a day</span></div><div class="cmd" data-find="levels stack keep lower roles `on` keeps every level role earned; `off` keeps only the highest. "><span class="n">$levels stack</span><span class="b">keep lower roles</span></div><div class="cmd" data-find="levels message level-up wording the level-up message. use {user}, {user.name}, {level} and "><span class="n">$levels message</span><span class="b">level-up wording</span></div><div class="cmd" data-find="levels boost premium xp boosts premium: roles that earn extra xp. boosts"><span class="n">$levels boost</span><span class="b">premium XP boosts</span><span class="a">also: $boosts</span></div><div class="cmd" data-find="levels boost add boost a role premium: a role earns this percent of normal xp, e.g. 150 for 1.5x. set"><span class="n">$levels boost add</span><span class="b">boost a role</span><span class="a">also: $set</span></div><div class="cmd" data-find="levels boost remove stop a boost stop a role&#x27;s xp boost. "><span class="n">$levels boost remove</span><span class="b">stop a boost</span></div><div class="cmd" data-find="dashboard settings on the web dms you a private link to change level settings on the web. dash"><span class="n">$dashboard</span><span class="b">settings on the web</span><span class="a">also: $dash</span></div><div class="cmd" data-find="sitelist show on the website whether this server appears in the list on the bot&#x27;s website. website"><span class="n">$sitelist</span><span class="b">show on the website</span><span class="a">also: $website</span></div><div class="cmd" data-find="upgrade paper premium whether this server has paper premium, and how to get it. papergold serverpremium"><span class="n">$upgrade</span><span class="b">Paper Premium</span><span class="a">also: $papergold $serverpremium</span></div><div class="cmd" data-find="levels reset back to level 0 take someone back to level 0. their roles stay. "><span class="n">$levels reset</span><span class="b">back to level 0</span></div></div></div>
 <div class="group" id="g-voice-rooms" data-area="voice"><h3>🔊 Voice rooms<b>13</b></h3><div class="cmds"><div class="cmd" data-find="vc every vc command your own voice channel. on its own, shows every $vc command. vm voice voicemaster"><span class="n">$vc</span><span class="b">every vc command</span><span class="a">also: $vm $voice $voicemaster</span></div><div class="cmd" data-find="vc lock lock your call stop anyone else joining. "><span class="n">$vc lock</span><span class="b">lock your call</span></div><div class="cmd" data-find="vc unlock open it let anyone join again. "><span class="n">$vc unlock</span><span class="b">open it</span></div><div class="cmd" data-find="vc hide hide it hide the channel from the list. "><span class="n">$vc hide</span><span class="b">hide it</span></div><div class="cmd" data-find="vc unhide show it show the channel in the list again. show"><span class="n">$vc unhide</span><span class="b">show it</span><span class="a">also: $show</span></div><div class="cmd" data-find="vc rename rename it rename your channel. discord allows twice every 10 minutes. name"><span class="n">$vc rename</span><span class="b">rename it</span><span class="a">also: $name</span></div><div class="cmd" data-find="vc limit cap who joins cap how many people can join. 0 for no cap. cap"><span class="n">$vc limit</span><span class="b">cap who joins</span><span class="a">also: $cap</span></div><div class="cmd" data-find="vc permit let someone in let someone in, even when it&#x27;s locked or hidden. allow"><span class="n">$vc permit</span><span class="b">let someone in</span><span class="a">also: $allow</span></div><div class="cmd" data-find="vc reject take access away take away someone&#x27;s access and remove them if they&#x27;re in. deny"><span class="n">$vc reject</span><span class="b">take access away</span><span class="a">also: $deny</span></div><div class="cmd" data-find="vc ban block someone stop someone joining or seeing your channel at all. block"><span class="n">$vc ban</span><span class="b">block someone</span><span class="a">also: $block</span></div><div class="cmd" data-find="vc unban unblock them let someone you banned join again. unblock"><span class="n">$vc unban</span><span class="b">unblock them</span><span class="a">also: $unblock</span></div><div class="cmd" data-find="vc claim take over take over a channel whose owner has left. "><span class="n">$vc claim</span><span class="b">take over</span></div><div class="cmd" data-find="vc transfer hand it over give your channel to someone in it. give"><span class="n">$vc transfer</span><span class="b">hand it over</span><span class="a">also: $give</span></div></div></div>
 <div class="group" id="g-voice-hours" data-area="voice"><h3>📊 Voice hours<b>8</b></h3><div class="cmds"><div class="cmd" data-find="vc stats your vc time how long you&#x27;ve spent in voice. me time"><span class="n">$vc stats</span><span class="b">your vc time</span><span class="a">also: $me $time</span></div><div class="cmd" data-find="vc lb hour leaderboard who has spent the most time in voice. leaderboard top"><span class="n">$vc lb</span><span class="b">hour leaderboard</span><span class="a">also: $leaderboard $top</span></div><div class="cmd" data-find="vc hours hour roles the roles you get for time in voice. roles"><span class="n">$vc hours</span><span class="b">hour roles</span><span class="a">also: $roles</span></div><div class="cmd" data-find="vc hours add add an hour role give a role at so many hours in voice. set"><span class="n">$vc hours add</span><span class="b">add an hour role</span><span class="a">also: $set</span></div><div class="cmd" data-find="vc hours remove drop one stop giving a role at so many hours. nobody loses it. "><span class="n">$vc hours remove</span><span class="b">drop one</span></div><div class="cmd" data-find="vc setup make join to create make join to create. or name an existing voice channel to use it. "><span class="n">$vc setup</span><span class="b">make Join To Create</span></div><div class="cmd" data-find="vc panel post the commands post the list of $vc commands here. "><span class="n">$vc panel</span><span class="b">post the commands</span></div><div class="cmd" data-find="vc reset turn it off turn join to create off. hours and hour roles are kept. "><span class="n">$vc reset</span><span class="b">turn it off</span></div></div></div>
 <div class="group" id="g-staff-points" data-area="mod"><h3>🏅 Staff points<b>5</b></h3><div class="cmds"><div class="cmd" data-find="point give a point give someone a point, e.g. for a report that ended in a ban. addpoint givepoint"><span class="n">$point</span><span class="b">give a point</span><span class="a">also: $addpoint $givepoint</span></div><div class="cmd" data-find="points see someone&#x27;s points how many points someone has, and what each one was for. mypoints pointlist"><span class="n">$points</span><span class="b">see someone&#x27;s points</span><span class="a">also: $mypoints $pointlist</span></div><div class="cmd" data-find="toppoints who has the most everyone with points, most first. pointsboard pointslb"><span class="n">$toppoints</span><span class="b">who has the most</span><span class="a">also: $pointsboard $pointslb</span></div><div class="cmd" data-find="removepoint take one back take back one point by its number, shown in $points. delpoint unpoint"><span class="n">$removepoint</span><span class="b">take one back</span><span class="a">also: $delpoint $unpoint</span></div><div class="cmd" data-find="clearpoints wipe someone&#x27;s points wipe all of someone&#x27;s points, e.g. after a promotion. resetpoints"><span class="n">$clearpoints</span><span class="b">wipe someone&#x27;s points</span><span class="a">also: $resetpoints</span></div></div></div>
@@ -454,7 +483,7 @@ footer p{margin:0 0 6px}
 </section>
 
 <footer>
-  <p><a href="./#setup">How to set Yuri up</a> · <a href="https://gachabot-production-fbd6.up.railway.app/dashboard">Dashboard</a></p>
+  <p><a href="./#setup">How to set Paper up</a> · <a href="https://gachabot-production-fbd6.up.railway.app/dashboard">Dashboard</a></p>
 </footer>
 </div>
 
@@ -661,6 +690,44 @@ footer p{margin:0 0 6px}
     show(true);
     document.getElementById("characters").scrollIntoView();
   }
+})();
+
+(function(){
+  // The account chip. The website and the dashboard live on different
+  // domains, so the site can't see the dashboard's login. Instead the
+  // dashboard hands over a display name and picture in the link (#me=...)
+  // when you log in or come back from it, and #me=out when you log out.
+  // It's only ever shown here, never trusted: faking it changes what one
+  // person sees in their own browser, nothing else.
+  var chip = document.getElementById("acct");
+  if (!chip) return;
+  var KEY = "paper-me", WEEK = 7 * 86400 * 1000, me = null;
+  var match = /[#&]me=([^&]+)/.exec(location.hash);
+  try {
+    if (match) {
+      if (match[1] === "out") localStorage.removeItem(KEY);
+      else {
+        var raw = JSON.parse(decodeURIComponent(escape(atob(
+          match[1].replace(/-/g, "+").replace(/_/g, "/")))));
+        localStorage.setItem(KEY, JSON.stringify({
+          n: String(raw.n || "").slice(0, 40), a: raw.a || "", until: Date.now() + WEEK}));
+      }
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    me = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (me && me.until < Date.now()) { localStorage.removeItem(KEY); me = null; }
+  } catch (e) { me = null; }
+  if (!me || !me.n) return;
+  chip.className = "acct";
+  chip.href = "https://gachabot-production-fbd6.up.railway.app/dashboard";
+  chip.textContent = "";
+  chip.title = "Signed in as " + me.n + ": open the dashboard";
+  if (/^https:\/\/cdn\.discordapp\.com\//.test(me.a)) {
+    var img = document.createElement("img"); img.src = me.a; img.alt = "";
+    chip.appendChild(img);
+  }
+  var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = me.n;
+  chip.appendChild(nm);
 })();
 
 (function(){

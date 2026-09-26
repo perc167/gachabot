@@ -307,6 +307,26 @@ CREATE TABLE IF NOT EXISTS invoke_messages (
     PRIMARY KEY (guild_id, action, kind)
 );
 
+-- Paper Premium, one row per server (billing.py). Premium means `until`
+-- is in the future; everything else is for showing and managing billing.
+CREATE TABLE IF NOT EXISTS guild_premium (
+    guild_id     INTEGER PRIMARY KEY,
+    status       TEXT NOT NULL DEFAULT '',
+    until        INTEGER NOT NULL DEFAULT 0,
+    customer     TEXT NOT NULL DEFAULT '',
+    subscription TEXT NOT NULL DEFAULT '',
+    buyer_id     INTEGER NOT NULL DEFAULT 0,
+    updated_at   INTEGER NOT NULL DEFAULT 0
+);
+
+-- Premium: roles that earn extra XP, as a percentage (150 = 1.5x).
+CREATE TABLE IF NOT EXISTS level_boosts (
+    guild_id INTEGER NOT NULL,
+    role_id  INTEGER NOT NULL,
+    percent  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+);
+
 -- Dashboard logins. Only a hash of the session key is kept, so a copy of
 -- the database can't be used to log in as anybody. guilds is the JSON list
 -- of servers Discord said they could manage when they logged in.
@@ -780,6 +800,45 @@ class Database:
             return self._delete("invoke_messages", guild_id=guild_id,
                                 action=action, kind=kind)
         return self._delete("invoke_messages", guild_id=guild_id, action=action)
+
+    # ---------- premium ----------
+
+    def set_premium(self, guild_id: int, status: str, until: int, customer: str,
+                    subscription: str, buyer_id: int = 0):
+        row = self.premium_of(guild_id)
+        self._upsert("guild_premium", {
+            "guild_id": guild_id, "status": status, "until": int(until),
+            # A later event may not carry these; don't forget them.
+            "customer": customer or (row["customer"] if row else ""),
+            "subscription": subscription or (row["subscription"] if row else ""),
+            "buyer_id": buyer_id or (row["buyer_id"] if row else 0),
+            "updated_at": int(time.time())})
+
+    def premium_of(self, guild_id: int):
+        rows = self._select("guild_premium", guild_id=guild_id)
+        return rows[0] if rows else None
+
+    def is_premium(self, guild_id: int) -> bool:
+        row = self.premium_of(guild_id)
+        return bool(row and row["until"] > time.time())
+
+    def set_level_boost(self, guild_id: int, role_id: int, percent: int):
+        self._upsert("level_boosts",
+                     {"guild_id": guild_id, "role_id": role_id, "percent": percent})
+
+    def remove_level_boost(self, guild_id: int, role_id: int) -> int:
+        return self._delete("level_boosts", guild_id=guild_id, role_id=role_id)
+
+    def level_boosts_of(self, guild_id: int) -> list:
+        return self._select("level_boosts", "percent DESC", guild_id=guild_id)
+
+    def replace_level_boosts(self, guild_id: int, pairs):
+        with self.conn:
+            self.conn.execute("DELETE FROM level_boosts WHERE guild_id = ?",
+                              (guild_id,))
+            self.conn.executemany(
+                "INSERT INTO level_boosts (guild_id, role_id, percent)"
+                " VALUES (?, ?, ?)", [(guild_id, r, p) for r, p in pairs])
 
     # ---------- dashboard logins ----------
 

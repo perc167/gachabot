@@ -8,7 +8,7 @@ Manage Server on the server they're changing:
 
 - Log in with Discord (oauth.py). A session cookie, HttpOnly and SameSite,
   lasts SESSION_DAYS; only its hash is stored. Changes made with it must
-  carry an X-Yuri header, which another site can't add without a CORS
+  carry an X-Paper header, which another site can't add without a CORS
   preflight this server never grants, so a forged form can't save
   anything.
 - `$dashboard`, which DMs a private link for one server, good for
@@ -23,10 +23,15 @@ the service's Settings > Networking > Generate Domain.
 Everything saved here goes through the same checks as the $levels commands:
 Levels.save_settings() and the limits in cogs/levels.py.
 
+Paper Premium is sold here too (billing.py): Upgrade opens a Stripe
+Checkout page, and Stripe reports back to /stripe/webhook, which is checked
+against Stripe's signature before anything is believed.
+
 It also serves /api/servers, the public list of servers the bot is in, for
 the scrolling strip on the website. Only a server's name, icon and member
 count go out, and any server can leave the list with `$sitelist off`.
 """
+import base64
 import json
 import os
 import secrets
@@ -36,8 +41,10 @@ import discord
 from aiohttp import web
 from discord.ext import commands
 
+import billing
 import oauth
 import webparts
+from cogs.levels import BOOST_RANGE
 
 from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
                          MESSAGE_LIMIT, MESSAGE_VARIABLES, SETTINGS, level_for,
@@ -45,12 +52,14 @@ from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "dashboard", "index.html")
+LOGO = os.path.join(ROOT, "dashboard", "paper.png")
 LINK_LIFETIME = 3600
 MAX_LEVEL_ROLES = 100
 SHOWCASE_CACHE = 300        # seconds the public server list is reused for
 SHOWCASE_LIMIT = 60
 SESSION_COOKIE = "yuri_session"
 STATE_COOKIE = "yuri_state"
+NEXT_COOKIE = "paper_next"
 SESSION_DAYS = 7
 # Where the dashboard's Home link goes: the public website.
 SITE_URL = os.getenv("SITE_URL", "https://gachabot.perc-1fc.workers.dev").rstrip("/")
@@ -69,6 +78,13 @@ def public_url() -> str:
         return url
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
     return f"https://{domain}" if domain else ""
+
+
+def handover(person: dict) -> str:
+    """A display name and picture for the website's nav, in its link. Shown
+    there, never trusted: see the chip in tools/build_site.py."""
+    raw = json.dumps({"n": person["name"], "a": person.get("avatar") or ""})
+    return base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
 
 
 def redirect(location: str):
@@ -97,11 +113,16 @@ class Dashboard(commands.Cog):
         app = web.Application(client_max_size=256 * 1024)
         app.router.add_get("/", self.home)
         app.router.add_get("/dashboard", self.page)
+        app.router.add_get("/paper.png", self.logo)
         app.router.add_get("/login", self.login)
         app.router.add_get("/callback", self.callback)
         app.router.add_post("/logout", self.logout)
         app.router.add_get("/api/me", self.api_me)
         app.router.add_get("/api/overview", self.api_overview)
+        app.router.add_post("/api/premium/checkout", self.api_checkout)
+        app.router.add_post("/api/premium/portal", self.api_portal)
+        app.router.add_get("/api/cases.csv", self.api_cases)
+        app.router.add_post("/stripe/webhook", self.stripe_webhook)
         app.router.add_get("/api/part/{part}", self.api_part_get)
         app.router.add_post("/api/part/{part}", self.api_part_save)
         app.router.add_get("/api/levels", self.api_get)
@@ -157,6 +178,33 @@ class Dashboard(commands.Cog):
                            " try again.")
             return
         await ctx.send("Sent you the link in DMs.")
+
+    @commands.command(name="upgrade", aliases=["serverpremium", "papergold"])
+    @commands.guild_only()
+    async def upgrade(self, ctx):
+        """Whether this server has Paper Premium, and how to get it."""
+        db = self.bot.db
+        base = public_url()
+        link = f"{base}/dashboard?guild={ctx.guild.id}" if base else ""
+        if db.is_premium(ctx.guild.id):
+            row = db.premium_of(ctx.guild.id)
+            text = (f"\u2728 **{ctx.guild.name}** has Paper Premium until"
+                    f" <t:{row['until']}:D>.")
+            if link:
+                text += f"\nManage billing on the dashboard: <{link}>"
+        else:
+            price = billing.price_label()
+            text = ("**Paper Premium** for this server"
+                    + (f", {price}" if price else "") + ":\n"
+                    "\u2022 XP boost roles, like 1.5x XP for Boosters\n"
+                    "\u2022 Up to 50 automatic warn punishments (free: 3)\n"
+                    "\u2022 Moderation case history as a spreadsheet\n"
+                    "\u2022 More on the way, and it supports the bot")
+            if link and billing.configured():
+                text += f"\nAn admin can upgrade on the dashboard: <{link}>"
+            elif not billing.configured():
+                text += "\nIt isn't on sale just yet."
+        await ctx.send(text, allowed_mentions=discord.AllowedMentions.none())
 
     # ---------------------------------------------------------- showcase
 
@@ -234,6 +282,10 @@ class Dashboard(commands.Cog):
         response = redirect(oauth.authorize_url(
             self.client_id(), self.redirect_url(), state))
         response.set_cookie(STATE_COOKIE, state, **self.cookie_options(600))
+        # Logging in from the website goes back to the website afterwards.
+        # Only ever to SITE_URL: where to go is a word, not an address.
+        if request.query.get("next") == "site":
+            response.set_cookie(NEXT_COOKIE, "site", **self.cookie_options(600))
         return response
 
     async def callback(self, request):
@@ -255,14 +307,18 @@ class Dashboard(commands.Cog):
             oauth.hash_token(token), person["id"], person["name"],
             person["avatar"], oauth.dump_guilds(person["guilds"]),
             int(time.time()) + SESSION_DAYS * 86400)
-        response = redirect("/dashboard")
+        going = "/dashboard"
+        if request.cookies.get(NEXT_COOKIE) == "site":
+            going = SITE_URL + "#me=" + handover(person)
+        response = redirect(going)
         response.set_cookie(SESSION_COOKIE, token,
                             **self.cookie_options(SESSION_DAYS * 86400))
         response.del_cookie(STATE_COOKIE, path="/")
+        response.del_cookie(NEXT_COOKIE, path="/")
         return response
 
     async def logout(self, request):
-        if request.headers.get("X-Yuri") != "1":
+        if request.headers.get("X-Paper") != "1":
             return problem(403, "Log out from the dashboard page.")
         token = request.cookies.get(SESSION_COOKIE, "")
         if token:
@@ -307,7 +363,7 @@ class Dashboard(commands.Cog):
         """(guild, member, Levels cog) for a request, or an error response.
 
         A private link names its own server. A logged-in session names it
-        with ?guild=, and must send X-Yuri with anything that changes."""
+        with ?guild=, and must send X-Paper with anything that changes."""
         header = request.headers.get("Authorization", "")
         if header.startswith("Bearer "):
             entry = self.links.get(header[7:])
@@ -320,7 +376,7 @@ class Dashboard(commands.Cog):
             session = self.session_of(request)
             if not session:
                 return None, problem(401, "You're logged out. Log in again.")
-            if request.method != "GET" and request.headers.get("X-Yuri") != "1":
+            if request.method != "GET" and request.headers.get("X-Paper") != "1":
                 return None, problem(403, "Save from the dashboard page.")
             try:
                 guild_id = int(request.query.get("guild", ""))
@@ -340,6 +396,9 @@ class Dashboard(commands.Cog):
 
     async def home(self, request):
         return redirect("/dashboard")
+
+    async def logo(self, request):
+        return web.FileResponse(LOGO, headers={"Cache-Control": "public, max-age=86400"})
 
     async def page(self, request):
         return web.FileResponse(PAGE, headers={**HEADERS,
@@ -381,6 +440,10 @@ class Dashboard(commands.Cog):
             "variables": list(MESSAGE_VARIABLES),
             "karuda_every": KARUDA_EVERY,
             "curve": [total_for(n) for n in range(101)],
+            "premium": self.bot.db.is_premium(guild.id),
+            "boosts": [{"role": str(r["role_id"]), "percent": r["percent"]}
+                       for r in self.bot.db.level_boosts_of(guild.id)],
+            "boost_range": list(BOOST_RANGE),
         }
 
     async def api_get(self, request):
@@ -462,6 +525,30 @@ class Dashboard(commands.Cog):
                 if isinstance(channel, discord.TextChannel):
                     channel_ids.append(channel.id)
 
+        boosts = body.get("boosts")
+        boost_pairs = []
+        if boosts is not None:
+            if boosts and not self.bot.db.is_premium(guild.id):
+                problems.append("XP boosts are a Premium feature.")
+            low, high = BOOST_RANGE
+            seen_roles = set()
+            for row in boosts if isinstance(boosts, list) else []:
+                try:
+                    role_id, percent = int(row["role"]), int(row["percent"])
+                except (TypeError, ValueError, KeyError):
+                    problems.append("Every XP boost needs a role and a percent.")
+                    continue
+                role = guild.get_role(role_id)
+                if not role or role.is_default():
+                    problems.append("XP boosts need a role from this server.")
+                elif role_id in seen_roles:
+                    problems.append(f"{role.name} has two boosts. Pick one.")
+                elif not low <= percent <= high:
+                    problems.append(f"Boosts go from {low}% to {high}%.")
+                else:
+                    seen_roles.add(role_id)
+                    boost_pairs.append((role_id, percent))
+
         # Every problem at once, so fixing one doesn't just reveal the next.
         problems += [p for key, value in settings.items()
                      if key != "channel" and (p := validate(key, value))]
@@ -483,6 +570,8 @@ class Dashboard(commands.Cog):
             self.bot.db.replace_level_roles(guild.id, sorted(pairs))
         if ignored is not None:
             self.bot.db.replace_level_ignored(guild.id, channel_ids)
+        if boosts is not None:
+            self.bot.db.replace_level_boosts(guild.id, boost_pairs)
         return web.json_response(self.state(guild, levels), headers=HEADERS)
 
     async def api_overview(self, request):
@@ -495,8 +584,99 @@ class Dashboard(commands.Cog):
             "guild": {"name": guild.name,
                       "icon": guild.icon.url if guild.icon else None},
             "parts": webparts.overview(self.bot, guild),
+            "premium": self.premium_state(guild),
             "site": SITE_URL,
         }, headers=HEADERS)
+
+    # ------------------------------------------------------------ premium
+
+    def premium_state(self, guild) -> dict:
+        row = self.bot.db.premium_of(guild.id)
+        active = self.bot.db.is_premium(guild.id)
+        return {
+            "active": active,
+            "until": row["until"] if row and active else 0,
+            # A cancelled subscription still runs to the end of the month.
+            "ending": bool(row and active and row["status"] not in ("active", "trialing")),
+            "billing": bool(row and row["customer"]),
+            "for_sale": billing.configured(),
+            "price": billing.price_label(),
+        }
+
+    async def api_checkout(self, request):
+        found, error = self.who(request)
+        if error:
+            return error
+        guild, member = found[0], found[1]
+        if not billing.configured():
+            return problem(503, "Premium isn't on sale yet.")
+        if self.bot.db.is_premium(guild.id):
+            return problem(409, "This server already has Premium.")
+        back = f"{public_url()}/dashboard?guild={guild.id}"
+        row = self.bot.db.premium_of(guild.id)
+        try:
+            url = await billing.checkout(
+                guild.id, guild.name, member.id,
+                success_url=back + "&premium=thanks", cancel_url=back,
+                customer=row["customer"] if row else "")
+        except (billing.BillingError, OSError) as e:
+            return problem(502, f"Couldn't start the payment: {e}")
+        return web.json_response({"url": url}, headers=HEADERS)
+
+    async def api_portal(self, request):
+        found, error = self.who(request)
+        if error:
+            return error
+        guild = found[0]
+        row = self.bot.db.premium_of(guild.id)
+        if not row or not row["customer"]:
+            return problem(404, "This server has no billing to manage.")
+        try:
+            url = await billing.portal(row["customer"],
+                                       f"{public_url()}/dashboard?guild={guild.id}")
+        except (billing.BillingError, OSError) as e:
+            return problem(502, f"Couldn't open billing: {e}")
+        return web.json_response({"url": url}, headers=HEADERS)
+
+    async def stripe_webhook(self, request):
+        payload = await request.read()
+        try:
+            event = billing.verify(payload, request.headers.get("Stripe-Signature", ""))
+        except (billing.BadSignature, ValueError):
+            return web.Response(status=400, text="bad signature")
+        try:
+            await billing.handle(self.bot.db, event)
+        except (billing.BillingError, OSError, ValueError, KeyError):
+            # A 500 makes Stripe send it again later, which is what we want.
+            return web.Response(status=500, text="try again")
+        return web.Response(text="ok")
+
+    async def api_cases(self, request):
+        """Premium: every moderation case, as a spreadsheet."""
+        found, error = self.who(request)
+        if error:
+            return error
+        guild = found[0]
+        if not self.bot.db.is_premium(guild.id):
+            return problem(402, "Case history export is a Premium feature.")
+        import csv
+        import io
+        out = io.StringIO()
+        writer = csv.writer(out)
+        writer.writerow(["case", "when (UTC)", "action", "member id", "moderator id",
+                         "reason", "duration (seconds)"])
+        rows = self.bot.db.conn.execute(
+            "SELECT * FROM mod_cases WHERE guild_id = ? ORDER BY id",
+            (guild.id,)).fetchall()
+        for row in rows:
+            writer.writerow([row["id"], time.strftime("%Y-%m-%d %H:%M:%S",
+                                                      time.gmtime(row["created_at"])),
+                             row["action"], str(row["user_id"]), str(row["mod_id"]),
+                             row["reason"], row["duration"]])
+        return web.Response(
+            text=out.getvalue(), content_type="text/csv",
+            headers={**HEADERS, "Content-Disposition":
+                     f'attachment; filename="paper-cases-{guild.id}.csv"'})
 
     async def api_part_get(self, request):
         part = webparts.PARTS.get(request.match_info["part"])
