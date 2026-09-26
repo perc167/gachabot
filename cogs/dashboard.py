@@ -284,8 +284,9 @@ class Dashboard(commands.Cog):
         response.set_cookie(STATE_COOKIE, state, **self.cookie_options(600))
         # Logging in from the website goes back to the website afterwards.
         # Only ever to SITE_URL: where to go is a word, not an address.
-        if request.query.get("next") == "site":
-            response.set_cookie(NEXT_COOKIE, "site", **self.cookie_options(600))
+        if request.query.get("next") in ("site", "premium"):
+            response.set_cookie(NEXT_COOKIE, request.query["next"],
+                                **self.cookie_options(600))
         return response
 
     async def callback(self, request):
@@ -310,6 +311,8 @@ class Dashboard(commands.Cog):
         going = "/dashboard"
         if request.cookies.get(NEXT_COOKIE) == "site":
             going = SITE_URL + "#me=" + handover(person)
+        elif request.cookies.get(NEXT_COOKIE) == "premium":
+            going = "/dashboard?premium=1"
         response = redirect(going)
         response.set_cookie(SESSION_COOKIE, token,
                             **self.cookie_options(SESSION_DAYS * 86400))
@@ -341,7 +344,8 @@ class Dashboard(commands.Cog):
             icon = (f"https://cdn.discordapp.com/icons/{g['id']}/{g['icon']}.png?size=96"
                     if g.get("icon") else None)
             servers.append({"id": g["id"], "name": g["name"], "icon": icon,
-                            "has_bot": guild is not None})
+                            "has_bot": guild is not None,
+                            "premium": bool(guild) and self.bot.db.is_premium(guild.id)})
         servers.sort(key=lambda s: (not s["has_bot"], s["name"].lower()))
         invite = discord.utils.oauth_url(self.client_id(), scopes=("bot",),
                                          permissions=self.invite_permissions())
@@ -350,6 +354,8 @@ class Dashboard(commands.Cog):
             "servers": servers,
             "invite": invite,
             "site": SITE_URL,
+            "premium_sale": {"for_sale": billing.configured(),
+                             "price": billing.price_label()},
         }, headers=HEADERS)
 
     def invite_permissions(self):

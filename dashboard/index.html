@@ -197,6 +197,14 @@ body{background:transparent}
   font:inherit;cursor:pointer;padding:0;text-decoration:underline}
 .brow{display:grid;grid-template-columns:1fr 130px 38px;gap:8px;align-items:center;
   margin-bottom:8px}
+.prem-page{margin-top:26px}
+.pp-note{color:var(--gold);margin:0}
+.prem-link{color:var(--gold)}
+@media(max-width:520px){.prem-link{display:none}}
+.srv .st.gold{color:var(--gold)}
+.srv .st.dim{color:var(--faint)}
+a.btn{text-decoration:none}
+.srv .up{margin-left:auto;flex:none}
 .thanks{border:1px solid var(--ok);background:rgba(67,181,129,.1);color:#9fe0c1;
   border-radius:12px;padding:12px 16px;margin-bottom:16px}
 .home{color:var(--dim);font-size:14px;text-decoration:none}
@@ -244,6 +252,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 <div class="top" id="top" hidden><div class="wrap">
   <a class="brand" href="/dashboard" id="home"><img src="/paper.png" alt="">Paper<i class="wide"> dashboard</i></a>
   <a class="home" id="site" href="#">Home</a>
+  <a class="home prem-link" href="/dashboard?premium=1" id="to-premium">✨ Premium</a>
   <span class="me" id="me"></span>
   <button class="btn ghost small" id="logout" type="button">Log out</button>
 </div></div>
@@ -267,6 +276,19 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     <small>Paper only sees your username and which servers you're in.
       Not your messages, email or password.</small>
   </div>
+</div>
+
+<div class="wrap" id="view-premium" hidden>
+  <div class="prem prem-page">
+    <h2>✨ Paper Premium</h2>
+    <p id="pp-intro"></p>
+    <ul id="pp-perks"></ul>
+    <p class="pp-note" id="pp-note" hidden></p>
+  </div>
+  <div class="servers-head"><h1>Pick a server</h1>
+    <p>Premium belongs to one server. Admins of that server get it for everyone there.</p></div>
+  <div class="servers" id="pp-servers"></div>
+  <p class="center" id="pp-none" hidden>You don't manage any servers with Paper in them yet.</p>
 </div>
 
 <div class="wrap" id="view-servers" hidden>
@@ -421,8 +443,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   }
 
   function only(id){
-    ["loading", "denied", "view-login", "view-servers", "view-overview",
-     "view-part", "app"].forEach(function(v){ $(v).hidden = v !== id; });
+    ["loading", "denied", "view-login", "view-servers", "view-premium",
+     "view-overview", "view-part", "app"].forEach(function(v){ $(v).hidden = v !== id; });
     $("bar").hidden = id !== "app" && id !== "view-part";
   }
   function deny(why){
@@ -715,9 +737,18 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   }
 
   // ---- Paper Premium: what it is, and the one button that matters
+  var PERKS = [
+    "XP boost roles, like 1.5x XP for Boosters",
+    "Up to 50 automatic warn punishments (free servers get 3)",
+    "Download every moderation case as a spreadsheet",
+    "More on the way: rank card backgrounds, custom level-up images and more"
+  ];
+  function perks(){
+    return el("ul", {}, PERKS.map(function(t){ return el("li", {text: t}); }));
+  }
+
   function showPremium(p){
     var box = $("premium"); box.textContent = "";
-    if (!p.active && !p.for_sale) return;
     var panel = el("div", {cls: "prem"});
     if (p.active) {
       var until = new Date(p.until * 1000).toLocaleDateString(undefined,
@@ -731,19 +762,16 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         el("h2", {text: "✨ Paper Premium"}),
         el("p", {}, ["Everything in Paper stays free. Premium adds extras for this server",
           p.price ? el("span", {}, [" for ", el("span", {cls: "price", text: p.price})]) : null, ":"]),
-        el("ul", {}, [
-          el("li", {text: "XP boost roles, like 1.5x XP for Boosters"}),
-          el("li", {text: "Up to 50 automatic warn punishments (free servers get 3)"}),
-          el("li", {text: "Download every moderation case as a spreadsheet"}),
-          el("li", {text: "More on the way: rank card backgrounds, custom level-up images and more"})
-        ]),
-        button("Upgrade this server", "btn gold", "/api/premium/checkout"));
+        perks(),
+        p.for_sale ? button("Upgrade this server", "btn gold", "/api/premium/checkout")
+                   : el("p", {cls: "pp-note", text: "Coming soon. It isn't on sale just yet."}));
     }
     box.appendChild(panel);
   }
-  function button(label, cls, path){
+  function button(label, cls, path, forGuild){
     var b = el("button", {type: "button", cls: cls, text: label});
     b.addEventListener("click", function(){
+      if (forGuild) guildId = forGuild;
       b.disabled = true; b.textContent = "Opening Stripe…";
       api("POST", path).then(function(r){
         if (r.ok && r.data.url) { location.href = r.data.url; return; }
@@ -1014,6 +1042,45 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     }).catch(function(){ showErrors(["Couldn't reach the bot. Check your connection and try again."], "perrors"); partChanged(); });
   }
 
+  function showPremiumPage(me){
+    current = null;
+    only("view-premium");
+    var sale = me.premium_sale || {};
+    $("pp-intro").textContent = "Everything in Paper stays free. Premium adds extras to one server" +
+      (sale.price ? ", for " + sale.price : "") + ":";
+    var list = $("pp-perks"); list.textContent = "";
+    PERKS.forEach(function(t){ list.appendChild(el("li", {text: t})); });
+    $("pp-note").hidden = !!sale.for_sale;
+    $("pp-note").textContent = "Coming soon: Premium isn't on sale just yet. Check back soon.";
+    var box = $("pp-servers"); box.textContent = "";
+    me.servers.forEach(function(s, i){
+      var pic;
+      if (s.icon) pic = el("img", {src: s.icon, alt: ""});
+      else pic = el("span", {cls: "ph", text: s.name.charAt(0).toUpperCase()});
+      var status = s.premium ? el("span", {cls: "st gold", text: "✨ Premium"})
+        : s.has_bot ? el("span", {cls: "st dim", text: "Free"})
+        : el("span", {cls: "st dim", text: "Paper isn't here yet"});
+      var card = el("div", {cls: "srv"}, [pic, el("span", {}, [el("span", {cls: "nm", text: s.name}), status])]);
+      card.style.animationDelay = Math.min(i * 0.03, 0.3) + "s";
+      card.style.cursor = "default";
+      var action;
+      if (s.premium) {
+        action = el("button", {type: "button", cls: "btn ghost small up", text: "Manage"});
+        action.addEventListener("click", function(){
+          history.pushState(null, "", "/dashboard?guild=" + s.id); route();
+        });
+      } else if (!s.has_bot) {
+        action = el("a", {cls: "btn ghost small up", text: "Add Paper", target: "_blank", rel: "noopener",
+                          href: me.invite + "&guild_id=" + s.id + "&disable_guild_select=true"});
+      } else if (sale.for_sale) {
+        action = button("Upgrade", "btn gold small up", "/api/premium/checkout", s.id);
+      }
+      if (action) card.appendChild(action);
+      box.appendChild(card);
+    });
+    $("pp-none").hidden = me.servers.length > 0;
+  }
+
   function showServers(me){
     current = null;
     only("view-servers");
@@ -1051,7 +1118,10 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     var part = /[?&]part=(\w+)/.exec(location.search);
     guildId = guild ? guild[1] : "";
     current = null;
-    if (!token && !guildId) return showServers(window.__me);
+    if (!token && !guildId) {
+      if (/[?&]premium=1/.test(location.search)) return showPremiumPage(window.__me);
+      return showServers(window.__me);
+    }
     if (!part) return openOverview();
     if (!serverName) {
       // Straight onto a page: the back button still needs the server's name.
@@ -1075,6 +1145,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
           $("top").hidden = true;
           only("view-login");
           $("login-go").hidden = !me.login;
+          if (/[?&]premium=1/.test(location.search)) $("login-go").href = "/login?next=premium";
           $("login-off").hidden = !!me.login;
           $("login-oops").hidden = !/[?&]login=failed/.test(location.search);
           return;
@@ -1106,6 +1177,10 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   }
   document.querySelectorAll(".part-back").forEach(function(b){
     b.addEventListener("click", function(){ go(""); });
+  });
+  $("to-premium").addEventListener("click", function(e){
+    e.preventDefault();
+    leave(function(){ history.pushState(null, "", "/dashboard?premium=1"); route(); });
   });
   $("ov-back").addEventListener("click", function(){
     leave(function(){ history.pushState(null, "", "/dashboard"); route(); });

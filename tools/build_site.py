@@ -979,7 +979,7 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
       boost roles, up to 50 automatic warn punishments, moderation history as
       a spreadsheet, and more on the way. It also keeps the bot running.</p>
     </div>
-    <a class="btn gold" href="__DASHBOARD__">Get Premium</a>
+    <a class="btn gold" href="__DASHBOARD__?premium=1">Get Premium</a>
   </div>
 </section>
 <section id="characters">
