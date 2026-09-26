@@ -20,7 +20,10 @@ Karuda is deliberately scarce: a flat amount every KARUDA_EVERY levels and
 nothing in between, paid once per milestone for good. A daily already pays
 more than a milestone does, so levels are a thank-you, not an income.
 """
+import asyncio
 import difflib
+import io
+import logging
 import random
 import re
 import time
@@ -29,7 +32,9 @@ import discord
 from discord.ext import commands, tasks
 
 import config
+import rankcard
 import utils
+import weekly
 from views import Confirm, Paginator
 
 KARUDA_EVERY = 5            # levels between karuda payouts
@@ -211,14 +216,16 @@ class Levels(commands.Cog):
     # ------------------------------------------------------------ earning
 
     def boosted(self, member, amount: int) -> int:
-        """Premium servers' boost roles: the best one a member has applies."""
+        """Premium servers: the best boost role a member has, times any XP
+        event running now."""
         guild_id = member.guild.id
         if not self.db.is_premium(guild_id):
             return amount
         have = {r.id for r in getattr(member, "roles", [])}
         best = max((row["percent"] for row in self.db.level_boosts_of(guild_id)
                     if row["role_id"] in have), default=100)
-        return round(amount * best / 100)
+        event = self.db.event_strength(guild_id, "xp") or 100
+        return round(amount * best / 100 * event / 100)
 
     async def give_xp(self, member, amount: int, channel=None):
         """Add XP, and if that's a level up, pay out and announce it."""
@@ -306,15 +313,22 @@ class Levels(commands.Cog):
         high = self.setting(guild.id, "msg_max")
         amount = random.randint(min(low, high), max(low, high))
         if amount:
-            await self.give_xp(message.author, self.boosted(message.author, amount),
-                               message.channel)
+            gained = self.boosted(message.author, amount)
+            if weekly.tracking(self.db, guild.id):
+                self.db.add_weekly(guild.id, message.author.id, weekly.week_now(),
+                                   chat=gained)
+            await self.give_xp(message.author, gained, message.channel)
 
     @tasks.loop(minutes=1)
     async def voice_xp(self):
         day = today()
+        week = weekly.week_now()
         for guild in self.bot.guilds:
-            if not (self.setting(guild.id, "voice")
-                    and self.setting(guild.id, "voice_xp")):
+            xp_on = bool(self.setting(guild.id, "voice") and self.setting(guild.id, "voice_xp"))
+            # Weekly champions count voice minutes by the same rules, even
+            # where voice XP itself is switched off.
+            track = weekly.tracking(self.db, guild.id)
+            if not (xp_on or track):
                 continue
             for channel in guild.voice_channels:
                 if channel == guild.afk_channel:
@@ -327,7 +341,10 @@ class Levels(commands.Cog):
                     state = member.voice
                     if state and (state.self_deaf or state.deaf):
                         continue
-                    await self.give_voice_xp(member, day)
+                    if track:
+                        self.db.add_weekly(guild.id, member.id, week, voice=60)
+                    if xp_on:
+                        await self.give_voice_xp(member, day)
 
     async def give_voice_xp(self, member, day: int):
         row = self.db.level_row(member.guild.id, member.id)
@@ -347,14 +364,31 @@ class Levels(commands.Cog):
 
     # ----------------------------------------------------------- viewing
 
-    @commands.command(name="rank", aliases=["xp", "level", "lvl"])
+    @commands.group(name="rank", aliases=["xp", "level", "lvl"],
+                    invoke_without_command=True)
     @commands.guild_only()
     async def rank(self, ctx, member: discord.Member = None):
-        """Your level, how close the next one is, and your place here."""
+        """Your rank card: level, how close the next one is, and your place."""
         member = member or ctx.author
         row = self.db.level_row(ctx.guild.id, member.id)
         level, into, needed = level_for(row["xp"])
         place = self.db.level_rank(ctx.guild.id, member.id)
+        try:
+            gid = ctx.guild.id
+            background = None
+            if self.db.is_premium(gid):
+                background = (self.db.rank_background(gid, member.id)
+                              or self.db.rank_background(gid, 0))
+            avatar = await member.display_avatar.replace(size=256, format="png").read()
+            # Drawing takes a moment; keep it off the bot's main loop.
+            png = await asyncio.to_thread(
+                rankcard.render, member.display_name, avatar, level, into, needed,
+                place, row["xp"], self.colour(gid), background, member.name)
+            await ctx.send(file=discord.File(io.BytesIO(png), filename="rank.png"))
+            return
+        except (discord.HTTPException, OSError, ValueError):
+            # The card is a nicety: if it can't be drawn, the numbers still go out.
+            logging.getLogger("levels").exception("rank card failed")
         embed = discord.Embed(title=member.display_name,
                               colour=self.colour(ctx.guild.id))
         embed.set_thumbnail(url=member.display_avatar.url)
@@ -369,6 +403,40 @@ class Levels(commands.Cog):
         if upcoming:
             embed.set_footer(text=f"Next role at level {upcoming['level']}")
         await ctx.send(embed=embed)
+
+    async def picture(self, ctx):
+        """The picture attached to the command, made card-sized, or None."""
+        if not ctx.message.attachments:
+            return None
+        attachment = ctx.message.attachments[0]
+        if attachment.size > rankcard.MAX_UPLOAD:
+            raise rankcard.BadImage("That picture is over 8 MB.")
+        raw = await attachment.read()
+        return await asyncio.to_thread(rankcard.prepare_background, raw)
+
+    @rank.command(name="background", aliases=["bg"])
+    async def rank_background(self, ctx, reset: str = None):
+        """Premium: your own rank card background. Attach a picture, or say
+        `reset` to go back to the server's."""
+        gid = ctx.guild.id
+        if reset and reset.lower() in ("reset", "remove", "off"):
+            self.db.set_rank_background(gid, ctx.author.id, None)
+            await ctx.send("Your rank card uses the server's background again.")
+            return
+        if not self.db.is_premium(gid):
+            await ctx.send("Custom rank cards come with Paper Premium."
+                           f" `{ctx.prefix}upgrade` to see how to get it.")
+            return
+        try:
+            image = await self.picture(ctx)
+        except rankcard.BadImage as e:
+            await ctx.send(str(e))
+            return
+        if not image:
+            await ctx.send(f"Attach a picture to `{ctx.prefix}rank background`.")
+            return
+        self.db.set_rank_background(gid, ctx.author.id, image)
+        await ctx.send(f"Saved. Try `{ctx.prefix}rank`.")
 
     @commands.group(name="levels", aliases=["levelboard", "toplevels"],
                     invoke_without_command=True)
@@ -666,6 +734,32 @@ class Levels(commands.Cog):
         await ctx.send(f"**{role.name}** earns normal XP again." if gone
                        else f"**{role.name}** had no boost.",
                        allowed_mentions=discord.AllowedMentions.none())
+
+    @levels.command(name="card")
+    @commands.has_permissions(manage_guild=True)
+    async def levels_card(self, ctx, reset: str = None):
+        """Premium: the server's rank card background. Attach a picture, or
+        say `reset`."""
+        gid = ctx.guild.id
+        if reset and reset.lower() in ("reset", "remove", "off"):
+            self.db.set_rank_background(gid, 0, None)
+            await ctx.send("Rank cards are back to the starry default.")
+            return
+        if not self.db.is_premium(gid):
+            await ctx.send("Custom rank cards come with Paper Premium."
+                           f" `{ctx.prefix}upgrade` to see how to get it.")
+            return
+        try:
+            image = await self.picture(ctx)
+        except rankcard.BadImage as e:
+            await ctx.send(str(e))
+            return
+        if not image:
+            await ctx.send(f"Attach a picture to `{ctx.prefix}levels card`.")
+            return
+        self.db.set_rank_background(gid, 0, image)
+        await ctx.send(f"Saved. Everyone's `{ctx.prefix}rank` uses it now, unless"
+                       " they've set their own.")
 
     @levels.command(name="reset")
     @commands.has_permissions(manage_guild=True)

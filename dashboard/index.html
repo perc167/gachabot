@@ -205,6 +205,22 @@ body{background:transparent}
 .srv .st.dim{color:var(--faint)}
 a.btn{text-decoration:none}
 .srv .up{margin-left:auto;flex:none}
+.amrow{display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:start;
+  padding:10px 0;border-bottom:1px solid var(--line)}
+.amrow:last-child{border-bottom:0}
+.amrow .switch{margin:0}
+.amrow .hint{margin:2px 0 0 28px}
+@media(max-width:560px){.amrow{grid-template-columns:1fr}}
+.evrow{display:flex;justify-content:space-between;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--line)}
+.evrow .hint{margin:2px 0 0}
+.bgprev{border:1px dashed var(--line);border-radius:12px;min-height:80px;display:grid;
+  place-items:center;color:var(--faint);margin-bottom:14px;overflow:hidden}
+.bgprev img{width:100%;display:block}
+.linkish{background:none;border:0;color:var(--gold);font:inherit;font-weight:600;
+  text-decoration:underline;cursor:pointer;padding:0}
+input[type=datetime-local],input[type=file]{width:100%;background:var(--ink);color:var(--text);
+  border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;font-size:14px}
 .thanks{border:1px solid var(--ok);background:rgba(67,181,129,.1);color:#9fe0c1;
   border-radius:12px;padding:12px 16px;margin-bottom:16px}
 .home{color:var(--dim);font-size:14px;text-decoration:none}
@@ -675,7 +691,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     voice: {icon: "🔊", title: "Voice",
             sub: "Join To Create rooms and roles for hours in voice."},
     levels: {icon: "📈", title: "Levels",
-             sub: "XP, level roles and level-up messages."}
+             sub: "XP, level roles and level-up messages." },
+    extras: {icon: "\u2728", title: "Premium extras",
+             sub: "Server events, rank card backgrounds, weekly champions and the staff report."}
   };
   var current = null, serverName = "";
 
@@ -719,7 +737,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         setTimeout(openOverview, 2000);
       $("thanks").hidden = !/[?&]premium=thanks/.test(location.search) || r.data.premium.active;
       var box = $("parts"); box.textContent = "";
-      ["gacha", "mod", "voice", "levels"].forEach(function(key, i){
+      ["gacha", "mod", "voice", "levels", "extras"].forEach(function(key, i){
         var info = PARTS[key];
         var card = el("button", {type: "button", cls: "part"}, [
           el("span", {cls: "ic", text: info.icon}),
@@ -738,10 +756,12 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 
   // ---- Paper Premium: what it is, and the one button that matters
   var PERKS = [
+    "Server events: Double XP, karuda rushes and bonus rolls for everyone",
+    "Rank cards with your server's own background, and members' own",
+    "Weekly champions: a role and a shout-out for the top chatter and top voice member",
+    "Smarter automod: spam, blocked words, links and shouting",
     "XP boost roles, like 1.5x XP for Boosters",
-    "Up to 50 automatic warn punishments (free servers get 3)",
-    "Download every moderation case as a spreadsheet",
-    "More on the way: rank card backgrounds, custom level-up images and more"
+    "A weekly staff report, up to 50 warn punishments, and case history as a spreadsheet"
   ];
   function perks(){
     return el("ul", {}, PERKS.map(function(t){ return el("li", {text: t}); }));
@@ -753,9 +773,11 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     if (p.active) {
       var until = new Date(p.until * 1000).toLocaleDateString(undefined,
         {year: "numeric", month: "long", day: "numeric"});
-      panel.append(el("h2", {text: "✨ Paper Premium is on"}),
-        el("p", {text: (p.ending ? "It ends on " : "It renews by ") + until +
-          ". Thank you for supporting Paper."}));
+      panel.append(el("h2", {text: p.trialing ? "✨ Your free trial is on" : "✨ Paper Premium is on"}),
+        el("p", {text: p.trialing
+          ? "Everything below is unlocked until " + until + ". After that it's " +
+            (p.price || "the monthly price") + ", unless you cancel before then in Manage billing."
+          : (p.ending ? "It ends on " : "It renews by ") + until + ". Thank you for supporting Paper."}));
       if (p.billing) panel.appendChild(button("Manage billing", "btn ghost", "/api/premium/portal"));
     } else {
       panel.append(
@@ -763,7 +785,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         el("p", {}, ["Everything in Paper stays free. Premium adds extras for this server",
           p.price ? el("span", {}, [" for ", el("span", {cls: "price", text: p.price})]) : null, ":"]),
         perks(),
-        p.for_sale ? button("Upgrade this server", "btn gold", "/api/premium/checkout")
+        p.for_sale ? button(p.trial ? "Start your " + p.trial_days + "-day free trial" : "Upgrade this server",
+                            "btn gold", "/api/premium/checkout")
                    : el("p", {cls: "pp-note", text: "Coming soon. It isn't on sale just yet."}));
     }
     box.appendChild(panel);
@@ -966,6 +989,38 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         [d.premium ? null : el("div", {cls: "lock"}, ["✨ Comes with Paper Premium."]),
          el("div", {cls: "actions"}, [exportBtn])]));
 
+      // ---- automod
+      var am = d.automod, amRows = {};
+      var amBox = el("div");
+      am.filters.forEach(function(f){
+        var cur = am.settings[f.key];
+        var locked = f.premium && !d.premium;
+        var t = toggle(f.name + (f.premium ? "  ✨" : ""), cur.on && !locked);
+        if (locked) t.input.disabled = true;
+        var act = select(am.actions.map(function(a){
+          return [a, {delete: "Just delete it", warn: "Delete and warn", timeout: "Delete and time out",
+                      jail: "Delete and jail"}[a]]; }), cur.action);
+        amRows[f.key] = {on: t.input, action: act};
+        amBox.appendChild(el("div", {cls: "amrow"}, [
+          el("div", {}, [t.row, el("p", {cls: "hint", text: f.what + (locked ? ". Comes with Premium." : ".")})]),
+          act]));
+      });
+      var mentions = number(am.settings.mentions_limit, am.numbers.mentions_limit.min, am.numbers.mentions_limit.max);
+      var spamCount = number(am.settings.spam_count, am.numbers.spam_count.min, am.numbers.spam_count.max);
+      var spamSecs = number(am.settings.spam_seconds, am.numbers.spam_seconds.min, am.numbers.spam_seconds.max);
+      var words = el("textarea", {value: am.words, placeholder: "One word or phrase a line"});
+      if (!d.premium) words.disabled = true;
+      var amExempt = checklist(channelItems(d.channels), am.exempt);
+      form.appendChild(card("Automod",
+        "Talk first: a message that breaks a filter is deleted, then the sender is warned, timed out or jailed," +
+        " your choice. Staff and bots are left alone.",
+        [amBox,
+         el("div", {cls: "row"}, [field("Mass mentions at (pings)", mentions),
+                                  field("Spam: messages", spamCount), field("in seconds", spamSecs)]),
+         field("Blocked words" + (d.premium ? "" : "  ✨ Premium"), words,
+               "Whole words only, and capitals don't matter."),
+         el("label", {cls: "f", text: "Channels automod leaves alone"}), amExempt.box]));
+
       var lockRole = select([["", "@everyone"]].concat(d.roles.map(function(r){ return [r.id, r.name]; })), d.lock_role);
       var skip = checklist(channelItems(d.channels), d.lockdown_ignored);
       form.appendChild(card("Lockdowns", "Who a lockdown stops typing, and which channels $lockdown all leaves open.",
@@ -975,11 +1030,102 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         return {
           staff_roles: staff.value(), log_channel: log.value, lock_role: lockRole.value,
           lockdown_ignored: skip.value(),
+          automod: {
+            filters: Object.keys(amRows).reduce(function(o, k){
+              o[k] = {on: amRows[k].on.checked, action: amRows[k].action.value}; return o; }, {}),
+            mentions_limit: mentions.value, spam_count: spamCount.value, spam_seconds: spamSecs.value,
+            words: words.value, exempt: amExempt.value()
+          },
           punishments: Array.prototype.map.call(punish.querySelectorAll(".prow"), function(row){
             var i = row.querySelectorAll("input, select");
             return {threshold: i[0].value, action: i[1].value, duration: i[2].value};
           }).filter(function(p){ return p.threshold !== ""; })
         };
+      };
+    },
+
+    extras: function(d, form){
+      if (!d.premium) form.appendChild(el("section", {cls: "card note-card"}, [el("p", {},
+        ["These come with Paper Premium. ",
+         el("button", {type: "button", cls: "linkish", text: "See Premium",
+                       onclick: function(){ history.pushState(null, "", "/dashboard?premium=1"); route(); }})])]));
+
+      // ---- events: these act at once, no Save needed
+      var list = el("div");
+      if (!d.events.length) list.appendChild(el("p", {cls: "hint", text: "Nothing running or coming up."}));
+      d.events.forEach(function(ev){
+        var when = ev.running ? "Running now, until " + new Date(ev.ends_at * 1000).toLocaleString()
+          : new Date(ev.starts_at * 1000).toLocaleString() + " to " + new Date(ev.ends_at * 1000).toLocaleString();
+        var stop = el("button", {type: "button", cls: "btn ghost small", text: ev.running ? "Stop" : "Cancel"});
+        stop.addEventListener("click", function(){ act("POST", "/api/events/" + ev.id + "/stop"); });
+        list.appendChild(el("div", {cls: "evrow"}, [
+          el("div", {}, [el("b", {text: ev.label}), el("p", {cls: "hint", text: when})]), stop]));
+      });
+      var kind = select(d.kinds.map(function(k){ return [k.key, k.name]; }), "xp");
+      var strength = el("input", {type: "number"});
+      var unit = el("p", {cls: "hint"});
+      function kindChanged(){
+        var k = d.kinds.filter(function(x){ return x.key === kind.value; })[0];
+        strength.min = k.min; strength.max = k.max; strength.value = k.default;
+        unit.textContent = k.unit === "rolls" ? "Extra rolls every window, " + k.min + " to " + k.max + "."
+          : "Percent of normal: 200 is double. " + k.min + " to " + k.max + ".";
+      }
+      kind.addEventListener("change", kindChanged); kindChanged();
+      var start = el("input", {type: "datetime-local"});
+      var hours = el("input", {type: "number", value: 2, min: 0.25, max: 168, step: 0.25});
+      var where = select([["", "Don't announce"]].concat(d.channels.map(function(c){ return [c.id, "#" + c.name]; })), "");
+      var add = el("button", {type: "button", cls: "btn gold", text: "Add event"});
+      if (!d.premium) add.disabled = true;
+      add.addEventListener("click", function(){
+        act("POST", "/api/events", {kind: kind.value, strength: Number(strength.value),
+          starts_at: start.value ? Math.floor(new Date(start.value).getTime() / 1000) : 0,
+          hours: Number(hours.value), channel: where.value});
+      });
+      var evForm = el("div", {cls: "row"}, [field("Event", kind), el("div", {}, [field("Strength", strength), unit]),
+        field("Starts (blank for now)", start), field("Hours", hours), field("Announce in", where)]);
+      [kind, strength, start, hours, where].forEach(function(i){ i.dataset.nosave = "1"; });
+      form.appendChild(card("Server events",
+        "Double XP, a karuda rush or bonus rolls for everyone, for as long as you like. Paper announces the start and end.",
+        [list, evForm, el("div", {cls: "actions"}, [add])]));
+
+      // ---- rank card background: also at once
+      var preview = el("div", {cls: "bgprev", text: d.background ? "Loading…" : "The starry default"});
+      if (d.background) {
+        var headers = {}; if (token) headers["Authorization"] = "Bearer " + token;
+        fetch("/api/rankbg.jpg" + (token ? "" : "?guild=" + guildId), {headers: headers, credentials: "same-origin"})
+          .then(function(r){ return r.ok ? r.blob() : null; })
+          .then(function(b){ if (b) { preview.textContent = ""; preview.appendChild(el("img", {src: URL.createObjectURL(b), alt: "Rank card background"})); } });
+      }
+      var file = el("input", {type: "file", accept: "image/png,image/jpeg,image/gif,image/webp"});
+      file.dataset.nosave = "1";
+      if (!d.premium) file.disabled = true;
+      file.addEventListener("change", function(){
+        var f = file.files[0]; if (!f) return;
+        if (f.size > 8 * 1024 * 1024) { alert("That picture is over 8 MB."); return; }
+        var reader = new FileReader();
+        reader.onload = function(){ act("POST", "/api/rankbg", {image: reader.result}); };
+        reader.readAsDataURL(f);
+      });
+      var reset = el("button", {type: "button", cls: "btn ghost small", text: "Back to the default"});
+      reset.addEventListener("click", function(){ act("POST", "/api/rankbg", {image: null}); });
+      form.appendChild(card("Rank card background",
+        "Everyone's $rank card uses this, unless they've set their own with $rank background. Wide pictures work best (934 by 282).",
+        [preview, field("Upload a picture (up to 8 MB)", file), d.background ? el("div", {cls: "actions"}, [reset]) : null]));
+
+      // ---- champions and the staff report: these use Save
+      var chChannel = select([["", "Don't announce"]].concat(d.channels.map(function(c){ return [c.id, "#" + c.name]; })), d.champ_channel);
+      var chChat = select(roleOptions(d.roles, "No role"), d.champ_chat_role);
+      var chVoice = select(roleOptions(d.roles, "No role"), d.champ_voice_role);
+      form.appendChild(card("Weekly champions",
+        "Every Monday the week's top chatter and top voice member get a role and a shout-out. Voice counts with someone else in the channel, not deafened.",
+        [field("Announce in", chChannel), el("div", {cls: "row"}, [field("Top chatter role", chChat), field("Top in voice role", chVoice)])]));
+      var report = toggle("DM the owner a staff report every Monday", d.report_on);
+      form.appendChild(card("Staff report",
+        "Jails, mutes, warnings, kicks and bans per staff member, and the staff points they earned that week.",
+        [report.row]));
+      return function(){
+        return {champ_channel: chChannel.value, champ_chat_role: chChat.value,
+                champ_voice_role: chVoice.value, report_on: report.input.checked};
       };
     },
 
@@ -1012,10 +1158,20 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     }
   };
 
+  function act(method, path, body){
+    api(method, path, body).then(function(r){
+      if (r.status === 401 || r.status === 403) return deny(r.data.problems[0]);
+      if (!r.ok) { showErrors(r.data.problems || ["Something went wrong."], "perrors"); return; }
+      showErrors([], "perrors");
+      renderPart(current.name, r.data);
+    }).catch(function(){ showErrors(["Couldn't reach the bot."], "perrors"); });
+  }
+
   function renderPart(name, data){
     var form = $("part-form"); form.textContent = "";
     var read = BUILD[name](data, form);
     form.querySelectorAll("input, select, textarea").forEach(function(i){
+      if (i.dataset.nosave) return;
       i.addEventListener("input", partChanged); i.addEventListener("change", partChanged);
     });
     current = {name: name, state: data, read: read, snapshot: JSON.stringify(read())};
@@ -1047,7 +1203,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     only("view-premium");
     var sale = me.premium_sale || {};
     $("pp-intro").textContent = "Everything in Paper stays free. Premium adds extras to one server" +
-      (sale.price ? ", for " + sale.price : "") + ":";
+      (sale.price ? ", for " + sale.price : "") + ". Every server can try it free for " +
+      (sale.trial_days || 7) + " days first:";
     var list = $("pp-perks"); list.textContent = "";
     PERKS.forEach(function(t){ list.appendChild(el("li", {text: t})); });
     $("pp-note").hidden = !!sale.for_sale;
@@ -1073,7 +1230,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         action = el("a", {cls: "btn ghost small up", text: "Add Paper", target: "_blank", rel: "noopener",
                           href: me.invite + "&guild_id=" + s.id + "&disable_guild_select=true"});
       } else if (sale.for_sale) {
-        action = button("Upgrade", "btn gold small up", "/api/premium/checkout", s.id);
+        action = button(s.trial ? "Try free" : "Upgrade", "btn gold small up",
+                        "/api/premium/checkout", s.id);
       }
       if (action) card.appendChild(action);
       box.appendChild(card);

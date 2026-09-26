@@ -110,7 +110,9 @@ class Dashboard(commands.Cog):
         port = os.getenv("PORT")
         if not port:
             return
-        app = web.Application(client_max_size=256 * 1024)
+        # Room for an 8 MB rank card picture, which grows by a third when
+        # the browser encodes it to send.
+        app = web.Application(client_max_size=12 * 1024 * 1024)
         app.router.add_get("/", self.home)
         app.router.add_get("/dashboard", self.page)
         app.router.add_get("/paper.png", self.logo)
@@ -122,6 +124,10 @@ class Dashboard(commands.Cog):
         app.router.add_post("/api/premium/checkout", self.api_checkout)
         app.router.add_post("/api/premium/portal", self.api_portal)
         app.router.add_get("/api/cases.csv", self.api_cases)
+        app.router.add_post("/api/events", self.api_event_add)
+        app.router.add_post("/api/events/{event}/stop", self.api_event_stop)
+        app.router.add_post("/api/rankbg", self.api_rankbg)
+        app.router.add_get("/api/rankbg.jpg", self.api_rankbg_get)
         app.router.add_post("/stripe/webhook", self.stripe_webhook)
         app.router.add_get("/api/part/{part}", self.api_part_get)
         app.router.add_post("/api/part/{part}", self.api_part_save)
@@ -196,10 +202,13 @@ class Dashboard(commands.Cog):
             price = billing.price_label()
             text = ("**Paper Premium** for this server"
                     + (f", {price}" if price else "") + ":\n"
-                    "\u2022 XP boost roles, like 1.5x XP for Boosters\n"
-                    "\u2022 Up to 50 automatic warn punishments (free: 3)\n"
-                    "\u2022 Moderation case history as a spreadsheet\n"
-                    "\u2022 More on the way, and it supports the bot")
+                    "\u2022 Server events: Double XP, karuda rushes, bonus rolls\n"
+                    "\u2022 Rank card backgrounds for the server and its members\n"
+                    "\u2022 Weekly champions for the top chatter and voice member\n"
+                    "\u2022 Smarter automod: spam, blocked words, links, shouting\n"
+                    "\u2022 XP boost roles, a weekly staff report, up to 50 warn"
+                    " punishments and case history as a spreadsheet\n"
+                    "\u2022 Try it free for 7 days")
             if link and billing.configured():
                 text += f"\nAn admin can upgrade on the dashboard: <{link}>"
             elif not billing.configured():
@@ -345,7 +354,8 @@ class Dashboard(commands.Cog):
                     if g.get("icon") else None)
             servers.append({"id": g["id"], "name": g["name"], "icon": icon,
                             "has_bot": guild is not None,
-                            "premium": bool(guild) and self.bot.db.is_premium(guild.id)})
+                            "premium": bool(guild) and self.bot.db.is_premium(guild.id),
+                            "trial": bool(guild) and self.bot.db.trial_available(guild.id)})
         servers.sort(key=lambda s: (not s["has_bot"], s["name"].lower()))
         invite = discord.utils.oauth_url(self.client_id(), scopes=("bot",),
                                          permissions=self.invite_permissions())
@@ -355,7 +365,8 @@ class Dashboard(commands.Cog):
             "invite": invite,
             "site": SITE_URL,
             "premium_sale": {"for_sale": billing.configured(),
-                             "price": billing.price_label()},
+                             "price": billing.price_label(),
+                             "trial_days": billing.TRIAL_DAYS},
         }, headers=HEADERS)
 
     def invite_permissions(self):
@@ -607,6 +618,9 @@ class Dashboard(commands.Cog):
             "billing": bool(row and row["customer"]),
             "for_sale": billing.configured(),
             "price": billing.price_label(),
+            "trial": billing.configured() and self.bot.db.trial_available(guild.id),
+            "trial_days": billing.TRIAL_DAYS,
+            "trialing": bool(row and active and row["status"] == "trialing"),
         }
 
     async def api_checkout(self, request):
@@ -624,7 +638,8 @@ class Dashboard(commands.Cog):
             url = await billing.checkout(
                 guild.id, guild.name, member.id,
                 success_url=back + "&premium=thanks", cancel_url=back,
-                customer=row["customer"] if row else "")
+                customer=row["customer"] if row else "",
+                trial=self.bot.db.trial_available(guild.id))
         except (billing.BillingError, OSError) as e:
             return problem(502, f"Couldn't start the payment: {e}")
         return web.json_response({"url": url}, headers=HEADERS)
@@ -683,6 +698,80 @@ class Dashboard(commands.Cog):
             text=out.getvalue(), content_type="text/csv",
             headers={**HEADERS, "Content-Disposition":
                      f'attachment; filename="paper-cases-{guild.id}.csv"'})
+
+    async def api_event_add(self, request):
+        found, error = self.who(request)
+        if error:
+            return error
+        guild, member = found[0], found[1]
+        events = self.bot.get_cog("Events")
+        try:
+            body = await request.json()
+            kind = str(body["kind"])
+            strength = int(body["strength"])
+            starts_at = int(body.get("starts_at") or time.time())
+            length = int(float(body["hours"]) * 3600)
+            channel = int(body.get("channel") or 0)
+        except (ValueError, KeyError, TypeError):
+            return problem(400, "Fill in every part of the event.")
+        if channel and not isinstance(guild.get_channel(channel), discord.TextChannel):
+            return problem(400, "Pick a text channel in this server to announce it in.")
+        if not events:
+            return problem(503, "Events are switched off on this bot.")
+        why = events.schedule(guild.id, kind, strength, starts_at, length, channel, member.id)
+        if why:
+            return problem(400, why)
+        return web.json_response(webparts.extras_state(self.bot, guild), headers=HEADERS)
+
+    async def api_event_stop(self, request):
+        found, error = self.who(request)
+        if error:
+            return error
+        guild = found[0]
+        try:
+            event_id = int(request.match_info["event"])
+        except ValueError:
+            return problem(404, "There's no such event.")
+        if not self.bot.db.end_event(guild.id, event_id):
+            return problem(404, "That event has already ended.")
+        return web.json_response(webparts.extras_state(self.bot, guild), headers=HEADERS)
+
+    async def api_rankbg(self, request):
+        """Premium: set or clear the server's rank card background."""
+        found, error = self.who(request)
+        if error:
+            return error
+        guild = found[0]
+        import asyncio
+        import base64
+        import rankcard
+        try:
+            body = await request.json()
+        except ValueError:
+            return problem(400, "That wasn't valid JSON.")
+        if body.get("image") is None:
+            self.bot.db.set_rank_background(guild.id, 0, None)
+        else:
+            if not self.bot.db.is_premium(guild.id):
+                return problem(402, "Custom rank cards come with Premium.")
+            try:
+                raw = base64.b64decode(str(body["image"]).split(",")[-1], validate=True)
+                image = await asyncio.to_thread(rankcard.prepare_background, raw)
+            except (ValueError, rankcard.BadImage) as e:
+                return problem(400, str(e) if isinstance(e, rankcard.BadImage)
+                               else "That picture didn't come through. Try again.")
+            self.bot.db.set_rank_background(guild.id, 0, image)
+        return web.json_response(webparts.extras_state(self.bot, guild), headers=HEADERS)
+
+    async def api_rankbg_get(self, request):
+        found, error = self.who(request)
+        if error:
+            return error
+        image = self.bot.db.rank_background(found[0].id, 0)
+        if not image:
+            return problem(404, "No background set.")
+        return web.Response(body=image, content_type="image/jpeg",
+                            headers={"Cache-Control": "no-store"})
 
     async def api_part_get(self, request):
         part = webparts.PARTS.get(request.match_info["part"])

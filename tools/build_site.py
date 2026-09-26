@@ -975,11 +975,12 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
   <div class="band premium-band">
     <div>
       <h2>✨ Paper Premium</h2>
-      <p>Everything in Paper stays free. Premium adds extras for a server: XP
-      boost roles, up to 50 automatic warn punishments, moderation history as
-      a spreadsheet, and more on the way. It also keeps the bot running.</p>
+      <p>Everything in Paper stays free. Premium makes a server feel alive:
+      Double XP and karuda events, rank cards with your own background, weekly
+      champions, smarter automod, and a weekly staff report. Try it free for
+      7 days.</p>
     </div>
-    <a class="btn gold" href="__DASHBOARD__?premium=1">Get Premium</a>
+    <a class="btn gold" href="__DASHBOARD__?premium=1">Try it free</a>
   </div>
 </section>
 <section id="characters">

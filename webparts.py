@@ -8,9 +8,14 @@ the gacha, the actions in cogs/modtools.py for moderation.
 Ids go out as strings, because they're bigger than a JavaScript number can
 hold exactly, and come back in as strings too.
 """
+import time
+
 import discord
 
 import config
+import weekly
+from cogs import automod as automod_cog
+from cogs import events as events_cog
 from cogs.modtools import FREE_WARN_PUNISHMENTS, describe_duration, parse_duration
 from cogs.toggles import GROUPS, TOGGLES
 
@@ -94,6 +99,9 @@ def overview(bot, guild) -> dict:
                    else "Join To Create is off"),
                   _count(len(db.hour_roles_of(gid)), "hour role")],
         "levels": [xp, _count(len(db.level_roles_of(gid)), "level role")],
+        "extras": [_count(len(db.events_of(gid)), "event") + " on or coming up",
+                   "Weekly champions are " + ("on" if weekly.champions_on(db, gid) else "off"),
+                   "Staff report is " + ("on" if db.get_premium_setting(gid, "report_on") else "off")],
     }
 
 
@@ -221,6 +229,16 @@ def mod_state(bot, guild) -> dict:
         "roles": _roles(guild),
         "premium": db.is_premium(gid),
         "free_punishments": FREE_WARN_PUNISHMENTS,
+        "automod": {
+            "settings": automod_cog.settings_of(db, gid),
+            "filters": [{"key": k, "name": n, "what": w, "premium": p}
+                        for k, (n, w, p, _a) in automod_cog.FILTERS.items()],
+            "actions": list(automod_cog.ACTIONS),
+            "numbers": {k: {"min": lo, "max": hi}
+                        for k, (_d, lo, hi) in automod_cog.NUMBERS.items()},
+            "words": "\n".join(db.automod_words(gid)),
+            "exempt": [str(c) for c in db.automod_exempt(gid)],
+        },
     }
 
 
@@ -284,9 +302,45 @@ def mod_save(bot, guild, body) -> list:
         if channel:
             ignored.append(channel.id)
 
+    auto = body.get("automod")
+    auto_changes, auto_words, auto_exempt = {}, None, None
+    if isinstance(auto, dict):
+        premium = db.is_premium(guild.id)
+        for key, (name, _w, paid, _a) in automod_cog.FILTERS.items():
+            row = (auto.get("filters") or {}).get(key)
+            if not isinstance(row, dict):
+                continue
+            on = bool(row.get("on"))
+            if on and paid and not premium:
+                problems.append(f"The {name.lower()} filter comes with Premium.")
+            action = str(row.get("action", "")).lower()
+            if action not in automod_cog.ACTIONS:
+                problems.append(f"Pick what happens after the {name.lower()} filter.")
+                continue
+            auto_changes[f"{key}_on"] = 1 if on else 0
+            auto_changes[f"{key}_action"] = action
+        for key, (_d, low, high) in automod_cog.NUMBERS.items():
+            if key in auto:
+                n = _id(auto[key])
+                if n is None or not low <= n <= high:
+                    problems.append(f"Automod numbers: pick from {low} to {high}.")
+                else:
+                    auto_changes[key] = n
+        if "words" in auto:
+            auto_words = automod_cog.clean_words(str(auto["words"] or ""))
+        if "exempt" in auto:
+            auto_exempt = [c.id for c in (_text_channel(guild, v) for v in auto["exempt"] or [])
+                           if c]
+
     if problems:
         return problems
     gid = guild.id
+    for key, value in auto_changes.items():
+        db.set_automod(gid, key, value)
+    if auto_words is not None:
+        db.replace_automod_words(gid, auto_words)
+    if auto_exempt is not None:
+        db.replace_automod_exempt(gid, auto_exempt)
     if log is not None:
         db.set_mod_config(gid, "log_channel", log_channel.id if log_channel else 0)
     if lock is not None:
@@ -366,8 +420,74 @@ def voice_save(bot, guild, body) -> list:
     return []
 
 
+# ------------------------------------------------------ Premium extras
+
+def extras_state(bot, guild) -> dict:
+    db = bot.db
+    gid = guild.id
+    get = db.get_premium_setting
+    now = time.time()
+    return {
+        "premium": db.is_premium(gid),
+        "events": [{"id": e["id"], "kind": e["kind"], "strength": e["strength"],
+                    "starts_at": e["starts_at"], "ends_at": e["ends_at"],
+                    "running": e["starts_at"] <= now,
+                    "label": events_cog.describe(e["kind"], e["strength"])}
+                   for e in db.events_of(gid)],
+        "kinds": [{"key": k, "name": n, "default": d, "min": lo, "max": hi, "unit": u}
+                  for k, (n, _e, d, lo, hi, u) in events_cog.KINDS.items()],
+        "background": bool(db.rank_background(gid, 0)),
+        "champ_channel": str(get(gid, "champ_channel") or ""),
+        "champ_chat_role": str(get(gid, "champ_chat_role") or ""),
+        "champ_voice_role": str(get(gid, "champ_voice_role") or ""),
+        "report_on": bool(get(gid, "report_on")),
+        "channels": _channels(guild),
+        "roles": _roles(guild),
+    }
+
+
+def extras_save(bot, guild, body) -> list:
+    """Champions and the staff report. Events and the card background have
+    buttons of their own, which act at once."""
+    db = bot.db
+    gid = guild.id
+    problems = []
+    premium = db.is_premium(gid)
+    channel = None
+    if body.get("champ_channel"):
+        channel = _text_channel(guild, body["champ_channel"])
+        if not channel:
+            problems.append("Pick a text channel for the champions.")
+    roles = {}
+    for kind in ("chat", "voice"):
+        value = body.get(f"champ_{kind}_role")
+        if value:
+            role = _usable_role(guild, value)
+            if not role:
+                problems.append(f"The {kind} champion role has to be one I can give.")
+            roles[kind] = role
+    wants = bool(channel or any(roles.values()) or body.get("report_on"))
+    if wants and not premium:
+        problems.append("Champions and the staff report come with Premium.")
+    if problems:
+        return problems
+    was_on = weekly.champions_on(db, gid)
+    db.set_premium_setting(gid, "champ_channel", channel.id if channel else 0)
+    for kind in ("chat", "voice"):
+        role = roles.get(kind)
+        db.set_premium_setting(gid, f"champ_{kind}_role", role.id if role else 0)
+    if weekly.champions_on(db, gid) and not was_on:
+        db.set_premium_setting(gid, "champ_week", weekly.week_now())
+    report = bool(body.get("report_on"))
+    if report and not db.get_premium_setting(gid, "report_on"):
+        db.set_premium_setting(gid, "report_week", weekly.week_now())
+    db.set_premium_setting(gid, "report_on", 1 if report else 0)
+    return []
+
+
 PARTS = {
     "gacha": (gacha_state, gacha_save),
     "mod": (mod_state, mod_save),
     "voice": (voice_state, voice_save),
+    "extras": (extras_state, extras_save),
 }

@@ -248,11 +248,13 @@ class Karuda(commands.Cog):
                 random
             )
             bonus = perks.effective(db, gid, ctx.author.id)["daily_percent"]
+            rush = db.event_strength(gid, "karuda") or 100  # a Premium event
             amount = round(
                 random.randint(DAILY_MIN, DAILY_MAX)
                 * multiplier
                 * (100 + bonus)
                 / 100
+                * rush / 100
             )
             drops.append((key, name, multiplier, colour, amount))
         db.update_player(

@@ -1,2 +1,4 @@
 discord.py>=2.3.2
 python-dotenv>=1.0.0
+# Rank cards. 10.1+ carries a scalable font, so no font files ship with the bot.
+Pillow>=10.1

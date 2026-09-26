@@ -316,7 +316,73 @@ CREATE TABLE IF NOT EXISTS guild_premium (
     customer     TEXT NOT NULL DEFAULT '',
     subscription TEXT NOT NULL DEFAULT '',
     buyer_id     INTEGER NOT NULL DEFAULT 0,
-    updated_at   INTEGER NOT NULL DEFAULT 0
+    updated_at   INTEGER NOT NULL DEFAULT 0,
+    -- One free trial per server, ever.
+    trial_used   INTEGER NOT NULL DEFAULT 0
+);
+
+-- Premium: events an admin schedules. strength is a percent for xp and
+-- karuda (200 = double) and a number of extra rolls for rolls.
+CREATE TABLE IF NOT EXISTS server_events (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id   INTEGER NOT NULL,
+    kind       TEXT NOT NULL,
+    strength   INTEGER NOT NULL,
+    starts_at  INTEGER NOT NULL,
+    ends_at    INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL DEFAULT 0,
+    created_by INTEGER NOT NULL DEFAULT 0,
+    announced  INTEGER NOT NULL DEFAULT 0   -- 1 once started, 2 once ended
+);
+
+-- Premium: each member's week, for weekly champions. week counts Mondays
+-- (UTC) since 1970; chat is message XP, voice is seconds in voice.
+CREATE TABLE IF NOT EXISTS weekly_activity (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    week     INTEGER NOT NULL,
+    chat     INTEGER NOT NULL DEFAULT 0,
+    voice    INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, week)
+);
+
+-- Settings for the Premium extras: champions and the staff report.
+CREATE TABLE IF NOT EXISTS premium_settings (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+
+-- Automod (cogs/automod.py): switches and numbers, blocked words, and
+-- channels it leaves alone.
+CREATE TABLE IF NOT EXISTS automod_settings (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    TEXT NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+
+CREATE TABLE IF NOT EXISTS automod_words (
+    guild_id INTEGER NOT NULL,
+    word     TEXT NOT NULL,
+    PRIMARY KEY (guild_id, word)
+);
+
+CREATE TABLE IF NOT EXISTS automod_exempt (
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, channel_id)
+);
+
+-- Premium: rank card backgrounds, stored as the finished card-sized JPEG
+-- (rankcard.py). user_id 0 is the server's own, for everyone.
+CREATE TABLE IF NOT EXISTS rank_backgrounds (
+    guild_id   INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    image      BLOB NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
 );
 
 -- Premium: roles that earn extra XP, as a percentage (150 = 1.5x).
@@ -477,6 +543,7 @@ class Database:
             ("players", "showcase_id", "INTEGER NOT NULL DEFAULT 0"),
             ("players", "tuto_step", "INTEGER NOT NULL DEFAULT 1"),
             ("players", "tuto_silent", "INTEGER NOT NULL DEFAULT 0"),
+            ("guild_premium", "trial_used", "INTEGER NOT NULL DEFAULT 0"),
         ):
             existing = {
                 row["name"]
@@ -806,7 +873,9 @@ class Database:
     def set_premium(self, guild_id: int, status: str, until: int, customer: str,
                     subscription: str, buyer_id: int = 0):
         row = self.premium_of(guild_id)
+        trial = status == "trialing" or bool(row and row["trial_used"])
         self._upsert("guild_premium", {
+            "trial_used": 1 if trial else 0,
             "guild_id": guild_id, "status": status, "until": int(until),
             # A later event may not carry these; don't forget them.
             "customer": customer or (row["customer"] if row else ""),
@@ -818,9 +887,146 @@ class Database:
         rows = self._select("guild_premium", guild_id=guild_id)
         return rows[0] if rows else None
 
+    def trial_available(self, guild_id: int) -> bool:
+        """A server that has never subscribed or trialled gets one free week."""
+        row = self.premium_of(guild_id)
+        return not row or (not row["subscription"] and not row["trial_used"])
+
     def is_premium(self, guild_id: int) -> bool:
         row = self.premium_of(guild_id)
         return bool(row and row["until"] > time.time())
+
+    def add_event(self, guild_id: int, kind: str, strength: int, starts_at: int,
+                  ends_at: int, channel_id: int, created_by: int) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO server_events (guild_id, kind, strength, starts_at, ends_at,"
+            " channel_id, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (guild_id, kind, strength, starts_at, ends_at, channel_id, created_by))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def events_of(self, guild_id: int, include_past: bool = False) -> list:
+        sql = "SELECT * FROM server_events WHERE guild_id = ?"
+        args = [guild_id]
+        if not include_past:
+            sql += " AND ends_at > ?"
+            args.append(int(time.time()))
+        return self.conn.execute(sql + " ORDER BY starts_at", args).fetchall()
+
+    def event(self, guild_id: int, event_id: int):
+        rows = self._select("server_events", guild_id=guild_id, id=event_id)
+        return rows[0] if rows else None
+
+    def end_event(self, guild_id: int, event_id: int) -> bool:
+        """Stop one now: a running one ends, a future one never starts."""
+        now = int(time.time())
+        cur = self.conn.execute(
+            "UPDATE server_events SET ends_at = ?,"
+            " starts_at = MIN(starts_at, ?) WHERE guild_id = ? AND id = ? AND ends_at > ?",
+            (now, now, guild_id, event_id, now))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def event_strength(self, guild_id: int, kind: str):
+        """The strongest event of this kind running now, or None. Only while
+        the server has Premium."""
+        now = int(time.time())
+        row = self.conn.execute(
+            "SELECT MAX(strength) AS s FROM server_events WHERE guild_id = ?"
+            " AND kind = ? AND starts_at <= ? AND ends_at > ?",
+            (guild_id, kind, now, now)).fetchone()
+        if not row or row["s"] is None or not self.is_premium(guild_id):
+            return None
+        return row["s"]
+
+    def events_to_announce(self) -> list:
+        now = int(time.time())
+        return self.conn.execute(
+            "SELECT * FROM server_events WHERE (announced = 0 AND starts_at <= ?)"
+            " OR (announced < 2 AND ends_at <= ?) ORDER BY starts_at", (now, now)).fetchall()
+
+    def mark_event(self, event_id: int, announced: int):
+        self.conn.execute("UPDATE server_events SET announced = ? WHERE id = ?",
+                          (announced, event_id))
+        self.conn.commit()
+
+    def add_weekly(self, guild_id: int, user_id: int, week: int,
+                   chat: int = 0, voice: int = 0):
+        self.conn.execute(
+            "INSERT INTO weekly_activity (guild_id, user_id, week, chat, voice)"
+            " VALUES (?, ?, ?, ?, ?) ON CONFLICT (guild_id, user_id, week)"
+            " DO UPDATE SET chat = chat + excluded.chat, voice = voice + excluded.voice",
+            (guild_id, user_id, week, chat, voice))
+        self.conn.commit()
+
+    def weekly_top(self, guild_id: int, week: int, column: str, limit: int = 3) -> list:
+        assert column in ("chat", "voice")
+        return self.conn.execute(
+            f"SELECT user_id, {column} AS amount FROM weekly_activity"
+            f" WHERE guild_id = ? AND week = ? AND {column} > 0"
+            f" ORDER BY {column} DESC LIMIT ?", (guild_id, week, limit)).fetchall()
+
+    def prune_weekly(self, before_week: int):
+        self.conn.execute("DELETE FROM weekly_activity WHERE week < ?", (before_week,))
+        self.conn.commit()
+
+    def get_premium_setting(self, guild_id: int, key: str, default: int = 0) -> int:
+        rows = self._select("premium_settings", guild_id=guild_id, key=key)
+        return rows[0]["value"] if rows else default
+
+    def set_premium_setting(self, guild_id: int, key: str, value: int):
+        self._upsert("premium_settings",
+                     {"guild_id": guild_id, "key": key, "value": int(value)})
+
+    def cases_between(self, guild_id: int, start: int, end: int) -> list:
+        return self.conn.execute(
+            "SELECT * FROM mod_cases WHERE guild_id = ? AND created_at >= ?"
+            " AND created_at < ?", (guild_id, start, end)).fetchall()
+
+    def points_between(self, guild_id: int, start: int, end: int) -> list:
+        return self.conn.execute(
+            "SELECT user_id, COUNT(*) AS points FROM staff_points WHERE guild_id = ?"
+            " AND given_at >= ? AND given_at < ? GROUP BY user_id",
+            (guild_id, start, end)).fetchall()
+
+    def automod_all(self, guild_id: int) -> dict:
+        return {r["key"]: r["value"] for r in self._select("automod_settings",
+                                                            guild_id=guild_id)}
+
+    def set_automod(self, guild_id: int, key: str, value):
+        self._upsert("automod_settings",
+                     {"guild_id": guild_id, "key": key, "value": str(value)})
+
+    def automod_words(self, guild_id: int) -> list:
+        return [r["word"] for r in self._select("automod_words", "word", guild_id=guild_id)]
+
+    def replace_automod_words(self, guild_id: int, words):
+        with self.conn:
+            self.conn.execute("DELETE FROM automod_words WHERE guild_id = ?", (guild_id,))
+            self.conn.executemany("INSERT OR IGNORE INTO automod_words (guild_id, word)"
+                                  " VALUES (?, ?)", [(guild_id, w) for w in words])
+
+    def automod_exempt(self, guild_id: int) -> list:
+        return [r["channel_id"] for r in self._select("automod_exempt", guild_id=guild_id)]
+
+    def replace_automod_exempt(self, guild_id: int, channel_ids):
+        with self.conn:
+            self.conn.execute("DELETE FROM automod_exempt WHERE guild_id = ?", (guild_id,))
+            self.conn.executemany("INSERT OR IGNORE INTO automod_exempt (guild_id, channel_id)"
+                                  " VALUES (?, ?)", [(guild_id, c) for c in channel_ids])
+
+    def set_rank_background(self, guild_id: int, user_id: int, image):
+        """user_id 0 is the server's. None removes it."""
+        if image is None:
+            self._delete("rank_backgrounds", guild_id=guild_id, user_id=user_id)
+        else:
+            self._upsert("rank_backgrounds", {
+                "guild_id": guild_id, "user_id": user_id, "image": image,
+                "updated_at": int(time.time())})
+
+    def rank_background(self, guild_id: int, user_id: int):
+        rows = self._select("rank_backgrounds", guild_id=guild_id, user_id=user_id)
+        return rows[0]["image"] if rows else None
 
     def set_level_boost(self, guild_id: int, role_id: int, percent: int):
         self._upsert("level_boosts",
@@ -1687,7 +1893,17 @@ class Database:
             "SELECT value FROM guild_settings WHERE guild_id = ? AND key = ?",
             (guild_id, key),
         ).fetchone()
-        return row["value"] if row else default
+        value = row["value"] if row else default
+        # Server events (Premium) lift these two while they run. Everything
+        # that reads rolls or grab payouts reads them here, so an event
+        # reaches all of it and stops by itself when it ends.
+        if key == "roll_limit":
+            value += self.event_strength(guild_id, "rolls") or 0
+        elif key == "karuda_grab_percent":
+            rush = self.event_strength(guild_id, "karuda")
+            if rush:
+                value = min(100, value * rush // 100)
+        return value
 
     def all_settings(self, guild_id: int) -> dict:
         return {k: self.get_setting(guild_id, k) for k in config.GUILD_SETTINGS}

@@ -154,6 +154,38 @@ async def main():
                                                  "buyer_id": "not a number"}})
     check("a bad buyer note doesn't stop a paid server getting premium",
           db.is_premium(GUILD + 5))
+    check("a new server can have a free trial", db.trial_available(GUILD + 9))
+    billing.apply_subscription(db, {"id": "sub_t", "status": "trialing",
+                                    "current_period_end": future,
+                                    "metadata": {"guild_id": str(GUILD + 9)}})
+    check("a trial is premium", db.is_premium(GUILD + 9))
+    billing.apply_subscription(db, {"id": "sub_t", "status": "canceled",
+                                    "metadata": {"guild_id": str(GUILD + 9)}})
+    check("a cancelled trial can't be taken again",
+          not db.is_premium(GUILD + 9) and not db.trial_available(GUILD + 9))
+    check("a server that subscribed before gets no trial", not db.trial_available(GUILD))
+
+    # Server events: only with Premium, only while they run, and a karuda
+    # rush never pushes a grab past the whole character.
+    EV = GUILD + 20
+    now = int(time.time())
+    base_rolls = db.get_setting(EV, "roll_limit")
+    db.add_event(EV, "rolls", 5, now - 10, now + 3600, 0, 0)
+    check("an event does nothing without Premium", db.get_setting(EV, "roll_limit") == base_rolls)
+    billing.apply_subscription(db, {"id": "sub_ev", "status": "active",
+                                    "current_period_end": future,
+                                    "metadata": {"guild_id": str(EV)}})
+    check("a rolls event adds rolls while it runs", db.get_setting(EV, "roll_limit") == base_rolls + 5)
+    db.set_setting(EV, "karuda_grab_percent", 60)
+    db.add_event(EV, "karuda", 300, now - 10, now + 3600, 0, 0)
+    check("a karuda rush lifts grabs but never past 100%",
+          db.get_setting(EV, "karuda_grab_percent") == 100)
+    db.add_event(EV, "xp", 150, now + 3600, now + 7200, 0, 0)
+    check("a future event isn't running yet", db.event_strength(EV, "xp") is None)
+    first = db.events_of(EV)[0]["id"]
+    db.end_event(EV, first)
+    check("stopping an event ends it at once", db.get_setting(EV, "roll_limit") == base_rolls)
+    check("another server's events don't leak", db.event_strength(EV + 1, "karuda") is None)
 
     # Levels: the curve, and a reset that keeps what was already paid.
     from cogs import levels as levelsmod

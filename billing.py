@@ -28,6 +28,7 @@ API = os.getenv("STRIPE_API_BASE", "https://api.stripe.com").rstrip("/")
 TIMEOUT = aiohttp.ClientTimeout(total=20)
 TOLERANCE = 300          # seconds a webhook signature stays good for
 GRACE = 86400            # a day's slack past the paid-for period, for renewals
+TRIAL_DAYS = 7
 
 
 class BillingError(Exception):
@@ -71,7 +72,8 @@ async def _call(method: str, path: str, form: dict = None) -> dict:
 
 
 async def checkout(guild_id: int, guild_name: str, buyer_id: int,
-                   success_url: str, cancel_url: str, customer: str = "") -> str:
+                   success_url: str, cancel_url: str, customer: str = "",
+                   trial: bool = False) -> str:
     """A Stripe Checkout page for one server's subscription. Returns its URL."""
     form = {
         "mode": "subscription",
@@ -88,6 +90,10 @@ async def checkout(guild_id: int, guild_name: str, buyer_id: int,
         "subscription_data[description]": f"Paper Premium for {guild_name}"[:500],
         "metadata[guild_id]": str(guild_id),
     }
+    if trial:
+        # Stripe takes a card now and charges after the trial, unless
+        # they cancel first.
+        form["subscription_data[trial_period_days]"] = str(TRIAL_DAYS)
     if customer:
         form["customer"] = customer
     session = await _call("POST", "/v1/checkout/sessions", form)
