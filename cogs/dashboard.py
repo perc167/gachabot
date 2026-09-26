@@ -3,11 +3,17 @@
 It runs inside the bot because the settings live in the bot's database. The
 public site on Cloudflare is static and can't reach it.
 
-There is no Discord login. `$dashboard` DMs an admin a private link, good
-for one server and LINK_LIFETIME seconds; the token is in the part of the
-URL after #, which browsers never send to a server or leak in a Referer.
-Every request checks again that the person still has Manage Server, so a
-link stops working the moment they lose it.
+Two ways in, and every request checks again, live, that the person has
+Manage Server on the server they're changing:
+
+- Log in with Discord (oauth.py). A session cookie, HttpOnly and SameSite,
+  lasts SESSION_DAYS; only its hash is stored. Changes made with it must
+  carry an X-Yuri header, which another site can't add without a CORS
+  preflight this server never grants, so a forged form can't save
+  anything.
+- `$dashboard`, which DMs a private link for one server, good for
+  LINK_LIFETIME seconds. The token is in the part of the URL after #,
+  which browsers never send to a server or leak in a Referer.
 
 The web server starts only when PORT is set, which Railway does. The link
 it hands out uses PUBLIC_URL, or the domain Railway gives the service
@@ -21,6 +27,7 @@ It also serves /api/servers, the public list of servers the bot is in, for
 the scrolling strip on the website. Only a server's name, icon and member
 count go out, and any server can leave the list with `$sitelist off`.
 """
+import json
 import os
 import secrets
 import time
@@ -28,6 +35,8 @@ import time
 import discord
 from aiohttp import web
 from discord.ext import commands
+
+import oauth
 
 from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
                          MESSAGE_LIMIT, MESSAGE_VARIABLES, SETTINGS, level_for,
@@ -39,6 +48,9 @@ LINK_LIFETIME = 3600
 MAX_LEVEL_ROLES = 100
 SHOWCASE_CACHE = 300        # seconds the public server list is reused for
 SHOWCASE_LIMIT = 60
+SESSION_COOKIE = "yuri_session"
+STATE_COOKIE = "yuri_state"
+SESSION_DAYS = 7
 
 HEADERS = {
     "Cache-Control": "no-store",
@@ -54,6 +66,11 @@ def public_url() -> str:
         return url
     domain = os.getenv("RAILWAY_PUBLIC_DOMAIN", "").strip()
     return f"https://{domain}" if domain else ""
+
+
+def redirect(location: str):
+    """A 302 as an ordinary response, so cookies can be set on it."""
+    return web.Response(status=302, headers={**HEADERS, "Location": location})
 
 
 def problem(status: int, message: str):
@@ -77,6 +94,10 @@ class Dashboard(commands.Cog):
         app = web.Application(client_max_size=256 * 1024)
         app.router.add_get("/", self.home)
         app.router.add_get("/dashboard", self.page)
+        app.router.add_get("/login", self.login)
+        app.router.add_get("/callback", self.callback)
+        app.router.add_post("/logout", self.logout)
+        app.router.add_get("/api/me", self.api_me)
         app.router.add_get("/api/levels", self.api_get)
         app.router.add_post("/api/levels", self.api_save)
         app.router.add_post("/api/levels/sync", self.api_sync)
@@ -183,16 +204,123 @@ class Dashboard(commands.Cog):
             "X-Content-Type-Options": "nosniff",
         })
 
+    # ------------------------------------------------------------- login
+
+    def client_id(self) -> int:
+        return int(os.getenv("DISCORD_CLIENT_ID") or self.bot.application_id
+                   or (self.bot.user.id if self.bot.user else 0))
+
+    def redirect_url(self) -> str:
+        return f"{public_url()}/callback"
+
+    def cookie_options(self, max_age: int) -> dict:
+        return {"max_age": max_age, "httponly": True, "samesite": "Lax",
+                "secure": public_url().startswith("https://"), "path": "/"}
+
+    def session_of(self, request):
+        token = request.cookies.get(SESSION_COOKIE, "")
+        return self.bot.db.web_session(oauth.hash_token(token)) if token else None
+
+    async def login(self, request):
+        if not oauth.configured() or not public_url():
+            return redirect("/dashboard?login=off")
+        state = secrets.token_urlsafe(24)
+        response = redirect(oauth.authorize_url(
+            self.client_id(), self.redirect_url(), state))
+        response.set_cookie(STATE_COOKIE, state, **self.cookie_options(600))
+        return response
+
+    async def callback(self, request):
+        state = request.cookies.get(STATE_COOKIE, "")
+        # Checked before anything else: a callback this browser didn't ask
+        # for is someone trying to log it in as them.
+        if not state or not secrets.compare_digest(
+                state, request.query.get("state", "")):
+            return redirect("/dashboard?login=failed")
+        code = request.query.get("code")
+        if not code:  # they pressed Cancel on Discord's page
+            return redirect("/dashboard")
+        try:
+            person = await oauth.log_in(self.client_id(), self.redirect_url(), code)
+        except (oauth.LoginFailed, OSError, ValueError, KeyError):
+            return redirect("/dashboard?login=failed")
+        token = secrets.token_urlsafe(32)
+        self.bot.db.add_web_session(
+            oauth.hash_token(token), person["id"], person["name"],
+            person["avatar"], oauth.dump_guilds(person["guilds"]),
+            int(time.time()) + SESSION_DAYS * 86400)
+        response = redirect("/dashboard")
+        response.set_cookie(SESSION_COOKIE, token,
+                            **self.cookie_options(SESSION_DAYS * 86400))
+        response.del_cookie(STATE_COOKIE, path="/")
+        return response
+
+    async def logout(self, request):
+        if request.headers.get("X-Yuri") != "1":
+            return problem(403, "Log out from the dashboard page.")
+        token = request.cookies.get(SESSION_COOKIE, "")
+        if token:
+            self.bot.db.end_web_session(oauth.hash_token(token))
+        response = web.json_response({"ok": True}, headers=HEADERS)
+        response.del_cookie(SESSION_COOKIE, path="/")
+        return response
+
+    async def api_me(self, request):
+        """Who's logged in and the servers they can manage."""
+        session = self.session_of(request)
+        if not session:
+            return web.json_response(
+                {"user": None, "login": oauth.configured() and bool(public_url())},
+                headers=HEADERS)
+        servers = []
+        for g in json.loads(session["guilds"]):
+            guild = self.bot.get_guild(int(g["id"]))
+            icon = (f"https://cdn.discordapp.com/icons/{g['id']}/{g['icon']}.png?size=96"
+                    if g.get("icon") else None)
+            servers.append({"id": g["id"], "name": g["name"], "icon": icon,
+                            "has_bot": guild is not None})
+        servers.sort(key=lambda s: (not s["has_bot"], s["name"].lower()))
+        invite = discord.utils.oauth_url(self.client_id(), scopes=("bot",),
+                                         permissions=self.invite_permissions())
+        return web.json_response({
+            "user": {"name": session["name"], "avatar": session["avatar"]},
+            "servers": servers,
+            "invite": invite,
+        }, headers=HEADERS)
+
+    def invite_permissions(self):
+        try:
+            from cogs.profile import INVITE_PERMISSIONS
+            return INVITE_PERMISSIONS
+        except ImportError:
+            return discord.Permissions.none()
+
     def who(self, request):
-        """(guild, member, Levels cog) for a request's link, or an error."""
+        """(guild, member, Levels cog) for a request, or an error response.
+
+        A private link names its own server. A logged-in session names it
+        with ?guild=, and must send X-Yuri with anything that changes."""
         header = request.headers.get("Authorization", "")
-        token = header[7:] if header.startswith("Bearer ") else ""
-        entry = self.links.get(token)
-        if not entry or entry["expires"] < time.time():
-            return None, problem(401, "This link has expired. Run $dashboard"
-                                      " in Discord for a new one.")
-        guild = self.bot.get_guild(entry["guild"])
-        member = guild.get_member(entry["user"]) if guild else None
+        if header.startswith("Bearer "):
+            entry = self.links.get(header[7:])
+            if not entry or entry["expires"] < time.time():
+                return None, problem(401, "This link has expired. Run"
+                                          " $dashboard in Discord for a new"
+                                          " one, or log in instead.")
+            guild_id, user_id = entry["guild"], entry["user"]
+        else:
+            session = self.session_of(request)
+            if not session:
+                return None, problem(401, "You're logged out. Log in again.")
+            if request.method != "GET" and request.headers.get("X-Yuri") != "1":
+                return None, problem(403, "Save from the dashboard page.")
+            try:
+                guild_id = int(request.query.get("guild", ""))
+            except ValueError:
+                return None, problem(400, "Pick a server first.")
+            user_id = session["user_id"]
+        guild = self.bot.get_guild(guild_id)
+        member = guild.get_member(user_id) if guild else None
         if not member or not member.guild_permissions.manage_guild:
             return None, problem(403, "You need Manage Server on this server.")
         levels = self.bot.get_cog("Levels")
@@ -203,9 +331,7 @@ class Dashboard(commands.Cog):
     # --------------------------------------------------------------- pages
 
     async def home(self, request):
-        return web.Response(text="Yuri is running. Run $dashboard in Discord"
-                                 " for a link to your server's dashboard.",
-                            headers=HEADERS)
+        return redirect("/dashboard")
 
     async def page(self, request):
         return web.FileResponse(PAGE, headers={**HEADERS,

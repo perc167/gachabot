@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="color-scheme" content="dark">
-<title>Levels dashboard</title>
+<title>Yuri dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
@@ -85,18 +85,121 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .errors ul{margin:4px 0 0;padding-left:18px}
 .center{text-align:center;padding:80px 16px;color:var(--dim)}
 .center h1{margin-bottom:8px;color:var(--text)}
+
+/* ---- the sky, as on the website ---- */
+html{background:var(--ink)}
+body{background:transparent}
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;filter:blur(90px)}
+.glow.a{width:560px;height:560px;left:-180px;top:-180px;opacity:.26;
+  background:radial-gradient(circle,var(--accent),transparent 70%)}
+.glow.b{width:480px;height:480px;right:-180px;bottom:-160px;opacity:.14;
+  background:radial-gradient(circle,var(--rose),transparent 70%)}
+
+/* ---- top bar ---- */
+.top{position:sticky;top:0;z-index:20;background:rgba(13,11,20,.86);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;align-items:center;gap:14px;height:58px}
+.brand{font-family:var(--display);font-weight:700;font-size:17px;color:var(--text);
+  display:flex;align-items:center;gap:9px;margin-right:auto;text-decoration:none}
+.brand span{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
+  background:linear-gradient(140deg,var(--accent),var(--rose));font-size:12px;color:#0D0B14}
+.me{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--dim)}
+.me img{width:28px;height:28px;border-radius:50%}
+.btn.small{padding:6px 12px;font-size:13px}
+.back{display:inline-flex;gap:6px;align-items:center;color:var(--dim);font-size:14px;
+  margin-top:22px;cursor:pointer;background:none;border:0;font:inherit;padding:0}
+.back:hover{color:var(--text)}
+
+/* ---- login ---- */
+.login{max-width:440px;margin:12vh auto 0;text-align:center;padding:36px 28px;
+  background:rgba(23,19,36,.88);border:1px solid var(--line);border-radius:18px;
+  animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
+.login .logo{width:58px;height:58px;border-radius:17px;margin:0 auto 16px;display:grid;
+  place-items:center;font-family:var(--display);font-weight:700;font-size:26px;
+  color:#0D0B14;background:linear-gradient(140deg,var(--accent),var(--rose))}
+.login h1{font-size:24px;margin-bottom:8px}
+.login p{color:var(--dim);margin:0 0 22px}
+.discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
+  font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
+  border-radius:11px;text-decoration:none;transition:background .15s,transform .15s}
+.discord:hover{background:#4752C4;transform:translateY(-1px)}
+.login small{display:block;margin-top:18px;color:var(--faint);font-size:12.5px}
+.login .oops{color:#F3A5AC;margin:-8px 0 18px}
+
+/* ---- servers ---- */
+.servers-head{padding:34px 0 18px}
+.servers-head h1{font-size:24px}
+.servers-head p{color:var(--dim);margin:6px 0 0}
+.servers{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  padding-bottom:40px}
+.srv{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;
+  background:var(--panel);border:1px solid var(--line);color:var(--text);
+  text-decoration:none;cursor:pointer;font:inherit;text-align:left;width:100%;
+  transition:border-color .15s,background .15s,transform .15s;
+  animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
+.srv:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px)}
+.srv img,.srv .ph{width:46px;height:46px;border-radius:14px;flex:none;background:var(--raise);
+  display:grid;place-items:center;font-family:var(--display);font-weight:700;color:var(--dim)}
+.srv .nm{display:block;font-family:var(--display);font-weight:600;font-size:15px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv .st{font-size:12.5px;color:var(--ok)}
+.srv.add .st{color:var(--accent-soft)}
+.srv.add{opacity:.8}
+.srv>span:last-child{min-width:0}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.card{animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
+@media(prefers-reduced-motion:reduce){
+  .login,.srv,.card{animation:none}.srv,.discord{transition:none}
+  .srv:hover,.discord:hover{transform:none}
+}
 </style>
 </head>
 <body>
+<div class="glow a" aria-hidden="true"></div>
+<div class="glow b" aria-hidden="true"></div>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<div class="top" id="top" hidden><div class="wrap">
+  <a class="brand" href="/dashboard" id="home"><span>Y</span>Yuri dashboard</a>
+  <span class="me" id="me"></span>
+  <button class="btn ghost small" id="logout" type="button">Log out</button>
+</div></div>
 
 <div class="center" id="loading"><h1>Loading…</h1></div>
-<div class="center" id="denied" hidden><h1>This link doesn't work</h1>
-  <p id="denied-why"></p></div>
+<div class="center" id="denied" hidden><h1>That didn't work</h1>
+  <p id="denied-why"></p>
+  <p><a class="discord" href="/login" id="denied-login">Log in with Discord</a></p></div>
+
+<div class="wrap" id="view-login" hidden>
+  <div class="login">
+    <div class="logo">Y</div>
+    <h1>Yuri dashboard</h1>
+    <p>Log in with Discord to change the settings of the servers you manage.</p>
+    <p class="oops" id="login-oops" hidden>That login didn't go through. Try once more.</p>
+    <a class="discord" href="/login" id="login-go">
+      <svg width="20" height="15" viewBox="0 0 71 55" aria-hidden="true"><path fill="currentColor" d="M60.1 4.9A58.5 58.5 0 0 0 45.5.4a.2.2 0 0 0-.2.1 40.8 40.8 0 0 0-1.8 3.7 54 54 0 0 0-16.2 0A37.4 37.4 0 0 0 25.4.5a.2.2 0 0 0-.2-.1A58.4 58.4 0 0 0 10.6 4.9a.2.2 0 0 0-.1.1C1.3 18.7-1.2 32.1.1 45.3a.2.2 0 0 0 .1.2 58.8 58.8 0 0 0 17.7 8.9.2.2 0 0 0 .2-.1 42 42 0 0 0 3.6-5.9.2.2 0 0 0-.1-.3 38.7 38.7 0 0 1-5.5-2.6.2.2 0 0 1 0-.4l1.1-.9a.2.2 0 0 1 .2 0 42 42 0 0 0 35.6 0 .2.2 0 0 1 .2 0l1.1.9a.2.2 0 0 1 0 .4 36.3 36.3 0 0 1-5.5 2.6.2.2 0 0 0-.1.3 47.2 47.2 0 0 0 3.6 5.9.2.2 0 0 0 .2.1 58.6 58.6 0 0 0 17.8-8.9.2.2 0 0 0 .1-.2c1.5-15.2-2.5-28.5-10.6-40.3a.2.2 0 0 0-.1-.1ZM23.7 37.3c-3.5 0-6.4-3.2-6.4-7.1s2.8-7.1 6.4-7.1 6.5 3.2 6.4 7.1c0 3.9-2.8 7.1-6.4 7.1Zm23.6 0c-3.5 0-6.4-3.2-6.4-7.1s2.8-7.1 6.4-7.1 6.5 3.2 6.4 7.1c0 3.9-2.8 7.1-6.4 7.1Z"/></svg>
+      Log in with Discord</a>
+    <p id="login-off" hidden>Logging in isn't switched on for this bot yet.
+      Until it is, type <code>$dashboard</code> in your server for a private link.</p>
+    <small>Yuri only sees your username and which servers you're in.
+      Not your messages, email or password.</small>
+  </div>
+</div>
+
+<div class="wrap" id="view-servers" hidden>
+  <div class="servers-head"><h1>Your servers</h1>
+    <p>Servers you can manage. Pick one to change its settings.</p></div>
+  <div class="servers" id="servers"></div>
+  <p class="center" id="no-servers" hidden>You don't manage any servers yet.
+    You need Manage Server on a server to change its settings here.</p>
+</div>
 
 <main class="wrap" id="app" hidden>
+  <button class="back" id="back" type="button" hidden>&larr; All servers</button>
   <header>
     <img id="icon" alt="" hidden><div class="noicon" id="noicon"></div>
-    <div><h1 id="gname"></h1><p>Levels dashboard · changes save for the whole server</p></div>
+    <div><h1 id="gname"></h1><p>Level settings · changes save for the whole server</p></div>
   </header>
 
   <div class="errors" id="errors" hidden><b>Nothing was saved:</b><ul></ul></div>
@@ -174,22 +277,32 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   "use strict";
   var $ = function(id){ return document.getElementById(id); };
   var NUMBERS = ["msg_min","msg_max","cooldown","voice_xp","voice_cap","karuda"];
-  var token = "", state = null;
+  var token = "", state = null, guildId = "";
 
-  // The token arrives after #. Keep it for reloads in this tab only, and take
-  // it out of the address bar so it isn't left on screen or in history.
+  // Two ways in. A private link from $dashboard has its token after #: keep
+  // it for reloads in this tab only, and take it out of the address bar.
+  // Otherwise it's a Discord login, carried by a cookie the page never sees.
   try {
-    token = location.hash.replace(/^#/, "") || sessionStorage.getItem("yuri-dash") || "";
-    if (location.hash) {
+    if (location.hash.length > 1) {
+      token = location.hash.slice(1);
       sessionStorage.setItem("yuri-dash", token);
-      history.replaceState(null, "", location.pathname);
+      history.replaceState(null, "", location.pathname + "?link=1");
+    } else if (/[?&]link=1/.test(location.search)) {
+      token = sessionStorage.getItem("yuri-dash") || "";
     }
-  } catch (e) { token = location.hash.replace(/^#/, ""); }
+  } catch (e) { token = location.hash.slice(1); }
 
   function api(method, path, body){
+    var headers = {"Content-Type": "application/json"};
+    if (token) headers["Authorization"] = "Bearer " + token;
+    else {
+      headers["X-Yuri"] = "1";
+      if (guildId) path += (path.indexOf("?") < 0 ? "?" : "&") + "guild=" + guildId;
+    }
     return fetch(path, {
       method: method,
-      headers: {"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+      headers: headers,
+      credentials: "same-origin",
       body: body ? JSON.stringify(body) : undefined
     }).then(function(r){
       return r.json().catch(function(){ return {}; }).then(function(data){
@@ -198,9 +311,15 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
     });
   }
 
+  function only(id){
+    ["loading", "denied", "view-login", "view-servers", "app"].forEach(function(v){
+      $(v).hidden = v !== id;
+    });
+    $("bar").hidden = id !== "app";
+  }
   function deny(why){
-    $("loading").hidden = true; $("app").hidden = true; $("bar").hidden = true;
-    $("denied").hidden = false; $("denied-why").textContent = why;
+    only("denied"); $("denied-why").textContent = why;
+    $("denied-login").hidden = !!token;
   }
 
   function option(value, text){
@@ -386,12 +505,136 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
     if (!$("save").disabled) { e.preventDefault(); e.returnValue = ""; }
   });
 
-  if (!token) { deny("Run $dashboard in Discord to get your own link."); return; }
-  api("GET", "/api/levels").then(function(r){
-    if (!r.ok) return deny((r.data.problems || ["Something went wrong."])[0]);
-    $("loading").hidden = true; $("app").hidden = false; $("bar").hidden = false;
-    fill(r.data);
-  }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  function openServer(id){
+    guildId = id;
+    only("loading");
+    api("GET", "/api/levels").then(function(r){
+      if (!r.ok) return deny((r.data.problems || ["Something went wrong."])[0]);
+      showErrors([]);
+      only("app");
+      $("back").hidden = !!token;
+      window.scrollTo(0, 0);
+      fill(r.data);
+    }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  }
+
+  function showServers(me){
+    only("view-servers");
+    var box = $("servers"); box.textContent = "";
+    me.servers.forEach(function(s, i){
+      var card = document.createElement(s.has_bot ? "button" : "a");
+      card.className = "srv" + (s.has_bot ? "" : " add");
+      card.style.animationDelay = Math.min(i * 0.03, 0.3) + "s";
+      var pic;
+      if (s.icon) { pic = document.createElement("img"); pic.src = s.icon; pic.alt = ""; }
+      else { pic = document.createElement("span"); pic.className = "ph"; pic.textContent = s.name.charAt(0).toUpperCase(); }
+      var text = document.createElement("span");
+      var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
+      var st = document.createElement("span"); st.className = "st";
+      st.textContent = s.has_bot ? "Manage \u2192" : "Add Yuri \u2192";
+      text.append(nm, st); card.append(pic, text);
+      if (s.has_bot) {
+        card.type = "button";
+        card.addEventListener("click", function(){
+          history.pushState(null, "", "/dashboard?guild=" + s.id);
+          openServer(s.id);
+        });
+      } else {
+        // Straight to Discord's invite, with this server already picked.
+        card.href = me.invite + "&guild_id=" + s.id + "&disable_guild_select=true";
+        card.target = "_blank"; card.rel = "noopener";
+      }
+      box.appendChild(card);
+    });
+    $("no-servers").hidden = me.servers.length > 0;
+  }
+
+  function route(){
+    if (token) { $("top").hidden = true; openServer(""); return; }
+    var match = /[?&]guild=(\d+)/.exec(location.search);
+    fetch("/api/me", {credentials: "same-origin"}).then(function(r){ return r.json(); })
+      .then(function(me){
+        if (!me.user) {
+          $("top").hidden = true;
+          only("view-login");
+          $("login-go").hidden = !me.login;
+          $("login-off").hidden = !!me.login;
+          $("login-oops").hidden = !/[?&]login=failed/.test(location.search);
+          return;
+        }
+        $("top").hidden = false;
+        var who = $("me"); who.textContent = "";
+        if (me.user.avatar) { var img = document.createElement("img"); img.src = me.user.avatar; img.alt = ""; who.appendChild(img); }
+        who.appendChild(document.createTextNode(me.user.name));
+        window.__me = me;
+        if (match) openServer(match[1]); else showServers(me);
+      })
+      .catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  }
+
+  function leave(then){
+    // Unsaved changes are worth one question before they're thrown away.
+    if (!$("app").hidden && !$("save").disabled &&
+        !confirm("You have unsaved changes. Leave without saving?")) return;
+    then();
+  }
+  $("back").addEventListener("click", function(){
+    leave(function(){
+      history.pushState(null, "", "/dashboard");
+      guildId = "";
+      if (window.__me) showServers(window.__me); else route();
+    });
+  });
+  $("home").addEventListener("click", function(e){ e.preventDefault(); $("back").click(); });
+  $("logout").addEventListener("click", function(){
+    leave(function(){
+      fetch("/logout", {method: "POST", headers: {"X-Yuri": "1"}, credentials: "same-origin"})
+        .then(function(){ location.href = "/dashboard"; });
+    });
+  });
+  window.addEventListener("popstate", function(){ guildId = ""; route(); });
+  // A private link pasted into a dashboard tab that's already open only
+  // changes the part after #, which doesn't reload the page. Make it.
+  window.addEventListener("hashchange", function(){
+    if (location.hash.length > 1) location.reload();
+  });
+
+  route();
+})();
+
+(function(){
+  // The same sky as the website, without the shooting stars.
+  var canvas = document.getElementById("sky");
+  if (!canvas || !canvas.getContext) return;
+  var ctx = canvas.getContext("2d"), stars = [], w = 0, h = 0, frame = 0;
+  var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function build(){
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = innerWidth; h = innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    stars = [];
+    for (var i = 0, n = Math.min(200, Math.round(w * h / 8000)); i < n; i++)
+      stars.push({x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.1 + 0.25,
+                  a: Math.random() * 0.5 + 0.2, s: Math.random() * 1.3 + 0.4, p: Math.random() * 6.3});
+  }
+  function draw(t){
+    ctx.clearRect(0, 0, w, h);
+    stars.forEach(function(s){
+      var tw = still ? 1 : 0.6 + 0.4 * Math.sin(t / 1000 * s.s + s.p);
+      ctx.fillStyle = "rgba(255,255,255," + (s.a * tw).toFixed(3) + ")";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.2832); ctx.fill();
+    });
+  }
+  function loop(t){ draw(t); frame = requestAnimationFrame(loop); }
+  build();
+  if (still) draw(0); else frame = requestAnimationFrame(loop);
+  addEventListener("resize", function(){ build(); if (still) draw(0); });
+  document.addEventListener("visibilitychange", function(){
+    if (still) return;
+    if (document.hidden) { cancelAnimationFrame(frame); frame = 0; }
+    else if (!frame) frame = requestAnimationFrame(loop);
+  });
 })();
 </script>
 </body>

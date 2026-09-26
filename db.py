@@ -307,6 +307,18 @@ CREATE TABLE IF NOT EXISTS invoke_messages (
     PRIMARY KEY (guild_id, action, kind)
 );
 
+-- Dashboard logins. Only a hash of the session key is kept, so a copy of
+-- the database can't be used to log in as anybody. guilds is the JSON list
+-- of servers Discord said they could manage when they logged in.
+CREATE TABLE IF NOT EXISTS web_sessions (
+    token_hash TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL,
+    name       TEXT NOT NULL,
+    avatar     TEXT,
+    guilds     TEXT NOT NULL DEFAULT '[]',
+    expires    INTEGER NOT NULL
+);
+
 -- Voice: where Join To Create is, and the channels it has made.
 CREATE TABLE IF NOT EXISTS vc_settings (
     guild_id INTEGER NOT NULL,
@@ -768,6 +780,27 @@ class Database:
             return self._delete("invoke_messages", guild_id=guild_id,
                                 action=action, kind=kind)
         return self._delete("invoke_messages", guild_id=guild_id, action=action)
+
+    # ---------- dashboard logins ----------
+
+    def add_web_session(self, token_hash: str, user_id: int, name: str,
+                        avatar, guilds_json: str, expires: int):
+        with self.conn:
+            self.conn.execute("DELETE FROM web_sessions WHERE expires < ?",
+                              (int(time.time()),))
+            self.conn.execute(
+                "INSERT OR REPLACE INTO web_sessions (token_hash, user_id, name,"
+                " avatar, guilds, expires) VALUES (?, ?, ?, ?, ?, ?)",
+                (token_hash, user_id, name, avatar, guilds_json, expires))
+
+    def web_session(self, token_hash: str):
+        row = self.conn.execute(
+            "SELECT * FROM web_sessions WHERE token_hash = ? AND expires > ?",
+            (token_hash, int(time.time()))).fetchone()
+        return row
+
+    def end_web_session(self, token_hash: str) -> int:
+        return self._delete("web_sessions", token_hash=token_hash)
 
     # ---------- voice ----------
 

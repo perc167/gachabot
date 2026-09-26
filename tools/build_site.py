@@ -1,4 +1,8 @@
-"""Builds the public site: every command, and how to set the bot up.
+"""Builds the public site: how to set the bot up, and every command.
+
+Two pages in site/: index.html, the home page with a step-by-step setup
+guide for each part of the bot, and commands.html, the full reference. They
+share one head, style and sky, so they read as one site.
 
     python tools/build_site.py
 
@@ -35,9 +39,12 @@ CLIENT_ID = 1550497695582519418
 # The bot's public list of servers, for the scrolling strip under the stats.
 # The page fetches it live, so it stays current without a rebuild; if the
 # bot can't be reached the strip simply doesn't appear. YURI_API overrides.
-SERVERS_API = os.getenv(
-    "YURI_API", "https://gachabot-production-fbd6.up.railway.app").rstrip("/") \
-    + "/api/servers"
+BOT_URL = os.getenv(
+    "YURI_API", "https://gachabot-production-fbd6.up.railway.app").rstrip("/")
+SERVERS_API = BOT_URL + "/api/servers"
+# The dashboard lives on the bot, which holds the settings and the login.
+DASHBOARD_URL = BOT_URL + "/dashboard"
+COMMANDS_OUT = os.path.join(ROOT, "site", "commands.html")
 
 # The three parts of the bot, each with its own tab on the page. Sections
 # are named as they are in cogs/help.py; anything not listed is the gacha.
@@ -165,7 +172,7 @@ def inline(url: str) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(out.getvalue()).decode()
 
 
-PAGE = r"""<title>Yuri Gacha</title>
+PAGE = r"""<title>__TITLE__</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
@@ -385,7 +392,7 @@ code,kbd{
 .feature.on::before{transform:scaleX(1)}
 /* The title is the button; this stretches it over the whole card, so the
    card clicks as one without a list and paragraph inside a <button>. */
-.feature .pick{all:unset;cursor:pointer}
+.feature .pick{all:unset;cursor:pointer;color:inherit}
 .feature .pick::after{content:"";position:absolute;inset:0;border-radius:14px}
 .feature .pick:focus-visible::after{outline:2px solid var(--accent-soft);outline-offset:2px}
 .feature .ic{font-size:22px;line-height:1;margin-bottom:12px}
@@ -410,6 +417,34 @@ code,kbd{
 .seg[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
   color:#0C0A14}
 
+/* Setup steps read as a path: a faint line joins the numbers between cards. */
+.steps{position:relative}
+.steps::before{content:"";position:absolute;left:40px;top:30px;bottom:30px;width:2px;
+  background:linear-gradient(var(--accent),var(--rose));opacity:.3}
+.step{position:relative}
+.cmdline{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:560px){
+  .step{grid-template-columns:1fr;gap:10px;padding:18px}
+  .steps::before{display:none}
+}
+.step .num{border-radius:50%;background:var(--ink);border-color:var(--accent);
+  color:var(--text);font-weight:600}
+
+.band{display:flex;flex-wrap:wrap;align-items:center;gap:22px 34px;
+  justify-content:space-between;padding:30px 32px;border-radius:18px;
+  border:1px solid var(--line);
+  background:linear-gradient(120deg,rgba(124,107,240,.18),rgba(238,127,168,.10))}
+.band h2{margin:0 0 6px}
+.band p{margin:0;color:var(--dim);max-width:52ch}
+.discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
+  font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
+  border-radius:11px;transition:background .15s,transform .15s}
+.discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
+.nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
+  padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
+.nav-in .dash:hover{background:var(--accent-soft);text-decoration:none}
+.page-head{padding-block:48px 8px}
+.page-head h1{font-size:clamp(30px,5vw,44px);margin-bottom:10px}
 .cmd-area{margin-top:30px;padding-top:26px;border-top:1px dashed var(--line);
   scroll-margin-top:70px}
 .cmd-area h3.area-title{font-family:var(--display);font-weight:600;font-size:20px;
@@ -508,105 +543,20 @@ footer p{margin:0 0 6px}
 <div class="glow b" aria-hidden="true"></div>
 <canvas id="sky" aria-hidden="true"></canvas>
 
-<nav><div class="wrap nav-in">
-  <a class="brand" href="#top"><span>Y</span>Yuri</a>
-  <a class="link" href="#features">Features</a>
-  <a class="link" href="#commands">Commands</a>
-  <a class="link" href="#setup">Setup</a>
-  <a class="link" href="#characters">Characters</a>
-</div></nav>
-
-<div id="top" class="wrap">
-<header>
-  <p class="eyebrow">Gacha · Moderation · Voice · Levels</p>
-  <h1>Roll for <em>__TOTAL__</em> characters.<br>Run the server too.</h1>
-  <p class="lede">A gacha bot in the shape of Mudae, with its own roster and
-  currency, plus the moderation, voice rooms and levels a server needs, so
-  one bot does the job of four.</p>
-  <div class="cta">
-    __INVITE__
-    <a class="btn ghost" href="#setup">Set it up</a>
-  </div>
-  <div class="stats">
-    <div class="stat"><b>__TOTAL__</b><i>characters</i></div>
-    <div class="stat"><b>__SERIES__</b><i>series</i></div>
-    <div class="stat"><b>__COMMANDS__</b><i>commands</i></div>
-    <div class="stat"><b>__STEPS__</b><i>tutorial steps</i></div>
-  </div>
-</header>
-
-<section id="servers" hidden aria-label="Servers using Yuri">
-  <p class="count">Powering <b id="srv-users"></b> users across
-  <b id="srv-count"></b> <span id="srv-word">communities</span></p>
-  <div class="marquee"><div class="track" id="srv-track"></div></div>
-</section>
-
-<section id="features">
-  <h2>What it does</h2>
-  <p class="sub">Four parts. Pick one to see everything it can do, or search
-  all __COMMANDS__ commands at once.</p>
-  <div class="features" role="group" aria-label="Part of the bot">__FEATURES_HTML__</div>
-
-  <div class="cmd-area" id="commands">
-    <h3 class="area-title" id="area-title"></h3>
-    <p class="sub">Type <code>$help</code> in Discord and the same list arrives
-    by DM.</p>
-    <div class="tools">
-      <input id="q" type="search" placeholder="Search every command, or what it does…"
-             autocomplete="off" aria-label="Search commands">
-    </div>
-    __JUMP_HTML__
-    <div id="groups">__COMMANDS_HTML__</div>
-    <p id="empty">Nothing matches that.</p>
-  </div>
-</section>
-
-<section id="setup">
-  <h2>Getting it working on your server</h2>
-  <p class="sub">Pick the part you're setting up. The steps are in order.</p>
-  <div class="segs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
-  __SETUP_HTML__
-</section>
-
-<section id="characters">
-  <div class="sec-row">
-    <div>
-      <h2 id="roster-title">The top of the roster</h2>
-      <p class="sub" id="roster-sub">The __SHOWN__ most wanted, out of __TOTAL__.
-      Value comes from how much people want to own somebody, which is not the
-      same as how many have heard of them — so the top here is not the top of
-      a popularity chart.</p>
-      <p class="sub" id="secret-sub" hidden>Original characters from the
-      people around Yuri. Tap one to flip through their art.</p>
-    </div>
-    __SECRET_BUTTON__
-  </div>
-  <div class="grid" id="roster-grid">__CHARACTERS_HTML__</div>
-  __SECRET_HTML__
-</section>
-
-<footer>
-  <p>Yuri runs on its own roster built from AniList, plus games and cartoons
-  AniList does not carry.</p>
-  <p>Character art belongs to its creators and is shown here for
-  identification.</p>
-</footer>
-</div>
-
-<script>
+__BODY__<script>
 (function(){
   // One part of the bot at a time, picked by its card in What it does or
   // its button in Setup (they move together). Searching looks through every
   // part at once.
-  var q = document.getElementById("q");
-  var empty = document.getElementById("empty");
+  var q = document.getElementById("q") || {value: "", addEventListener: function(){}};
+  var empty = document.getElementById("empty") || {style: {}};
   var groups = Array.prototype.slice.call(
     document.querySelectorAll("#groups .group"));
   var tabs = Array.prototype.slice.call(document.querySelectorAll("[data-tab]"));
   var panels = Array.prototype.slice.call(document.querySelectorAll("[data-panel]"));
   var jumps = Array.prototype.slice.call(document.querySelectorAll(".jump"));
   var area = "gacha";
-  var title = document.getElementById("area-title");
+  var title = document.getElementById("area-title") || {};
   var names = {};
   tabs.forEach(function(tab){ names[tab.dataset.tab] = tab.dataset.name; });
 
@@ -661,22 +611,15 @@ footer p{margin:0 0 6px}
   });
   q.addEventListener("input", apply);
 
-  // Links like #commands-mod or #setup-voice open that part's tab.
+  // Links like #setup-voice open that part's tab, and on the commands
+  // page a bare #mod does.
   function fromHash(){
-    var match = /^#(setup|commands)-(\w+)$/.exec(location.hash);
+    var match = /^#(?:(setup|commands)-)?(\w+)$/.exec(location.hash);
     if (!match || !document.querySelector('[data-tab="' + match[2] + '"]')) return;
     choose(match[2]);
-    document.getElementById(match[1]).scrollIntoView();
+    var target = document.getElementById(match[1] || "commands");
+    if (match[1] && target) target.scrollIntoView();
   }
-  // A card click brings its commands into view, unless they already are.
-  tabs.forEach(function(tab){
-    if (!tab.classList.contains("pick")) return;
-    tab.addEventListener("click", function(){
-      var box = document.getElementById("commands").getBoundingClientRect();
-      if (box.top > window.innerHeight * 0.7)
-        document.getElementById("commands").scrollIntoView({behavior: "smooth"});
-    });
-  });
   window.addEventListener("hashchange", fromHash);
   apply();
   fromHash();
@@ -687,7 +630,7 @@ footer p{margin:0 0 6px}
   // current. Built with textContent: server names are other people's words.
   var section = document.getElementById("servers");
   var track = document.getElementById("srv-track");
-  if (!window.fetch) return;
+  if (!section || !window.fetch) return;
   fetch("__SERVERS_API__").then(function(r){ return r.ok ? r.json() : null; })
     .then(function(data){
       if (!data || !data.list || !data.list.length) return;
@@ -901,6 +844,127 @@ footer p{margin:0 0 6px}
 """
 
 
+HOME_BODY = r"""<nav><div class="wrap nav-in">
+  <a class="brand" href="./"><span>Y</span>Yuri</a>
+  <a class="link" href="./#setup">Setup</a>
+  <a class="link" href="./#features">Features</a>
+  <a class="link" href="commands.html">Commands</a>
+  <a class="dash" href="__DASHBOARD__">Dashboard</a>
+</div></nav>
+
+<div id="top" class="wrap">
+<header>
+  <p class="eyebrow">Gacha · Moderation · Voice · Levels</p>
+  <h1>Roll for <em>__TOTAL__</em> characters.<br>Run the server too.</h1>
+  <p class="lede">A gacha bot in the shape of Mudae, with its own roster and
+  currency, plus the moderation, voice rooms and levels a server needs, so
+  one bot does the job of four.</p>
+  <div class="cta">
+    __INVITE__
+    <a class="btn ghost" href="#setup">Set it up</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>__TOTAL__</b><i>characters</i></div>
+    <div class="stat"><b>__SERIES__</b><i>series</i></div>
+    <div class="stat"><b>__COMMANDS__</b><i>commands</i></div>
+    <div class="stat"><b>__STEPS__</b><i>tutorial steps</i></div>
+  </div>
+</header>
+
+<section id="servers" hidden aria-label="Servers using Yuri">
+  <p class="count">Powering <b id="srv-users"></b> users across
+  <b id="srv-count"></b> <span id="srv-word">communities</span></p>
+  <div class="marquee"><div class="track" id="srv-track"></div></div>
+</section>
+
+<section id="setup">
+  <h2>Set it up in a few minutes</h2>
+  <p class="sub">Pick what you want to use. Each part has a few short steps,
+  in order.</p>
+  <div class="segs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
+  __SETUP_HTML__
+</section>
+
+<section id="features">
+  <h2>What it does</h2>
+  <p class="sub">Four parts. Use all of them, or only the ones you need.
+  Pick one to see its commands.</p>
+  <div class="features">__FEATURES_HTML__</div>
+</section>
+
+<section id="dashboard">
+  <div class="band">
+    <div>
+      <h2>Change settings without the commands</h2>
+      <p>Log in with Discord, pick your server, and set XP, level roles and
+      level-up messages from one page.</p>
+    </div>
+    <a class="discord" href="__DASHBOARD__">Open the dashboard</a>
+  </div>
+</section>
+<section id="characters">
+  <div class="sec-row">
+    <div>
+      <h2 id="roster-title">The top of the roster</h2>
+      <p class="sub" id="roster-sub">The __SHOWN__ most wanted, out of __TOTAL__.
+      Value comes from how much people want to own somebody, which is not the
+      same as how many have heard of them — so the top here is not the top of
+      a popularity chart.</p>
+      <p class="sub" id="secret-sub" hidden>Original characters from the
+      people around Yuri. Tap one to flip through their art.</p>
+    </div>
+    __SECRET_BUTTON__
+  </div>
+  <div class="grid" id="roster-grid">__CHARACTERS_HTML__</div>
+  __SECRET_HTML__
+</section>
+
+<footer>
+  <p>Yuri runs on its own roster built from AniList, plus games and cartoons
+  AniList does not carry.</p>
+  <p>Character art belongs to its creators and is shown here for
+  identification.</p>
+</footer>
+</div>
+
+"""
+
+COMMANDS_BODY = r"""<nav><div class="wrap nav-in">
+  <a class="brand" href="./"><span>Y</span>Yuri</a>
+  <a class="link" href="./#setup">Setup</a>
+  <a class="link" href="./#features">Features</a>
+  <a class="link" href="commands.html">Commands</a>
+  <a class="dash" href="__DASHBOARD__">Dashboard</a>
+</div></nav>
+
+<div id="top" class="wrap">
+<header class="page-head">
+  <p class="eyebrow">Commands</p>
+  <h1>Every command, by what it's for</h1>
+  <p class="lede">__COMMANDS__ commands. Pick a part, or search them all.
+  Type <code>$help</code> in Discord and the same list arrives by DM.</p>
+</header>
+
+<section id="commands" class="cmd-page">
+  <div class="segs" role="group" aria-label="Part of the bot">__TABS_HTML__</div>
+  <h3 class="area-title" id="area-title"></h3>
+  <div class="tools">
+    <input id="q" type="search" placeholder="Search every command, or what it does…"
+           autocomplete="off" aria-label="Search commands">
+  </div>
+  __JUMP_HTML__
+  <div id="groups">__COMMANDS_HTML__</div>
+  <p id="empty">Nothing matches that.</p>
+</section>
+
+<footer>
+  <p><a href="./#setup">How to set Yuri up</a> · <a href="__DASHBOARD__">Dashboard</a></p>
+</footer>
+</div>
+
+"""
+
+
 def step_html(steps) -> str:
     out = []
     for number, (title, body) in enumerate(steps, 1):
@@ -1013,8 +1077,8 @@ def build(embed: int = 0, invite_url: str = ""):
     gacha_steps = [
         ("Add the bot", """
          <p>Run <code>$invite</code> in a server that already has it, or use
-         the button at the top of this page. It asks for what all three parts
-         need: messages and embeds for the gacha, roles, kicks, bans and
+         the button at the top of this page. It asks for what every part
+         needs: messages and embeds for the gacha, roles, kicks, bans and
          timeouts for moderation, and moving members for voice. Untick
          anything for a part you won't use.</p>"""),
         ("Give it one channel", """
@@ -1112,10 +1176,11 @@ $vc lb</code>"""),
          <code class="cmdline">$levels role add 10 @Active
 $levels sync</code>"""),
         ("Change it on the web", """
-         <p>Run <code>$dashboard</code> and the bot DMs you a private link to
-         a dashboard: XP per message and per minute in voice, level roles,
-         the level-up message and where it goes, and channels that earn
-         nothing. The link works only for you, for an hour.</p>
+         <p>Open the <a href="__DASHBOARD__">dashboard</a>, log in with
+         Discord and pick your server: XP per message and per minute in
+         voice, level roles, the level-up message and where it goes, and
+         channels that earn nothing. <code>$dashboard</code> in Discord DMs
+         you a private link to the same page.</p>
          <p class="note">Every setting is a command too: <code>$levels
          settings</code> shows them all.</p>"""),
         ("Tidy it up", """
@@ -1174,9 +1239,7 @@ $levels ignore #bot-spam</code>
     ]
     features_html = "\n".join(
         f'<div class="feature"><span class="ic" aria-hidden="true">{icon}</span>'
-        f'<h3><button type="button" class="pick" data-tab="{key}"'
-        f' data-name="{name}" aria-pressed="false" aria-controls="commands">'
-        f'{name}</button></h3>'
+        f'<h3><a class="pick" href="commands.html#{key}">{name}</a></h3>'
         f'<p>{esc(blurb)}</p><ul>{"".join(f"<li>{esc(x)}</li>" for x in points)}</ul>'
         f'<span class="go">{counts[key]} commands \u2192</span></div>'
         for key, icon, name, blurb, points in features)
@@ -1232,7 +1295,10 @@ $levels ignore #bot-spam</code>
               if link else
               '<a class="btn ghost" href="#setup">Run $invite for the link</a>')
 
-    page = (PAGE
+    def render(title, body):
+        return DOCUMENT.replace("__PAGE__", PAGE
+            .replace("__TITLE__", title)
+            .replace("__BODY__", body)
             .replace("__TOTAL__", f"{total:,}")
             .replace("__SERIES__", f"{series:,}")
             .replace("__COMMANDS__", f"{command_total:,}")
@@ -1247,9 +1313,12 @@ $levels ignore #bot-spam</code>
             .replace("__COMMANDS_HTML__", "\n".join(groups))
             .replace("__CHARACTERS_HTML__", "\n".join(cards))
             .replace("__SECRET_BUTTON__", secret_button)
-            .replace("__SECRET_HTML__", secret_html))
-    page = DOCUMENT.replace("__PAGE__", page)
-    return page, total, series, command_total, len(shown)
+            .replace("__SECRET_HTML__", secret_html)
+            .replace("__DASHBOARD__", DASHBOARD_URL))
+
+    page = render("Yuri Gacha", HOME_BODY)
+    commands_page = render("Commands · Yuri", COMMANDS_BODY)
+    return page, commands_page, total, series, command_total, len(shown)
 
 
 def main():
@@ -1270,16 +1339,20 @@ def main():
         except (AttributeError, ValueError):
             pass
 
-    page, total, series, commands, shown = build(args.embed, args.invite)
+    page, commands_page, total, series, commands, shown = build(
+        args.embed, args.invite)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     with io.open(args.out, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(page)
+    commands_out = os.path.join(os.path.dirname(args.out), "commands.html")
+    with io.open(commands_out, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(commands_page)
 
     print(f"{commands} commands · {total:,} characters · {series:,} series")
     print(f"  showcase: {shown} characters"
           + (" (art inlined)" if args.embed else " with linkable art"))
     print(f"  page: {len(page) / 1024:.0f} KB")
-    print(f"\nWrote {args.out}")
+    print(f"\nWrote {args.out} and {commands_out}")
     return 0
 
 

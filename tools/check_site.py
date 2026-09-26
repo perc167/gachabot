@@ -15,7 +15,8 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PAGE = os.path.join(ROOT, "site", "index.html")
+PAGES = [os.path.join(ROOT, "site", name)
+         for name in ("index.html", "commands.html")]
 
 # Each of these must appear exactly once: twice means the document got
 # wrapped twice, none means it was never wrapped at all.
@@ -32,6 +33,14 @@ MIN_BYTES = 80_000
 
 
 def main():
+    failed = 0
+    for path in PAGES:
+        failed += check(path)
+    return 1 if failed else 0
+
+
+def check(PAGE):
+    name = os.path.basename(PAGE)
     if not os.path.exists(PAGE):
         print(f"no page at {PAGE} - did the build run?")
         return 1
@@ -64,12 +73,12 @@ def main():
                         " UTF-8 as Latin-1 on the way in")
 
     if problems:
-        print("the built page is not fit to ship:")
+        print(f"{name} is not fit to ship:")
         for problem in problems:
             print(f"  - {problem}")
         return 1
 
-    print(f"page looks sound: {len(page) / 1024:.0f} KB, all tags present")
+    print(f"{name} looks sound: {len(page) / 1024:.0f} KB, all tags present")
     return 0
 
 
