@@ -896,8 +896,8 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
   <div class="band">
     <div>
       <h2>Change settings without the commands</h2>
-      <p>Log in with Discord, pick your server, and set XP, level roles and
-      level-up messages from one page.</p>
+      <p>Log in with Discord, pick your server, and set up the gacha,
+      moderation, voice rooms and levels from one place.</p>
     </div>
     <a class="discord" href="__DASHBOARD__">Open the dashboard</a>
   </div>

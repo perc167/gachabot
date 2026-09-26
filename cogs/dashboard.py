@@ -37,6 +37,7 @@ from aiohttp import web
 from discord.ext import commands
 
 import oauth
+import webparts
 
 from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
                          MESSAGE_LIMIT, MESSAGE_VARIABLES, SETTINGS, level_for,
@@ -51,6 +52,8 @@ SHOWCASE_LIMIT = 60
 SESSION_COOKIE = "yuri_session"
 STATE_COOKIE = "yuri_state"
 SESSION_DAYS = 7
+# Where the dashboard's Home link goes: the public website.
+SITE_URL = os.getenv("SITE_URL", "https://gachabot.perc-1fc.workers.dev").rstrip("/")
 
 HEADERS = {
     "Cache-Control": "no-store",
@@ -98,6 +101,9 @@ class Dashboard(commands.Cog):
         app.router.add_get("/callback", self.callback)
         app.router.add_post("/logout", self.logout)
         app.router.add_get("/api/me", self.api_me)
+        app.router.add_get("/api/overview", self.api_overview)
+        app.router.add_get("/api/part/{part}", self.api_part_get)
+        app.router.add_post("/api/part/{part}", self.api_part_save)
         app.router.add_get("/api/levels", self.api_get)
         app.router.add_post("/api/levels", self.api_save)
         app.router.add_post("/api/levels/sync", self.api_sync)
@@ -270,7 +276,8 @@ class Dashboard(commands.Cog):
         session = self.session_of(request)
         if not session:
             return web.json_response(
-                {"user": None, "login": oauth.configured() and bool(public_url())},
+                {"user": None, "login": oauth.configured() and bool(public_url()),
+                 "site": SITE_URL},
                 headers=HEADERS)
         servers = []
         for g in json.loads(session["guilds"]):
@@ -286,6 +293,7 @@ class Dashboard(commands.Cog):
             "user": {"name": session["name"], "avatar": session["avatar"]},
             "servers": servers,
             "invite": invite,
+            "site": SITE_URL,
         }, headers=HEADERS)
 
     def invite_permissions(self):
@@ -476,6 +484,58 @@ class Dashboard(commands.Cog):
         if ignored is not None:
             self.bot.db.replace_level_ignored(guild.id, channel_ids)
         return web.json_response(self.state(guild, levels), headers=HEADERS)
+
+    async def api_overview(self, request):
+        """The server's name and a line or two about each part."""
+        found, error = self.who(request)
+        if error:
+            return error
+        guild = found[0]
+        return web.json_response({
+            "guild": {"name": guild.name,
+                      "icon": guild.icon.url if guild.icon else None},
+            "parts": webparts.overview(self.bot, guild),
+            "site": SITE_URL,
+        }, headers=HEADERS)
+
+    async def api_part_get(self, request):
+        part = webparts.PARTS.get(request.match_info["part"])
+        if not part:
+            return problem(404, "There's no such page.")
+        found, error = self.who(request)
+        if error:
+            return error
+        return web.json_response(part[0](self.bot, found[0]), headers=HEADERS)
+
+    async def api_part_save(self, request):
+        name = request.match_info["part"]
+        part = webparts.PARTS.get(name)
+        if not part:
+            return problem(404, "There's no such page.")
+        found, error = self.who(request)
+        if error:
+            return error
+        guild = found[0]
+        try:
+            body = await request.json()
+        except ValueError:
+            return problem(400, "That wasn't valid JSON.")
+        if not isinstance(body, dict):
+            return problem(400, "That wasn't valid JSON.")
+        problems = part[1](self.bot, guild, body)
+        if problems:
+            return web.json_response({"problems": problems}, status=400,
+                                     headers=HEADERS)
+        if name == "mod" and body.get("staff_roles") is not None:
+            # New staff roles get into the jail and the mod log, as they do
+            # when they're added with $staffroles.
+            modtools = self.bot.get_cog("ModTools")
+            if modtools:
+                try:
+                    await modtools.show_staff_the_rooms(guild)
+                except discord.HTTPException:
+                    pass
+        return web.json_response(part[0](self.bot, guild), headers=HEADERS)
 
     async def api_sync(self, request):
         """Bring every member's level roles up to date, like $levels sync."""

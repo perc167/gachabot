@@ -106,7 +106,13 @@ body{background:transparent}
   background:linear-gradient(140deg,var(--accent),var(--rose));font-size:12px;color:#0D0B14}
 .me{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--dim)}
 .me img{width:28px;height:28px;border-radius:50%}
-.btn.small{padding:6px 12px;font-size:13px}
+.btn.small{padding:6px 12px;font-size:13px;white-space:nowrap}
+.brand i{font-style:normal}
+.brand,.home{white-space:nowrap}
+@media(max-width:520px){
+  .top .wrap{gap:10px}
+  .wide,.me .nm{display:none}
+}
 .back{display:inline-flex;gap:6px;align-items:center;color:var(--dim);font-size:14px;
   margin-top:22px;cursor:pointer;background:none;border:0;font:inherit;padding:0}
 .back:hover{color:var(--text)}
@@ -147,10 +153,60 @@ body{background:transparent}
 .srv.add .st{color:var(--accent-soft)}
 .srv.add{opacity:.8}
 .srv>span:last-child{min-width:0}
+/* ---- a server's overview: one card per part ---- */
+.ov-head{display:flex;align-items:center;gap:14px;padding:18px 0 22px}
+.ov-head img,.ov-head .ph{width:56px;height:56px;border-radius:16px;flex:none;
+  background:var(--raise);display:grid;place-items:center;object-fit:cover;
+  font-family:var(--display);font-weight:700;font-size:22px;color:var(--dim)}
+.ov-head h1{font-size:24px}
+.ov-head p{margin:2px 0 0;color:var(--dim);font-size:14px}
+.parts{display:grid;gap:14px;grid-template-columns:repeat(2,1fr);padding-bottom:40px}
+@media(max-width:620px){.parts{grid-template-columns:1fr}}
+.part{display:flex;flex-direction:column;gap:6px;text-align:left;cursor:pointer;
+  font:inherit;color:var(--text);padding:22px;border-radius:16px;position:relative;
+  background:var(--panel);border:1px solid var(--line);overflow:hidden;
+  transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;
+  animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
+.part::before{content:"";position:absolute;inset:0 0 auto;height:3px;
+  background:linear-gradient(90deg,var(--accent),var(--rose));transform:scaleX(0);
+  transform-origin:left;transition:transform .25s}
+.part:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px);
+  box-shadow:0 12px 30px -16px rgba(124,107,240,.6)}
+.part:hover::before{transform:scaleX(1)}
+.part .ic{font-size:26px;line-height:1;margin-bottom:6px}
+.part b{font-family:var(--display);font-size:19px;font-weight:600}
+.part span.l{font-size:14px;color:var(--dim)}
+.part .go{margin-top:10px;font-family:var(--mono);font-size:12.5px;color:var(--accent-soft)}
+.home{color:var(--dim);font-size:14px;text-decoration:none}
+.home:hover{color:var(--text)}
+.part-head{padding:6px 0 18px}
+.part-head h1{font-size:24px}
+.part-head p{margin:4px 0 0;color:var(--dim)}
+.note-card{border-color:var(--gold);background:rgba(229,197,90,.07)}
+.note-card p{margin:0;color:var(--text)}
+.hint b{color:var(--dim);font-weight:500}
+.checks{max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:10px;
+  padding:6px 10px}
+.checks label{display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer}
+.checks input{accent-color:var(--accent)}
+.checks .cat{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--faint);margin:10px 0 4px}
+.prow{display:grid;grid-template-columns:110px 1fr 1fr 38px;gap:8px;align-items:center;
+  margin-bottom:8px}
+@media(max-width:560px){.prow{grid-template-columns:1fr 1fr}.prow .x{grid-column:2}}
+.hrow{display:grid;grid-template-columns:110px 1fr 38px;gap:8px;align-items:center;
+  margin-bottom:8px}
+.x{background:transparent;border:1px solid var(--line);color:var(--dim);
+  border-radius:9px;height:38px;cursor:pointer;font-size:16px}
+.x:hover{border-color:var(--bad);color:var(--bad)}
+.field{margin-bottom:14px}
+.field:last-child{margin-bottom:0}
+input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line);
+  border-radius:9px;background:var(--ink);cursor:pointer}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .card{animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
 @media(prefers-reduced-motion:reduce){
-  .login,.srv,.card{animation:none}.srv,.discord{transition:none}
+  .login,.srv,.card,.part{animation:none}.srv,.discord,.part{transition:none}
   .srv:hover,.discord:hover{transform:none}
 }
 </style>
@@ -161,7 +217,8 @@ body{background:transparent}
 <canvas id="sky" aria-hidden="true"></canvas>
 
 <div class="top" id="top" hidden><div class="wrap">
-  <a class="brand" href="/dashboard" id="home"><span>Y</span>Yuri dashboard</a>
+  <a class="brand" href="/dashboard" id="home"><span>Y</span>Yuri<i class="wide"> dashboard</i></a>
+  <a class="home" id="site" href="#">Home</a>
   <span class="me" id="me"></span>
   <button class="btn ghost small" id="logout" type="button">Log out</button>
 </div></div>
@@ -195,8 +252,22 @@ body{background:transparent}
     You need Manage Server on a server to change its settings here.</p>
 </div>
 
+<div class="wrap" id="view-overview" hidden>
+  <button class="back" id="ov-back" type="button">&larr; All servers</button>
+  <div class="ov-head"><img id="ov-icon" alt="" hidden><div class="ph" id="ov-noicon"></div>
+    <div><h1 id="ov-name"></h1><p>Pick what you want to set up.</p></div></div>
+  <div class="parts" id="parts"></div>
+</div>
+
+<div class="wrap" id="view-part" hidden>
+  <button class="back part-back" type="button">&larr; <span class="to-server"></span></button>
+  <div class="part-head"><h1 id="part-title"></h1><p id="part-sub"></p></div>
+  <div class="errors" id="perrors" hidden><b>Nothing was saved:</b><ul></ul></div>
+  <div id="part-form"></div>
+</div>
+
 <main class="wrap" id="app" hidden>
-  <button class="back" id="back" type="button" hidden>&larr; All servers</button>
+  <button class="back part-back" id="back" type="button">&larr; <span class="to-server"></span></button>
   <header>
     <img id="icon" alt="" hidden><div class="noicon" id="noicon"></div>
     <div><h1 id="gname"></h1><p>Level settings · changes save for the whole server</p></div>
@@ -312,10 +383,9 @@ body{background:transparent}
   }
 
   function only(id){
-    ["loading", "denied", "view-login", "view-servers", "app"].forEach(function(v){
-      $(v).hidden = v !== id;
-    });
-    $("bar").hidden = id !== "app";
+    ["loading", "denied", "view-login", "view-servers", "view-overview",
+     "view-part", "app"].forEach(function(v){ $(v).hidden = v !== id; });
+    $("bar").hidden = id !== "app" && id !== "view-part";
   }
   function deny(why){
     only("denied"); $("denied-why").textContent = why;
@@ -469,14 +539,15 @@ body{background:transparent}
     st.textContent = dirty ? "You have unsaved changes." : "All changes saved.";
   }
 
-  function showErrors(list){
-    var box = $("errors"), ul = box.querySelector("ul"); ul.textContent = "";
+  function showErrors(list, where){
+    var box = $(where || "errors"), ul = box.querySelector("ul"); ul.textContent = "";
     (list || []).forEach(function(p){ var li = document.createElement("li"); li.textContent = p; ul.appendChild(li); });
     box.hidden = !list || !list.length;
     if (!box.hidden) box.scrollIntoView({behavior: "smooth", block: "center"});
   }
 
   $("save").addEventListener("click", function(){
+    if (current) return savePart();
     $("save").disabled = true; $("status").textContent = "Saving…";
     api("POST", "/api/levels", collect()).then(function(r){
       if (r.status === 401 || r.status === 403) return deny(r.data.problems[0]);
@@ -485,7 +556,10 @@ body{background:transparent}
       $("status").className = "msg ok"; $("status").textContent = "Saved.";
     }).catch(function(){ showErrors(["Couldn't reach the bot. Check your connection and try again."]); changed(); });
   });
-  $("discard").addEventListener("click", function(){ showErrors([]); fill(state); });
+  $("discard").addEventListener("click", function(){
+    if (current) { showErrors([], "perrors"); renderPart(current.name, current.state); return; }
+    showErrors([]); fill(state);
+  });
   $("lr-add").addEventListener("click", function(){ addRow("", ""); changed(); });
   $("sync").addEventListener("click", function(){
     var b = $("sync"); b.disabled = true; b.textContent = "Giving roles…";
@@ -505,20 +579,314 @@ body{background:transparent}
     if (!$("save").disabled) { e.preventDefault(); e.returnValue = ""; }
   });
 
-  function openServer(id){
-    guildId = id;
+  var PARTS = {
+    gacha: {icon: "🎲", title: "Gacha",
+            sub: "Rolls, claims, karuda, the shop and what can roll."},
+    mod: {icon: "🛡️", title: "Moderation",
+          sub: "Staff roles, the mod log, warn punishments and lockdowns."},
+    voice: {icon: "🔊", title: "Voice",
+            sub: "Join To Create rooms and roles for hours in voice."},
+    levels: {icon: "📈", title: "Levels",
+             sub: "XP, level roles and level-up messages."}
+  };
+  var current = null, serverName = "";
+
+  // Addresses: /dashboard is your servers, ?guild=ID is one server's
+  // overview, and &part=levels (or gacha, mod, voice) one page of it. A
+  // private link keeps ?link=1 and names its server itself.
+  function url(part){
+    var q = token ? "?link=1" : "?guild=" + guildId;
+    return "/dashboard" + q + (part ? "&part=" + part : "");
+  }
+  function go(part){
+    leave(function(){ history.pushState(null, "", url(part)); route(); });
+  }
+
+  function el(tag, props, kids){
+    var n = document.createElement(tag);
+    Object.keys(props || {}).forEach(function(k){
+      if (k === "text") n.textContent = props[k];
+      else if (k === "cls") n.className = props[k];
+      else n[k] = props[k];
+    });
+    (kids || []).forEach(function(k){ if (k) n.appendChild(typeof k === "string" ? document.createTextNode(k) : k); });
+    return n;
+  }
+
+  function openOverview(){
+    only("loading");
+    api("GET", "/api/overview").then(function(r){
+      if (!r.ok) return deny((r.data.problems || ["Something went wrong."])[0]);
+      var g = r.data.guild;
+      if (r.data.site) $("site").href = r.data.site;
+      serverName = g.name;
+      document.querySelectorAll(".to-server").forEach(function(t){ t.textContent = g.name; });
+      $("ov-name").textContent = g.name;
+      if (g.icon) { $("ov-icon").src = g.icon; $("ov-icon").hidden = false; $("ov-noicon").hidden = true; }
+      else { $("ov-icon").hidden = true; $("ov-noicon").hidden = false; $("ov-noicon").textContent = g.name.charAt(0).toUpperCase(); }
+      $("ov-back").hidden = !!token;
+      var box = $("parts"); box.textContent = "";
+      ["gacha", "mod", "voice", "levels"].forEach(function(key, i){
+        var info = PARTS[key];
+        var card = el("button", {type: "button", cls: "part"}, [
+          el("span", {cls: "ic", text: info.icon}),
+          el("b", {text: info.title})
+        ].concat((r.data.parts[key] || []).filter(Boolean).map(function(line){
+          return el("span", {cls: "l", text: line});
+        })).concat([el("span", {cls: "go", text: "Open →"})]));
+        card.style.animationDelay = (i * 0.05) + "s";
+        card.addEventListener("click", function(){ go(key); });
+        box.appendChild(card);
+      });
+      only("view-overview");
+      window.scrollTo(0, 0);
+    }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  }
+
+  function openLevels(){
+    current = null;
     only("loading");
     api("GET", "/api/levels").then(function(r){
       if (!r.ok) return deny((r.data.problems || ["Something went wrong."])[0]);
       showErrors([]);
       only("app");
-      $("back").hidden = !!token;
       window.scrollTo(0, 0);
       fill(r.data);
     }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
   }
 
+  function openPart(name){
+    only("loading");
+    api("GET", "/api/part/" + name).then(function(r){
+      if (!r.ok) return deny((r.data.problems || ["Something went wrong."])[0]);
+      showErrors([], "perrors");
+      $("part-title").textContent = PARTS[name].icon + " " + PARTS[name].title;
+      $("part-sub").textContent = PARTS[name].sub;
+      renderPart(name, r.data);
+      only("view-part");
+      window.scrollTo(0, 0);
+    }).catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
+  }
+
+  // ---- the pieces every part's form is built from
+  function card(title, sub, kids){
+    return el("section", {cls: "card"}, [el("h2", {text: title}),
+      sub ? el("p", {cls: "sub", text: sub}) : null].concat(kids));
+  }
+  function field(label, input, hint){
+    var id = "f" + Math.random().toString(36).slice(2);
+    input.id = id;
+    return el("div", {cls: "field"}, [el("label", {cls: "f", htmlFor: id, text: label}),
+      input, hint ? el("p", {cls: "hint", text: hint}) : null]);
+  }
+  function number(value, min, max){
+    return el("input", {type: "number", value: value, min: min, max: max});
+  }
+  function toggle(label, on){
+    var box = el("input", {type: "checkbox", checked: !!on});
+    return {row: el("label", {cls: "switch"}, [box, " " + label]), input: box};
+  }
+  function select(options, chosen){
+    var sel = el("select");
+    options.forEach(function(o){
+      var opt = el("option", {value: o[0], text: o[1]});
+      if (o[2]) opt.disabled = true;
+      sel.appendChild(opt);
+    });
+    sel.value = chosen || "";
+    return sel;
+  }
+  function checklist(items, chosen){
+    var set = new Set(chosen), box = el("div", {cls: "checks"}), last = null, inputs = [];
+    items.forEach(function(it){
+      if (it.category !== undefined && it.category !== last) {
+        box.appendChild(el("div", {cls: "cat", text: it.category || "No category"}));
+        last = it.category;
+      }
+      var cb = el("input", {type: "checkbox", value: it.id, checked: set.has(it.id)});
+      inputs.push(cb);
+      box.appendChild(el("label", {}, [cb, el("span", {text: it.label})]));
+    });
+    return {box: box, value: function(){
+      return inputs.filter(function(i){ return i.checked; }).map(function(i){ return i.value; });
+    }};
+  }
+  function channelItems(list){
+    return list.map(function(c){ return {id: c.id, label: "#" + c.name, category: c.category}; });
+  }
+  function roleOptions(roles, first){
+    return [["", first]].concat(roles.map(function(r){
+      return [r.id, r.name + (r.usable ? "" : "  (above the bot)"), !r.usable];
+    }));
+  }
+  function rows(make, list){
+    var holder = el("div");
+    list.forEach(function(item){ holder.appendChild(make(item)); });
+    return holder;
+  }
+  function removable(row){
+    var x = el("button", {type: "button", cls: "x", text: "×"});
+    x.setAttribute("aria-label", "Remove");
+    x.addEventListener("click", function(){ row.remove(); partChanged(); });
+    row.appendChild(x);
+    return row;
+  }
+
+  // ---- each part: build the form, and read it back
+  var BUILD = {
+    gacha: function(d, form){
+      var prefix = el("input", {type: "text", value: d.prefix, maxLength: 5,
+                                placeholder: d.default_prefix});
+      var colour = el("input", {type: "color", value: d.colour});
+      form.appendChild(card("Basics", "", [
+        field("Prefix", prefix, "Leave it empty for " + d.default_prefix + ". Up to 5 characters."),
+        field("Card colour", colour)]));
+      var allowed = checklist(channelItems(d.channels), d.allowed);
+      form.appendChild(card("Where the bot answers",
+        "Tick the channels gacha commands work in. With none ticked it answers everywhere." +
+        " Moderation, voice and level commands work in every channel regardless.",
+        [allowed.box]));
+      var numbers = {};
+      d.sections.forEach(function(sec){
+        form.appendChild(card(sec.title, "", sec.fields.map(function(f){
+          if (f.switch) {
+            var t = toggle(f.label, f.value);
+            numbers[f.key] = {switch: t.input};
+            return t.row;
+          }
+          var n = number(f.value, f.min, f.max);
+          numbers[f.key] = {input: n};
+          return field(f.label, n, "From " + f.min.toLocaleString() + " to " +
+                       f.max.toLocaleString() + ". Default " + f.default.toLocaleString() + ".");
+        })));
+      });
+      var switches = {};
+      d.toggles.forEach(function(group){
+        form.appendChild(card({Pool: "What can roll", Cards: "What cards show",
+                               Karuda: "Where karuda comes from"}[group.group] || group.group, "",
+          group.items.map(function(item){
+            var t = toggle(item.label, item.on); switches[item.key] = t.input; return t.row;
+          })));
+      });
+      return function(){
+        var settings = {};
+        Object.keys(numbers).forEach(function(k){
+          settings[k] = numbers[k].switch ? (numbers[k].switch.checked ? 1 : 0) : numbers[k].input.value;
+        });
+        var toggles = {};
+        Object.keys(switches).forEach(function(k){ toggles[k] = switches[k].checked; });
+        return {prefix: prefix.value, colour: colour.value, allowed: allowed.value(),
+                settings: settings, toggles: toggles};
+      };
+    },
+
+    mod: function(d, form){
+      if (!d.ready) form.appendChild(el("section", {cls: "card note-card"}, [el("p", {},
+        ["Moderation isn't set up in this server yet. Type ",
+         el("code", {text: "$setupmod @Mod @Trial Mod"}),
+         " in Discord first: it makes the jail, the mute roles and a mod log."])]));
+      var staff = checklist(d.roles.map(function(r){ return {id: r.id, label: r.name}; }), d.staff_roles);
+      form.appendChild(card("Staff roles",
+        "Roles that count as staff: they can see the jail and the mod log.", [staff.box]));
+      var log = select([["", "No mod log"]].concat(d.channels.map(function(c){
+        return [c.id, "#" + c.name + (c.category ? "  ·  " + c.category : "")]; })), d.log_channel);
+      form.appendChild(card("Mod log", "Every jail, mute, warning, kick and ban is posted here.",
+        [field("Channel", log)]));
+
+      function punishRow(p){
+        var at = number(p.threshold || "", 1, 50); at.placeholder = "Warnings";
+        var act = select(d.actions.map(function(a){ return [a, a.charAt(0).toUpperCase() + a.slice(1)]; }), p.action || "timeout");
+        var dur = el("input", {type: "text", value: p.duration || "1h", placeholder: "e.g. 1h"});
+        function showDur(){ dur.style.visibility = act.value === "timeout" ? "visible" : "hidden"; }
+        act.addEventListener("change", showDur); showDur();
+        [at, act, dur].forEach(function(i){ i.addEventListener("input", partChanged); i.addEventListener("change", partChanged); });
+        return removable(el("div", {cls: "prow"}, [at, act, dur]));
+      }
+      var punish = rows(punishRow, d.punishments);
+      var addP = el("button", {type: "button", cls: "btn ghost", text: "+ Add a punishment"});
+      addP.addEventListener("click", function(){ punish.appendChild(punishRow({})); partChanged(); });
+      form.appendChild(card("Warn punishments",
+        "What happens by itself when someone reaches a number of warnings. Timeouts take a length like 10m, 1h or 1d.",
+        [punish, el("div", {cls: "actions"}, [addP])]));
+
+      var lockRole = select([["", "@everyone"]].concat(d.roles.map(function(r){ return [r.id, r.name]; })), d.lock_role);
+      var skip = checklist(channelItems(d.channels), d.lockdown_ignored);
+      form.appendChild(card("Lockdowns", "Who a lockdown stops typing, and which channels $lockdown all leaves open.",
+        [field("Role to lock", lockRole), el("label", {cls: "f", text: "Channels to leave open"}), skip.box]));
+
+      return function(){
+        return {
+          staff_roles: staff.value(), log_channel: log.value, lock_role: lockRole.value,
+          lockdown_ignored: skip.value(),
+          punishments: Array.prototype.map.call(punish.querySelectorAll(".prow"), function(row){
+            var i = row.querySelectorAll("input, select");
+            return {threshold: i[0].value, action: i[1].value, duration: i[2].value};
+          }).filter(function(p){ return p.threshold !== ""; })
+        };
+      };
+    },
+
+    voice: function(d, form){
+      var create = select([["", "Off"]].concat(d.voice_channels.map(function(c){
+        return [c.id, "🔊 " + c.name + (c.category ? "  ·  " + c.category : "")]; })), d.create_channel);
+      form.appendChild(card("Join To Create",
+        "Joining this voice channel makes someone their own room, deleted when it empties. Only one bot should run this.",
+        [field("Channel", create)]));
+      function hourRow(h){
+        var hours = number(h.hours || "", 1, 100000); hours.placeholder = "Hours";
+        var role = select(roleOptions(d.roles, "Pick a role…"), h.role);
+        [hours, role].forEach(function(i){ i.addEventListener("input", partChanged); i.addEventListener("change", partChanged); });
+        return removable(el("div", {cls: "hrow"}, [hours, role]));
+      }
+      var list = rows(hourRow, d.hour_roles);
+      var add = el("button", {type: "button", cls: "btn ghost", text: "+ Add an hour role"});
+      add.addEventListener("click", function(){ list.appendChild(hourRow({})); partChanged(); });
+      form.appendChild(card("Hour roles", "Roles people get for time spent in voice.",
+        [list, el("div", {cls: "actions"}, [add])]));
+      return function(){
+        return {
+          create_channel: create.value,
+          hour_roles: Array.prototype.map.call(list.querySelectorAll(".hrow"), function(row){
+            var i = row.querySelectorAll("input, select");
+            return {hours: i[0].value, role: i[1].value};
+          }).filter(function(h){ return h.hours !== "" || h.role !== ""; })
+        };
+      };
+    }
+  };
+
+  function renderPart(name, data){
+    var form = $("part-form"); form.textContent = "";
+    var read = BUILD[name](data, form);
+    form.querySelectorAll("input, select, textarea").forEach(function(i){
+      i.addEventListener("input", partChanged); i.addEventListener("change", partChanged);
+    });
+    current = {name: name, state: data, read: read, snapshot: JSON.stringify(read())};
+    partChanged();
+  }
+
+  function partChanged(){
+    if (!current) return;
+    var dirty = JSON.stringify(current.read()) !== current.snapshot;
+    $("save").disabled = !dirty; $("discard").disabled = !dirty;
+    var st = $("status");
+    st.className = "msg" + (dirty ? " dirty" : "");
+    st.textContent = dirty ? "You have unsaved changes." : "All changes saved.";
+  }
+
+  function savePart(){
+    $("save").disabled = true; $("status").textContent = "Saving…";
+    api("POST", "/api/part/" + current.name, current.read()).then(function(r){
+      if (r.status === 401 || r.status === 403) return deny(r.data.problems[0]);
+      if (!r.ok) { showErrors(r.data.problems || ["Something went wrong. Try again."], "perrors"); partChanged(); return; }
+      showErrors([], "perrors");
+      renderPart(current.name, r.data);
+      $("status").className = "msg ok"; $("status").textContent = "Saved.";
+    }).catch(function(){ showErrors(["Couldn't reach the bot. Check your connection and try again."], "perrors"); partChanged(); });
+  }
+
   function showServers(me){
+    current = null;
     only("view-servers");
     var box = $("servers"); box.textContent = "";
     me.servers.forEach(function(s, i){
@@ -531,13 +899,13 @@ body{background:transparent}
       var text = document.createElement("span");
       var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       var st = document.createElement("span"); st.className = "st";
-      st.textContent = s.has_bot ? "Manage \u2192" : "Add Yuri \u2192";
+      st.textContent = s.has_bot ? "Manage →" : "Add Yuri →";
       text.append(nm, st); card.append(pic, text);
       if (s.has_bot) {
         card.type = "button";
         card.addEventListener("click", function(){
           history.pushState(null, "", "/dashboard?guild=" + s.id);
-          openServer(s.id);
+          route();
         });
       } else {
         // Straight to Discord's invite, with this server already picked.
@@ -549,11 +917,31 @@ body{background:transparent}
     $("no-servers").hidden = me.servers.length > 0;
   }
 
+  function show(){
+    var guild = /[?&]guild=(\d+)/.exec(location.search);
+    var part = /[?&]part=(\w+)/.exec(location.search);
+    guildId = guild ? guild[1] : "";
+    current = null;
+    if (!token && !guildId) return showServers(window.__me);
+    if (!part) return openOverview();
+    if (!serverName) {
+      // Straight onto a page: the back button still needs the server's name.
+      api("GET", "/api/overview").then(function(r){
+        if (r.ok) { serverName = r.data.guild.name;
+          document.querySelectorAll(".to-server").forEach(function(t){ t.textContent = serverName; }); }
+      });
+    }
+    if (part[1] === "levels") openLevels();
+    else if (BUILD[part[1]]) openPart(part[1]);
+    else openOverview();
+  }
+
   function route(){
-    if (token) { $("top").hidden = true; openServer(""); return; }
-    var match = /[?&]guild=(\d+)/.exec(location.search);
+    if (token) { $("top").hidden = false; $("me").hidden = true; $("logout").hidden = true; return show(); }
+    if (window.__me) return show();
     fetch("/api/me", {credentials: "same-origin"}).then(function(r){ return r.json(); })
       .then(function(me){
+        if (me.site) $("site").href = me.site;
         if (!me.user) {
           $("top").hidden = true;
           only("view-login");
@@ -565,34 +953,36 @@ body{background:transparent}
         $("top").hidden = false;
         var who = $("me"); who.textContent = "";
         if (me.user.avatar) { var img = document.createElement("img"); img.src = me.user.avatar; img.alt = ""; who.appendChild(img); }
-        who.appendChild(document.createTextNode(me.user.name));
+        who.appendChild(el("span", {cls: "nm", text: me.user.name}));
         window.__me = me;
-        if (match) openServer(match[1]); else showServers(me);
+        show();
       })
       .catch(function(){ deny("Couldn't reach the bot. Try again in a minute."); });
   }
 
   function leave(then){
     // Unsaved changes are worth one question before they're thrown away.
-    if (!$("app").hidden && !$("save").disabled &&
+    if (!$("bar").hidden && !$("save").disabled &&
         !confirm("You have unsaved changes. Leave without saving?")) return;
     then();
   }
-  $("back").addEventListener("click", function(){
-    leave(function(){
-      history.pushState(null, "", "/dashboard");
-      guildId = "";
-      if (window.__me) showServers(window.__me); else route();
-    });
+  document.querySelectorAll(".part-back").forEach(function(b){
+    b.addEventListener("click", function(){ go(""); });
   });
-  $("home").addEventListener("click", function(e){ e.preventDefault(); $("back").click(); });
+  $("ov-back").addEventListener("click", function(){
+    leave(function(){ history.pushState(null, "", "/dashboard"); route(); });
+  });
+  $("home").addEventListener("click", function(e){
+    e.preventDefault();
+    leave(function(){ history.pushState(null, "", token ? url("") : "/dashboard"); route(); });
+  });
   $("logout").addEventListener("click", function(){
     leave(function(){
       fetch("/logout", {method: "POST", headers: {"X-Yuri": "1"}, credentials: "same-origin"})
         .then(function(){ location.href = "/dashboard"; });
     });
   });
-  window.addEventListener("popstate", function(){ guildId = ""; route(); });
+  window.addEventListener("popstate", function(){ route(); });
   // A private link pasted into a dashboard tab that's already open only
   // changes the part after #, which doesn't reload the page. Make it.
   window.addEventListener("hashchange", function(){
