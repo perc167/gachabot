@@ -4,7 +4,8 @@
     python tools/add_external.py --source all
 
 AniList is an anime and manga database. Avatar, Overwatch, Undertale,
-Deltarune, Doki Doki Literature Club and Fortnite are none of those, and
+Deltarune, Doki Doki Literature Club, Genshin Impact and Fortnite are none
+of those, and
 searching AniList for them returns only coincidental name matches - "Zuko"
 finds Nezuko Kamado. So each franchise's names and art come from its own
 public API instead, and the records are marked with where they came from.
@@ -82,8 +83,9 @@ def usable_image(url: str) -> str:
     return ""
 
 
-def record(name, series, image_url, favourites, source):
-    return {
+def record(name, series, image_url, favourites, source, gender="",
+           images=None):
+    row = {
         "name": name,
         "series": series,
         "image_url": image_url,
@@ -91,6 +93,14 @@ def record(name, series, image_url, favourites, source):
         "favourites": favourites,
         "source": source,
     }
+    # Only set when a source actually knows. Blank means "not recorded",
+    # which is what half the AniList roster carries, and those roll under
+    # $m rather than $w or $h.
+    if gender:
+        row["gender"] = gender
+    if images:
+        row["images"] = images
+    return row
 
 
 # --------------------------------------------------------------------------
@@ -354,6 +364,64 @@ LIMBUS_REST = ["Vergilius", "Charon", "Mephistopheles", "Sancho",
                "Effie", "Kromer", "Hermann", "Ahab"]
 
 
+# --------------------------------------------------------------------------
+# Genshin Impact. Its community API carries every playable character with
+# miHoYo's own art, and states rarity and gender outright, so neither has to
+# be guessed at.
+# --------------------------------------------------------------------------
+GENSHIN_API = "https://genshin.jmp.blue/characters"
+
+
+def source_genshin() -> list:
+    """Every playable Genshin character, with miHoYo's own art.
+
+    Two images each where they exist: the portrait, which is the clean
+    render miHoYo publishes, and the gacha splash, which puts them in a
+    scene. The card art is skipped on purpose - it has GENSHIN IMPACT
+    printed across the top, and a title banner is not a picture of anybody.
+
+    Five stars are leads and four stars are not. That is the game's own
+    judgement rather than mine, and it happens to line up with who people
+    have heard of.
+    """
+    slugs = fetch(GENSHIN_API) or []
+    rows, splashes = [], 0
+    for slug in slugs:
+        detail = fetch(f"{GENSHIN_API}/{slug}")
+        if not isinstance(detail, dict) or not detail.get("name"):
+            continue
+
+        portrait = f"{GENSHIN_API}/{slug}/portrait"
+        splash = f"{GENSHIN_API}/{slug}/gacha-splash"
+        album = [portrait]
+        if reachable(splash):
+            album.append(splash)
+            splashes += 1
+
+        weight = LEAD if str(detail.get("rarity")) == "5" else SECONDARY
+        gender = detail.get("gender") or ""
+        rows.append(record(detail["name"], "Genshin Impact", portrait, weight,
+                           "genshin.jmp.blue",
+                           gender=gender if gender in ("Female", "Male") else "",
+                           images=album))
+        time.sleep(0.2)
+
+    print(f"    {splashes} of {len(rows)} also have splash art")
+    return rows
+
+
+def reachable(url: str) -> bool:
+    """True if the image is really there; a few characters have no splash."""
+    request = urllib.request.Request(url, method="HEAD", headers={
+        "User-Agent": "gachabot-external/1.0",
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status == 200
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return False
+
+
 def source_discoelysium() -> list:
     return from_fandom("discoelysium", "Disco Elysium",
                        DISCO_LEADS, DISCO_REST, "discoelysium.fandom")
@@ -374,6 +442,7 @@ SOURCES = {
     "vocaloid": source_vocaloid,
     "discoelysium": source_discoelysium,
     "limbuscompany": source_limbuscompany,
+    "genshin": source_genshin,
 }
 
 
