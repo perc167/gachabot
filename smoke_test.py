@@ -21,6 +21,11 @@ os.environ["DISCORD_TOKEN"] = "fake-token-for-import-only"
 failures = []
 
 
+def config_db_path():
+    import config
+    return config.DB_PATH
+
+
 def check(label, condition, detail=""):
     status = "ok  " if condition else "FAIL"
     if not condition:
@@ -186,6 +191,17 @@ async def main():
     db.end_event(EV, first)
     check("stopping an event ends it at once", db.get_setting(EV, "roll_limit") == base_rolls)
     check("another server's events don't leak", db.event_strength(EV + 1, "karuda") is None)
+
+    # Backups: made from the live file, restorable, and marked as trimmed.
+    import backup
+    data, _note = backup.make(config_db_path())
+    check("a backup can be made and read back",
+          backup.check(data).startswith(b"SQLite format 3"))
+    try:
+        backup.check(b"not a backup")
+        check("junk is refused as a backup", False)
+    except backup.BadBackup:
+        check("junk is refused as a backup", True)
 
     # Levels: the curve, and a reset that keeps what was already paid.
     from cogs import levels as levelsmod

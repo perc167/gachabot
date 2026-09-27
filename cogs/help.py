@@ -506,6 +506,8 @@ CATEGORIES = [
         ("delimage", "remove an image"),
         ("missingart", "who has no picture"),
         ("genkey", "mint premium keys"),
+        ("backup", "DM the owners a backup"),
+        ("restore", "restore a backup (DM)"),
         ("keystats", "keys made and spent"),
     ]),
 ]

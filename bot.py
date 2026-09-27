@@ -10,6 +10,7 @@ import time
 import discord
 from discord.ext import commands
 
+import backup
 import config
 import views
 from db import Database
@@ -51,6 +52,7 @@ COGS = [
     "cogs.events",
     "cogs.champions",
     "cogs.automod",
+    "cogs.backups",
     "cogs.dashboard",
     "cogs.aliases",
     "cogs.tea",
@@ -107,6 +109,9 @@ class GachaBot(commands.Bot):
             help_command=None,
             case_insensitive=True,
         )
+        # A backup parked by $restore goes in before the database opens.
+        if backup.apply_pending(config.DB_PATH):
+            log.warning("restored the database from a backup")
         self.db = Database()
         self.started_at = time.time()
         self.cooldowns = Cooldowns(self.db)
@@ -179,7 +184,10 @@ class GachaBot(commands.Bot):
         Saves running $import by hand on a fresh database, which is exactly
         the moment somebody is least likely to know they have to.
         """
-        if self.db.character_count():
+        # A restored backup carries only the characters something points at;
+        # it's marked, and the rest of the roster is loaded back in here.
+        trimmed = self.db.get_pref(0, "backup_trimmed", 0)
+        if self.db.character_count() and not trimmed:
             return
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                             "data", "characters.json")
@@ -199,6 +207,8 @@ class GachaBot(commands.Bot):
                 loaded += (await asyncio.to_thread(
                     self.db.import_characters, batch))["total"]
             log.info("loaded %s characters", f"{loaded:,}")
+            if trimmed:
+                self.db.set_pref(0, "backup_trimmed", 0)
         except Exception:  # noqa: BLE001 - a bad roster must not stop the bot
             log.exception("could not load the roster; use %simport",
                           config.PREFIX)

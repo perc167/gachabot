@@ -4,3 +4,10 @@ __pycache__/
 *.pyc
 *.bak
 assets/shards/_preview.png
+# Backups and restores hold every player's data: never uploaded.
+*.db-wal
+*.db-shm
+*.db.gz
+*.restore
+*.before-restore*
+paper-backup-*
