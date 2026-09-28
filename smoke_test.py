@@ -1901,6 +1901,34 @@ async def main():
     check("every badge has an icon to fall back on",
           all(b.fallback for b in perksmod.BADGES))
 
+    # Icons come from the bot's own emoji, uploaded to the application, so a
+    # server never has to paste them in. Until that upload lands - a fresh
+    # bot, or a failed call - the plain emoji has to show rather than a gap.
+    utils.set_app_emojis({})
+    check("badges fall back to a plain emoji before the upload",
+          all(utils.badge_icon(b.key, b.fallback) == b.fallback
+              for b in perksmod.BADGES))
+    utils.set_app_emojis({"badgegold": "<:badgegold:9>", "dust": "<:dust:8>"})
+    check("and use the bot's own emoji once it has them",
+          utils.badge_icon("gold", "x") == "<:badgegold:9>"
+          and utils.shard_icon(config.SHARD_TYPES[0][0]) == "<:dust:8>")
+    check("a badge with no emoji yet still falls back",
+          utils.badge_icon("paper", "P") == "P")
+    utils.set_app_emojis({})
+
+    import bot as botmod_icons
+    wanted = []
+    for folder, prefix in botmod_icons.GachaBot.EMOJI_SOURCES:
+        path = os.path.join(PROJECT, folder)
+        wanted += [prefix + os.path.splitext(f)[0]
+                   for f in os.listdir(path)
+                   if f.endswith(".png") and not f.startswith("_")]
+    check("every badge has a file for the bot to upload",
+          all(f"badge{b.key}" in wanted for b in perksmod.BADGES),
+          str(sorted(wanted)))
+    check("the preview sheet is not uploaded as an icon",
+          not any(name.startswith("_") for name in wanted))
+
     # The middle three are locked until the starters are climbed, the way
     # Mudae's are, so the list has something to uncover.
     starters = {k: 0 for k in perksmod.STARTERS}

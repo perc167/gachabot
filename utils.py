@@ -27,6 +27,30 @@ def fmt_duration(seconds: int) -> str:
     return f"{minutes}m"
 
 
+# The bot's own emoji, uploaded to the application rather than to any server:
+# {name: "<:name:id>"}. Discord lets an application hold two thousand of these
+# and use them in every server it is in, which is how a bot ships its own
+# icons instead of asking each server to paste them in.
+_app_emojis = {}
+
+
+def set_app_emojis(mapping: dict):
+    global _app_emojis
+    _app_emojis = dict(mapping or {})
+
+
+def _emoji(name: str, fallback: str) -> str:
+    """The bot's own emoji by that name, then a server's, then the plain one."""
+    found = _app_emojis.get(name)
+    if found:
+        return found
+    if _bot is not None:
+        guild_emoji = discord.utils.get(_bot.emojis, name=name)
+        if guild_emoji:
+            return str(guild_emoji)
+    return fallback
+
+
 # Set once at startup so icon lookups can see the server's custom emoji.
 # A module-level binding rather than a parameter threaded through every embed
 # helper: which icon to draw is presentation, not something callers decide.
@@ -42,28 +66,16 @@ def use_emoji_from(bot):
 def shard_icon(key: str) -> str:
     """The uploaded crystal for this shard, or the Unicode fallback.
 
-    If any server the bot is in has an emoji named after the shard - dust,
-    verdite, prism and so on - that emoji is used. Upload the files from
-    assets/shards/ and they appear on their own, with nothing to configure.
+    The bot uploads assets/shards/ to itself the first time it starts and
+    finds them missing, so this is normally the bot's own emoji. A server
+    that already had one by the same name still works.
     """
-    fallback = config.shard(key)[2]
-    if _bot is None:
-        return fallback
-    emoji = discord.utils.get(_bot.emojis, name=key)
-    return str(emoji) if emoji else fallback
+    return _emoji(key, config.shard(key)[2])
 
 
 def badge_icon(key: str, fallback: str) -> str:
-    """The uploaded badge emoji, or the plain one until it is uploaded.
-
-    Same arrangement as the shards: upload assets/badges/*.png as emoji
-    named after the badge - paper, iron, gold - and they appear on their
-    own, with nothing to configure.
-    """
-    if _bot is None:
-        return fallback
-    emoji = discord.utils.get(_bot.emojis, name=f"badge{key}")         or discord.utils.get(_bot.emojis, name=key)
-    return str(emoji) if emoji else fallback
+    """The badge's own emoji, or the plain one before the upload happens."""
+    return _emoji(f"badge{key}", "") or _emoji(key, fallback)
 
 
 # Characters whose art no CDN will serve keep their picture in the repo

@@ -177,6 +177,7 @@ class GachaBot(commands.Bot):
         # anything in it, and art arrives in batches long after the roster.
         await self._seed_art()
         await self._seed_secrets()
+        await self._sync_emojis()
         log.info("%s characters in the pool", self.db.character_count())
 
     async def _seed_pool(self):
@@ -300,6 +301,52 @@ class GachaBot(commands.Bot):
                 log.info("%s secret character(s) retired", retired)
         except Exception:  # noqa: BLE001 - a bad list must not stop the bot
             log.exception("could not load the secret characters")
+
+    # Where the bot's own artwork lives, and what each folder's emoji are
+    # called. Badges are prefixed because "gold" and "paper" are words a
+    # server might already have an emoji for.
+    EMOJI_SOURCES = (("assets/badges", "badge"), ("assets/shards", ""))
+
+    async def _sync_emojis(self):
+        """Upload the bot's icons to itself, once, and remember them.
+
+        Application emoji belong to the bot rather than to a server, so they
+        work everywhere it is and nobody has to paste anything into Server
+        Settings. Discord allows two thousand; this uploads about fifteen,
+        and only the ones that are not there already.
+        """
+        root = os.path.dirname(os.path.abspath(__file__))
+        try:
+            existing = {emoji.name: emoji
+                        for emoji in await self.fetch_application_emojis()}
+        except discord.HTTPException:
+            log.warning("could not read the bot's own emoji; using plain ones")
+            return
+
+        added = 0
+        for folder, prefix in self.EMOJI_SOURCES:
+            directory = os.path.join(root, folder)
+            if not os.path.isdir(directory):
+                continue
+            for entry in sorted(os.listdir(directory)):
+                # _preview.png is a contact sheet for people, not an icon.
+                if not entry.endswith(".png") or entry.startswith("_"):
+                    continue
+                name = prefix + os.path.splitext(entry)[0]
+                if name in existing:
+                    continue
+                try:
+                    with open(os.path.join(directory, entry), "rb") as handle:
+                        existing[name] = await self.create_application_emoji(
+                            name=name, image=handle.read())
+                    added += 1
+                except discord.HTTPException as error:
+                    log.warning("could not upload emoji %s: %s", name, error)
+
+        utils.set_app_emojis({name: str(emoji)
+                              for name, emoji in existing.items()})
+        log.info("%s emoji ready%s", len(existing),
+                 f", {added} newly uploaded" if added else "")
 
     def every_command_name(self):
         """Every name and alias the bot answers to, built once."""
