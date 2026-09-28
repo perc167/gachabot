@@ -295,6 +295,36 @@ async def main():
                                                   pages=3))).size == board.size)
     lv.message_counts.clear()
 
+    # The $level card: activity per channel and day, ranks, and the picture.
+    from cogs.levels import today as _today
+    day = _today()
+    lv.note_activity(PAID, ALICE, 700, messages=3)
+    lv.note_activity(PAID, ALICE, 701, messages=1)
+    lv.note_activity(PAID, ALICE, 800, voice=120)
+    lv.save_message_counts()
+    db.add_activity({(PAID, ALICE, day - 3, 701): [5, 0], (PAID, ALICE, day - 40, 702): [9, 0]})
+    check("activity adds up by day", db.activity_by_day(PAID, ALICE, day)[day] == (4, 120))
+    check("top channels, busiest first",
+          db.top_channels(PAID, ALICE, day - 29, "messages") == [(701, 6), (700, 3)]
+          and db.top_channels(PAID, ALICE, day - 29, "voice") == [(800, 120)])
+    db.prune_activity(day - 30)
+    check("old activity is cleared", not db.top_channels(PAID, ALICE, 0, "messages")
+          or all(c != 702 for c, _n in db.top_channels(PAID, ALICE, 0, "messages")))
+    check("message rank", db.message_rank(PAID, ALICE) == 1 and db.message_rank(PAID, BOB) == 2
+          and db.message_rank(PAID, 999) == 0)
+
+    class _Face:
+        async def read(self):
+            return b""
+
+    places = {700: NS(name="general"), 701: NS(name="gacha"), 800: NS(name="General VC")}
+    member = NS(id=ALICE, name="alice", display_name="Alice ♡",
+                guild=NS(id=PAID, get_channel=places.get),
+                display_avatar=NS(replace=lambda **kw: _Face()))
+    card = await lv.profile_file(member)
+    check("the $level card draws", card is not None
+          and _Image.open(card.fp).size == (1280, 800))
+
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
           and levelsmod.month_before(202607) == 202606)

@@ -34,6 +34,7 @@ from discord.ext import commands, tasks
 
 import boardcard
 import config
+import profilecard
 import rankcard
 import utils
 import weekly
@@ -191,6 +192,7 @@ def match_members(rows: list, members) -> tuple:
 
 BOARD_PAGE = 10         # people on a page of the leaderboard picture
 BOARD_LIMIT = 100       # people on the whole board
+ACTIVITY_DAYS = 30      # days of per-channel activity kept for the $level card
 
 
 class BoardView(discord.ui.View):
@@ -273,6 +275,8 @@ class Levels(commands.Cog):
         self.last_counted = {}  # (guild, user) -> when a message last paid
         self.pruned_for = 0     # the month old monthly XP was last cleared in
         self.message_counts = {}  # (guild, user) -> messages not saved yet
+        self.activity = {}        # (guild, user, day, channel) -> [messages, voice]
+        self.activity_pruned_for = 0
 
     @property
     def db(self):
@@ -286,8 +290,19 @@ class Levels(commands.Cog):
         self.save_message_counts()
 
     def save_message_counts(self):
+        """Save what's been counted in memory: messages, and activity per
+        channel and day."""
         counts, self.message_counts = self.message_counts, {}
         self.db.add_messages(counts)
+        activity, self.activity = self.activity, {}
+        self.db.add_activity(activity)
+
+    def note_activity(self, guild_id: int, user_id: int, channel_id: int,
+                      messages: int = 0, voice: int = 0):
+        key = (guild_id, user_id, today(), channel_id)
+        tally = self.activity.setdefault(key, [0, 0])
+        tally[0] += messages
+        tally[1] += voice
 
     async def cog_check(self, ctx):
         # A group's own checks don't run for its subcommands, and every one
@@ -359,6 +374,55 @@ class Levels(commands.Cog):
         if level > row["level"]:
             await self.levelled_up(member, row["level"], level,
                                    row["paid_through"], channel)
+
+    async def profile_file(self, member):
+        """The full $level card: level, messages, voice, ranks, top channels
+        and the last 14 days. None if it can't be drawn."""
+        guild = member.guild
+        gid = guild.id
+        try:
+            self.save_message_counts()      # so it includes the last minute
+            row = self.db.level_row(gid, member.id)
+            level, into, needed = level_for(row["xp"])
+            day = today()
+            by_day = self.db.activity_by_day(gid, member.id, day - ACTIVITY_DAYS + 1)
+
+            def since(first: int, part: int) -> int:
+                return sum(v[part] for d, v in by_day.items() if d >= first)
+
+            def named(cid: int) -> str:
+                place = guild.get_channel(cid)
+                return place.name if place else "deleted channel"
+            first = day - ACTIVITY_DAYS + 1
+            background = None
+            if self.db.is_premium(gid):
+                background = (self.db.rank_background(gid, member.id)
+                              or self.db.rank_background(gid, 0))
+            avatar = await member.display_avatar.replace(size=256, format="png").read()
+            p = {
+                "name": member.display_name, "username": member.name, "avatar": avatar,
+                "level": level, "into": into, "needed": needed, "xp": row["xp"],
+                "xp_rank": self.db.level_rank(gid, member.id),
+                "msg_total": row["messages"], "msg_7d": since(day - 6, 0),
+                "msg_1d": since(day, 0), "msg_rank": self.db.message_rank(gid, member.id),
+                "voice_total": self.db.vc_seconds(gid, member.id),
+                "voice_7d": since(day - 6, 1), "voice_1d": since(day, 1),
+                "voice_rank": self.db.voice_rank(gid, member.id),
+                "text_top": [(named(c), n) for c, n in
+                             self.db.top_channels(gid, member.id, first, "messages")],
+                "voice_top": [(named(c), n) for c, n in
+                              self.db.top_channels(gid, member.id, first, "voice")],
+                "days": [(d, *by_day.get(d, (0, 0))) for d in range(day - 13, day + 1)],
+            }
+            # Voice time tracked per channel can run ahead of the all-time
+            # total for the first days (that counts calls alone too).
+            p["voice_total"] = max(p["voice_total"], since(first, 1))
+            p["msg_total"] = max(p["msg_total"], since(first, 0))
+            png = await asyncio.to_thread(profilecard.render, p, self.colour(gid), background)
+        except Exception:  # noqa: BLE001 - $level must answer either way
+            logging.getLogger("levels").exception("level card failed")
+            return None
+        return discord.File(io.BytesIO(png), filename="level.png")
 
     async def card_file(self, member):
         """A member's rank card as a file to send, or None if it can't be
@@ -448,6 +512,10 @@ class Levels(commands.Cog):
         # Every message counts toward the leaderboard's total, XP or not.
         counted = (guild.id, message.author.id)
         self.message_counts[counted] = self.message_counts.get(counted, 0) + 1
+        # And toward the channel it was sent in, for the $level card. A thread
+        # counts as the channel it's in.
+        where = getattr(message.channel, "parent_id", None) or message.channel.id
+        self.note_activity(guild.id, message.author.id, where, messages=1)
         if message.channel.id in self.db.level_ignored_in(guild.id):
             return
         key = (guild.id, message.author.id)
@@ -478,7 +546,18 @@ class Levels(commands.Cog):
             # Last month stays viewable; anything older goes.
             self.db.prune_monthly(month_before(month))
             self.pruned_for = month
+        if self.activity_pruned_for != day:
+            self.db.prune_activity(day - ACTIVITY_DAYS)
+            self.activity_pruned_for = day
         for guild in self.bot.guilds:
+            # A minute in voice for everyone in a call, for the $level card:
+            # any call, alone or not, but not the AFK channel.
+            for channel in [*guild.voice_channels, *guild.stage_channels]:
+                if channel == guild.afk_channel:
+                    continue
+                for member in channel.members:
+                    if not member.bot:
+                        self.note_activity(guild.id, member.id, channel.id, voice=60)
             xp_on = bool(self.setting(guild.id, "voice") and self.setting(guild.id, "voice_xp"))
             # Weekly champions count voice minutes by the same rules, even
             # where voice XP itself is switched off.
@@ -524,12 +603,14 @@ class Levels(commands.Cog):
                     invoke_without_command=True)
     @commands.guild_only()
     async def rank(self, ctx, member: discord.Member = None):
-        """Your rank card: level, how close the next one is, and your place."""
+        """Your level card: level, messages, time in voice, where you rank,
+        your top channels and your last 14 days."""
         member = member or ctx.author
         row = self.db.level_row(ctx.guild.id, member.id)
         level, into, needed = level_for(row["xp"])
         place = self.db.level_rank(ctx.guild.id, member.id)
-        card = await self.card_file(member)
+        async with ctx.typing():
+            card = await self.profile_file(member) or await self.card_file(member)
         if card:
             await ctx.send(file=card)
             return

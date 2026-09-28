@@ -352,6 +352,19 @@ CREATE TABLE IF NOT EXISTS weekly_activity (
 -- XP earned each calendar month (UTC), month as YYYYMM, for the Premium
 -- monthly leaderboard. Kept for every server, so it's already full on the
 -- day a server upgrades.
+-- Messages and seconds in voice, per person, per channel, per day (UTC days
+-- since 1970), for the $level card's chart and top channels. Kept for
+-- ACTIVITY_DAYS; the all-time totals live in levels.messages and vc_time.
+CREATE TABLE IF NOT EXISTS activity (
+    guild_id   INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    day        INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    messages   INTEGER NOT NULL DEFAULT 0,
+    voice      INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, day, channel_id)
+);
+
 -- Paper's own profile on a server (Premium, botprofile.py): the bio as set,
 -- and the hashes Discord gave the pictures. Empty means Paper's own.
 CREATE TABLE IF NOT EXISTS bot_profiles (
@@ -1258,9 +1271,67 @@ class Database:
                 " DO UPDATE SET messages = messages + excluded.messages",
                 [(g, u, n) for (g, u), n in counts.items()])
 
-    def vc_seconds_many(self, guild_id: int, user_ids: list, now: int = None) -> dict:
-        """vc_seconds for several people at once."""
-        return {uid: self.vc_seconds(guild_id, uid, now) for uid in user_ids}
+    def add_activity(self, counts: dict):
+        """{(guild, user, day, channel): [messages, voice seconds]} added in
+        one go, like add_messages."""
+        if not counts:
+            return
+        with self.conn:
+            self.conn.executemany(
+                "INSERT INTO activity (guild_id, user_id, day, channel_id, messages, voice)"
+                " VALUES (?, ?, ?, ?, ?, ?)"
+                " ON CONFLICT (guild_id, user_id, day, channel_id) DO UPDATE SET"
+                " messages = messages + excluded.messages, voice = voice + excluded.voice",
+                [(*key, m, v) for key, (m, v) in counts.items()])
+
+    def activity_by_day(self, guild_id: int, user_id: int, since_day: int) -> dict:
+        """{day: (messages, voice seconds)} from since_day on."""
+        rows = self.conn.execute(
+            "SELECT day, SUM(messages) AS m, SUM(voice) AS v FROM activity"
+            " WHERE guild_id = ? AND user_id = ? AND day >= ? GROUP BY day",
+            (guild_id, user_id, since_day)).fetchall()
+        return {r["day"]: (r["m"], r["v"]) for r in rows}
+
+    def top_channels(self, guild_id: int, user_id: int, since_day: int,
+                     column: str, limit: int = 3) -> list:
+        """[(channel id, amount)] where someone chatted (column 'messages')
+        or talked ('voice') the most since since_day."""
+        assert column in ("messages", "voice")
+        return [(r["channel_id"], r["amount"]) for r in self.conn.execute(
+            f"SELECT channel_id, SUM({column}) AS amount FROM activity"
+            f" WHERE guild_id = ? AND user_id = ? AND day >= ?"
+            f" GROUP BY channel_id HAVING amount > 0 ORDER BY amount DESC LIMIT ?",
+            (guild_id, user_id, since_day, limit)).fetchall()]
+
+    def prune_activity(self, before_day: int):
+        self.conn.execute("DELETE FROM activity WHERE day < ?", (before_day,))
+        self.conn.commit()
+
+    def message_rank(self, guild_id: int, user_id: int) -> int:
+        """1 for the most messages on the server. 0 for none at all."""
+        mine = self.conn.execute(
+            "SELECT messages FROM levels WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id)).fetchone()
+        if not mine or mine["messages"] <= 0:
+            return 0
+        return 1 + self.conn.execute(
+            "SELECT COUNT(*) FROM levels WHERE guild_id = ? AND messages > ?",
+            (guild_id, mine["messages"])).fetchone()[0]
+
+    def voice_rank(self, guild_id: int, user_id: int, now: int = None) -> int:
+        """1 for the most time in voice on the server. 0 for none."""
+        now = int(time.time()) if now is None else now
+        mine = self.vc_seconds(guild_id, user_id, now)
+        if mine <= 0:
+            return 0
+        return 1 + self.conn.execute(
+            "SELECT COUNT(*) FROM ("
+            "  SELECT user_id, SUM(seconds) AS seconds FROM ("
+            "    SELECT user_id, seconds FROM vc_time WHERE guild_id = ?"
+            "    UNION ALL"
+            "    SELECT user_id, ? - joined_at FROM vc_sessions WHERE guild_id = ?"
+            "  ) GROUP BY user_id) WHERE seconds > ?",
+            (guild_id, now, guild_id, mine)).fetchone()[0]
 
     def top_levels(self, guild_id: int, limit: int = 100) -> list:
         return self.conn.execute(
