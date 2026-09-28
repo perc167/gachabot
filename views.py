@@ -1,5 +1,6 @@
 """Reusable interactive views: page flipping and yes/no confirmation."""
 import copy
+import difflib
 
 import discord
 
@@ -100,6 +101,71 @@ class Paginator(discord.ui.View):
         return self.message
 
 
+def _plain(text: str) -> str:
+    """Lowercase letters and digits only, so punctuation never blocks a match."""
+    return "".join(c for c in (text or "").lower() if c.isalnum())
+
+
+def rank_matches(rows, query: str) -> list:
+    """The rows worth showing for what has been typed, closest first.
+
+    A dropdown of a hundred characters is a wall to read, so typing narrows
+    it. What counts as closest, in order: the name starts with it, a word of
+    the name starts with it, the name contains it, the series matches, and
+    finally a misspelling close enough that difflib recognises it - which is
+    what catches "hatsne" for Hatsune.
+    """
+    wanted = _plain(query)
+    if not wanted:
+        return list(rows)
+
+    scored = []
+    for row in rows:
+        name = _plain(row["name"])
+        words = [_plain(word) for word in str(row["name"]).split()]
+        series = _plain(row["series"] if "series" in row.keys() else "")
+
+        if name.startswith(wanted):
+            score = 0.0
+        elif any(word.startswith(wanted) for word in words if word):
+            score = 1.0
+        elif wanted in name:
+            score = 2.0
+        elif series.startswith(wanted) or wanted in series:
+            score = 3.0
+        else:
+            close = difflib.SequenceMatcher(None, wanted, name).ratio()
+            # 0.68 keeps "hatsne" on Hatsune Miku (0.71) and drops
+            # "sakurajima" from Makima (0.63), which is the nearest pair of
+            # a real misspelling and a coincidence in the shipped roster.
+            if close < 0.68:
+                continue
+            score = 4.0 + (1.0 - close)
+        scored.append((score, str(row["name"]).lower(), row))
+
+    scored.sort(key=lambda item: (item[0], item[1]))
+    return [row for _score, _name, row in scored]
+
+
+class CharacterSearch(discord.ui.Modal, title="Search"):
+    """The box the picker types into."""
+
+    term = discord.ui.TextInput(
+        label="Part of a name",
+        placeholder="ha  ->  Hatsune Miku, Hayase Nagatoro, ...",
+        required=False,
+        max_length=60,
+    )
+
+    def __init__(self, picker):
+        super().__init__()
+        self.picker = picker
+        self.term.default = picker.query or None
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self.picker.search(interaction, str(self.term.value or ""))
+
+
 class CharacterPicker(discord.ui.View):
     """A dropdown of somebody's harem, so a trade needs no typing.
 
@@ -112,7 +178,10 @@ class CharacterPicker(discord.ui.View):
 
     def __init__(self, rows, owner_id: int, placeholder: str, timeout: float = 120):
         super().__init__(timeout=timeout)
-        self.rows = rows
+        # everything they own, and what is left after what they typed
+        self.all_rows = list(rows)
+        self.rows = list(rows)
+        self.query = ""
         self.owner_id = owner_id
         self.placeholder = placeholder
         self.page = 0
@@ -125,43 +194,71 @@ class CharacterPicker(discord.ui.View):
     def pages(self) -> int:
         return max(1, -(-len(self.rows) // self.PER_PAGE))
 
+    def apply_query(self, query: str):
+        """Narrow the list to what was typed, and go back to the first page."""
+        self.query = (query or "").strip()
+        self.rows = rank_matches(self.all_rows, self.query)
+        self.page = 0
+        self._build()
+
     def _build(self):
         self.clear_items()
         start = self.page * self.PER_PAGE
         window = self.rows[start : start + self.PER_PAGE]
 
-        select = discord.ui.Select(
-            placeholder=f"{self.placeholder} ({len(self.rows)} to choose from)",
-            options=[
-                discord.SelectOption(
-                    label=row["name"][:100],
-                    value=str(row["id"]),
-                    description=f"{row['series']}"[:100],
-                )
-                for row in window
-            ],
+        if window:
+            found = (f"{len(self.rows)} for \u201c{self.query}\u201d"
+                     if self.query else f"{len(self.rows)} to choose from")
+            select = discord.ui.Select(
+                placeholder=f"{self.placeholder} ({found})",
+                options=[
+                    discord.SelectOption(
+                        label=row["name"][:100],
+                        value=str(row["id"]),
+                        description=f"{row['series']}"[:100],
+                    )
+                    for row in window
+                ],
+            )
+            select.callback = self._on_select
+            self.add_item(select)
+        else:
+            # A select with no options is rejected by Discord, so say so on a
+            # dead button rather than sending nothing back.
+            empty = discord.ui.Button(
+                label=f"Nobody matches \u201c{self.query}\u201d", disabled=True)
+            self.add_item(empty)
+
+        search = discord.ui.Button(
+            label="Search" if not self.query else f"Search: {self.query}"[:80],
+            emoji="\U0001f50d", row=1,
         )
-        select.callback = self._on_select
-        self.add_item(select)
+        search.callback = self._on_search
+        self.add_item(search)
+
+        if self.query:
+            clear = discord.ui.Button(label="Clear", row=1)
+            clear.callback = self._on_clear
+            self.add_item(clear)
 
         if self.pages > 1:
-            previous = discord.ui.Button(label="◀", row=1)
+            previous = discord.ui.Button(label="◀", row=2)
             previous.disabled = self.page == 0
             previous.callback = self._on_prev
             self.add_item(previous)
 
             label = discord.ui.Button(
-                label=f"{self.page + 1}/{self.pages}", row=1, disabled=True
+                label=f"{self.page + 1}/{self.pages}", row=2, disabled=True
             )
             self.add_item(label)
 
-            nxt = discord.ui.Button(label="▶", row=1)
+            nxt = discord.ui.Button(label="▶", row=2)
             nxt.disabled = self.page >= self.pages - 1
             nxt.callback = self._on_next
             self.add_item(nxt)
 
         cancel = discord.ui.Button(
-            label="Cancel", style=discord.ButtonStyle.danger, row=1
+            label="Cancel", style=discord.ButtonStyle.danger, row=2
         )
         cancel.callback = self._on_cancel
         self.add_item(cancel)
@@ -176,11 +273,26 @@ class CharacterPicker(discord.ui.View):
 
     async def _on_select(self, interaction: discord.Interaction):
         character_id = int(interaction.data["values"][0])
-        self.chosen = next((r for r in self.rows if r["id"] == character_id), None)
+        # Looked up in everything they own, not the filtered view: the
+        # selection is made against the list on screen, but the row that
+        # comes back should not depend on what was typed.
+        self.chosen = next(
+            (r for r in self.all_rows if r["id"] == character_id), None)
         for child in self.children:
             child.disabled = True
         await interaction.response.edit_message(view=self)
         self.stop()
+
+    async def _on_search(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(CharacterSearch(self))
+
+    async def search(self, interaction: discord.Interaction, query: str):
+        self.apply_query(query)
+        await interaction.response.edit_message(view=self)
+
+    async def _on_clear(self, interaction: discord.Interaction):
+        self.apply_query("")
+        await interaction.response.edit_message(view=self)
 
     async def _on_prev(self, interaction: discord.Interaction):
         self.page = max(0, self.page - 1)

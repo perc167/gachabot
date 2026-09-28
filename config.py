@@ -91,8 +91,8 @@ GUILD_SETTINGS = {
         "Percent of a character's value a karuda grab pays out",
     ),
     "divorce_refund_percent": (
-        0, 0, 100,
-        "Percent of value refunded on divorce (0 stops claim-divorce farming)",
+        100, 0, 100,
+        "Percent of a character's value refunded on divorce",
     ),
     "price_rolls": (400, 10, 1000000, "Cost of a bundle of extra rolls"),
     "rolls_per_purchase": (5, 1, 50, "Rolls you get per bundle bought"),

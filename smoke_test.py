@@ -622,8 +622,54 @@ async def main():
     check("picker starts with nothing chosen", picker.chosen is None)
     small = views.CharacterPicker(many[:4], ALICE, "pick")
     check("short harem is one page", small.pages == 1)
-    check("short harem has no nav",
-          len([c for c in small.children if isinstance(c, discord.ui.Button)]) == 1)
+    check("short harem has only search and cancel",
+          len([c for c in small.children if isinstance(c, discord.ui.Button)]) == 2)
+
+    # Typing narrows the list, so a long harem is not a wall to read.
+    named = [dict(id=n, name=name, series=series) for n, (name, series) in
+             enumerate([("Hatsune Miku", "Vocaloid"),
+                        ("Hayase Nagatoro", "Nagatoro"),
+                        ("Mai Sakurajima", "Bunny Girl Senpai"),
+                        ("Makima", "Chainsaw Man"),
+                        ("Zero Two", "DARLING in the FRANXX")])]
+    check("typing nothing keeps everybody",
+          len(views.rank_matches(named, "")) == len(named))
+    hits = views.rank_matches(named, "ha")
+    # Three, not two: Makima comes in on her series, Chainsaw Man.
+    check("typing narrows the list", len(hits) == 3, str(len(hits)))
+    check("and the closest matches come first",
+          [h["name"] for h in hits[:2]] == ["Hatsune Miku", "Hayase Nagatoro"],
+          str([h["name"] for h in hits]))
+    check("a name beats a series",
+          hits[-1]["name"] == "Makima", str([h["name"] for h in hits]))
+    check("a word inside the name still matches",
+          [r["name"] for r in views.rank_matches(named, "sakurajima")]
+          == ["Mai Sakurajima"])
+    check("the series matches too",
+          any(r["name"] == "Zero Two"
+              for r in views.rank_matches(named, "franxx")))
+    check("a misspelling still finds them",
+          views.rank_matches(named, "hatsne")[0]["name"] == "Hatsune Miku")
+    check("and a coincidence does not",
+          "Makima" not in
+          [r["name"] for r in views.rank_matches(named, "sakurajima")])
+    check("nothing matching returns nothing",
+          views.rank_matches(named, "zzzzz") == [])
+
+    typed = views.CharacterPicker(named, ALICE, "pick")
+    typed.apply_query("ha")
+    check("the picker rebuilds around what was typed",
+          len(typed.rows) == 3 and typed.page == 0)
+    options = [c for c in typed.children if isinstance(c, discord.ui.Select)]
+    check("the dropdown shows the matches", len(options) == 1
+          and len(options[0].options) == 3)
+    check("and offers a way back to everybody",
+          any(getattr(c, "label", "") == "Clear" for c in typed.children))
+    typed.apply_query("zzzzz")
+    check("no matches leaves no dropdown, which Discord rejects",
+          not [c for c in typed.children if isinstance(c, discord.ui.Select)])
+    typed.apply_query("")
+    check("clearing brings everybody back", len(typed.rows) == len(named))
     check("picker option carries the character id",
           selects[0].options[0].value == str(many[0]["id"]))
 
@@ -1881,6 +1927,21 @@ async def main():
               not absent,
               f"{len(absent)} missing: " + ", ".join(absent[:8])
               + " - re-run tools/automod.py")
+
+    # 20j9. Divorcing hands back exactly what the character was worth, keys
+    # included, which is the number printed on their own card.
+    rate = db.get_setting(GUILD, "karuda_rate")
+    percent = db.get_setting(GUILD, "divorce_refund_percent")
+    check("divorce refunds the whole value by default", percent == 100,
+          str(percent))
+    someone = db.search_characters("", limit=1)[0]
+    worth = utils.value_with_keys(db, GUILD, someone, rate)
+    check("the refund is the value on the card",
+          max(1, worth * percent // 100) == worth, f"{worth}")
+    # A key raises what a character is worth, so it has to raise the refund.
+    db.raise_key_level(GUILD, someone["id"])
+    keyed = utils.value_with_keys(db, GUILD, someone, rate)
+    check("keys count towards the refund", keyed > worth, f"{keyed} vs {worth}")
 
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod

@@ -258,7 +258,11 @@ class Harem(commands.Cog):
         percent = db.get_setting(gid, "divorce_refund_percent")
         if percent:
             rate = db.get_setting(gid, "karuda_rate")
-            refund = max(1, utils.karuda_value(character, rate) * percent // 100)
+            # value_with_keys, not karuda_value: what a divorce hands back
+            # should be the number on the character's own card, and that one
+            # counts the keys spent on them.
+            worth = utils.value_with_keys(db, gid, character, rate)
+            refund = max(1, worth * percent // 100)
             total = db.add_karuda(gid, ctx.author.id, refund)
             await ctx.send(
                 f"{word(db, gid, ctx.author.id, 'divorce_word').title()}"
