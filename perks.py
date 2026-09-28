@@ -11,23 +11,69 @@ often as a new one, not ten times.
 
 import premium
 
-# key, icon, name, price, description, perks
+# Badges are seven materials of four levels each, climbed one level at a
+# time. A level replaces the one below it rather than stacking on it, so
+# Gold III is 9% and not 3+6+9 - which is what the numbers below say, and
+# what keeps a maxed player about half again as strong as a new one rather
+# than ten times.
+#
+# Order is the order they are worth buying in, and the price of a level is
+# the base times the level, so a material costs ten times its base to max.
+LEVELS = 4
+ROMAN = ("I", "II", "III", "IV")
+
+
+class Badge:
+    """One material: its levels, its price, and the perk it grants."""
+
+    __slots__ = ("key", "name", "fallback", "base", "perk", "amounts", "blurb")
+
+    def __init__(self, key, name, fallback, base, perk, amounts, blurb):
+        self.key = key
+        self.name = name
+        self.fallback = fallback      # emoji used until the PNG is uploaded
+        self.base = base
+        self.perk = perk
+        self.amounts = amounts        # what each level grants, I to IV
+        self.blurb = blurb
+
+    def amount(self, level: int) -> int:
+        return self.amounts[max(1, min(level, LEVELS)) - 1]
+
+    def perk_at(self, level: int) -> dict:
+        return {self.perk: self.amount(level)} if level else {}
+
+    def price(self, level: int):
+        """What the next level costs, or None past the top."""
+        if 1 <= level <= LEVELS:
+            return self.base * level
+        return None
+
+    def total(self) -> int:
+        return sum(self.base * n for n in range(1, LEVELS + 1))
+
+    def describe(self, level: int) -> str:
+        return f"+{self.amount(level)}{self.blurb}"
+
+
 BADGES = [
-    ("collector", "\U0001f4d6", "Collector", 3000,
-     "+2 rolls per window", {"rolls": 2}),
-    ("prospector", "⛏️", "Prospector", 4000,
-     "+4% from every karuda grab", {"grab_percent": 4}),
-    ("devoted", "\U0001f496", "Devoted", 3500,
-     "+2 wishlist slots", {"wish_slots": 2}),
-    ("swift", "⚡", "Swift", 6000,
-     "Claim cooldown 15% shorter", {"claim_percent": 15}),
-    ("lucky", "\U0001f340", "Lucky", 5000,
-     "+15% on your daily drops", {"daily_percent": 15}),
-    ("archivist", "\U0001f5c3️", "Archivist", 7500,
-     "+1 roll and +2% grab", {"rolls": 1, "grab_percent": 2}),
+    Badge("paper", "Paper", "\U0001f4c4", 800, "wish_slots",
+          (1, 2, 3, 5), " wishlist slots"),
+    Badge("iron", "Iron", "\u2699\ufe0f", 1200, "rolls",
+          (1, 2, 3, 4), " rolls per window"),
+    Badge("gold", "Gold", "\U0001f947", 1800, "grab_percent",
+          (3, 6, 9, 12), "% from every karuda grab"),
+    Badge("emerald", "Emerald", "\U0001f49a", 2600, "daily_percent",
+          (5, 10, 18, 25), "% on your daily drops"),
+    Badge("opal", "Opal", "\U0001f52e", 3600, "claim_percent",
+          (5, 10, 15, 20), "% off the claim wait"),
+    Badge("amethyst", "Amethyst", "\U0001f49c", 5000, "wish_chance",
+          (4, 8, 12, 18), "% chance a roll is someone you wished for"),
+    Badge("diamond", "Diamond", "\U0001f48e", 7000, "badge_discount",
+          (5, 10, 15, 25), "% off every other badge"),
 ]
 
-BADGES_BY_KEY = {entry[0]: entry for entry in BADGES}
+BADGES_BY_KEY = {badge.key: badge for badge in BADGES}
 
 # Tower floors, climbed in order. Each is (cost, what it adds).
 # Costs rise faster than income does, so the top floors are a long project
@@ -62,6 +108,10 @@ EMPTY = {
     "wish_slots": 0,
     "daily_percent": 0,
     "karuda_percent": 0,
+    # How often a roll is pulled from your own wishlist, and what comes off
+    # the price of every other badge. Both arrived with the levelled badges.
+    "wish_chance": 0,
+    "badge_discount": 0,
 }
 
 
@@ -93,6 +143,10 @@ def describe(perks: dict) -> str:
         parts.append(f"+{perks['daily_percent']}% daily")
     if perks.get("karuda_percent"):
         parts.append(f"+{perks['karuda_percent']}% karuda")
+    if perks.get("wish_chance"):
+        parts.append(f"+{perks['wish_chance']}% wish rolls")
+    if perks.get("badge_discount"):
+        parts.append(f"-{perks['badge_discount']}% badge prices")
     return " · ".join(parts) or "nothing yet"
 
 
@@ -113,8 +167,9 @@ def tower_perks(floor: int) -> dict:
 def effective(db, guild_id: int, user_id: int) -> dict:
     """Every perk a player currently has, from badges, their tower, and
     the server's Premium."""
-    owned = db.badges_of(guild_id, user_id)
-    badge_perks = [BADGES_BY_KEY[key][5] for key in owned if key in BADGES_BY_KEY]
+    owned = db.badge_levels(guild_id, user_id)
+    badge_perks = [BADGES_BY_KEY[key].perk_at(level)
+                   for key, level in owned.items() if key in BADGES_BY_KEY]
     player = db.get_player(guild_id, user_id)
     sources = [*badge_perks, tower_perks(player["tower_floor"])]
     if player["soulmate_id"]:
@@ -124,7 +179,23 @@ def effective(db, guild_id: int, user_id: int) -> dict:
     result = combine(*sources)
     # A claim that costs nothing to wait for would break the claim economy.
     result["claim_percent"] = min(result["claim_percent"], 60)
+    # Nor should every roll be a wish, or badges end up free.
+    result["wish_chance"] = min(result["wish_chance"], 40)
+    result["badge_discount"] = min(result["badge_discount"], 40)
     return result
+
+
+def badge_price(db, guild_id: int, user_id: int, badge, level: int):
+    """What the next level of a badge costs this player, discount included."""
+    full = badge.price(level)
+    if full is None:
+        return None
+    # Diamond pays for itself by making everything else cheaper - and it
+    # never discounts its own next level, which would compound.
+    discount = effective(db, guild_id, user_id)["badge_discount"]
+    if badge.key == "diamond":
+        discount = 0
+    return max(1, round(full * (100 - discount) / 100))
 
 
 def key_multiplier(level: int) -> float:

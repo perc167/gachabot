@@ -4,6 +4,7 @@ import random
 import discord
 from discord.ext import commands
 
+import config
 import perks
 import utils
 from cogs.personalise import word
@@ -254,10 +255,18 @@ class Rolling(commands.Cog):
             return
 
         include_claimed = bool(db.get_setting(gid, "show_claimed"))
-        character = db.random_character(
-            gid, include_claimed, db.get_setting(gid, "roll_bias"),
-            gender=gender, kind=kind, secret=True,
-        )
+        # Amethyst: some of your rolls come off your own wishlist. Checked
+        # before the pool, and it falls through to an ordinary roll when the
+        # wishlist is empty or everyone on it is taken.
+        character = None
+        wish_chance = perks.effective(db, gid, ctx.author.id)["wish_chance"]
+        if wish_chance and random.random() * 100 < wish_chance:
+            character = db.random_wish(gid, ctx.author.id, include_claimed)
+        if character is None:
+            character = db.random_character(
+                gid, include_claimed, db.get_setting(gid, "roll_bias"),
+                gender=gender, kind=kind, secret=True,
+            )
         if character is None:
             narrowed = " matching that" if (gender or kind) else ""
             await ctx.send(
@@ -350,6 +359,54 @@ class Rolling(commands.Cog):
             inline=True,
         )
         await ctx.send(embed=embed)
+
+    @commands.command(name="limroul", aliases=["limitroulette", "rollcap"])
+    @commands.guild_only()
+    async def limroul(self, ctx, value: str = None):
+        """How deep the rolls go. `$limroul` to see, `$limroul 20000` to set."""
+        db = self.bot.db
+        gid = ctx.guild.id
+        pool = db.count_characters_in(gid)
+
+        if value is not None:
+            # Reading is for everybody; changing the server is not.
+            if not ctx.author.guild_permissions.manage_guild:
+                raise commands.MissingPermissions(["manage_guild"])
+            wanted = value.strip().lower()
+            if wanted in ("off", "none", "all", "0"):
+                limit = 0
+            else:
+                try:
+                    limit = int(wanted.replace(",", "").replace("#", ""))
+                except ValueError:
+                    await ctx.send(
+                        f"Give a rank, or `off`. `{ctx.prefix}limroul 20000`"
+                    )
+                    return
+            _default, low, high, _text = config.GUILD_SETTINGS["roll_rank_limit"]
+            if not low <= limit <= high:
+                await ctx.send(f"Pick a rank between {low} and {high:,}, or `off`.")
+                return
+            db.set_setting(gid, "roll_rank_limit", limit)
+
+        limit = db.get_setting(gid, "roll_rank_limit")
+        if limit <= 0:
+            await ctx.send(
+                f"Rolls reach the whole roster — all {pool:,} characters."
+                f" `{ctx.prefix}limroul 20000` would cut it to the top 20,000."
+            )
+            return
+
+        # The deepest character actually reachable, which is not the same as
+        # the limit: a server can set 20,000 on a roster that stops at 12,000.
+        deepest = db.deepest_rollable(gid)
+        await ctx.send(
+            f"Rolls stop at claim rank **#{limit:,}**"
+            + (f", and the lowest anyone here can roll is **#{deepest:,}**."
+               if deepest else ".")
+            + f" The other {max(0, pool - deepest):,} of {pool:,} are switched"
+            f" off. `{ctx.prefix}limroul off` rolls everybody again."
+        )
 
 
 async def setup(bot):

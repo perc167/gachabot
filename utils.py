@@ -53,6 +53,19 @@ def shard_icon(key: str) -> str:
     return str(emoji) if emoji else fallback
 
 
+def badge_icon(key: str, fallback: str) -> str:
+    """The uploaded badge emoji, or the plain one until it is uploaded.
+
+    Same arrangement as the shards: upload assets/badges/*.png as emoji
+    named after the badge - paper, iron, gold - and they appear on their
+    own, with nothing to configure.
+    """
+    if _bot is None:
+        return fallback
+    emoji = discord.utils.get(_bot.emojis, name=f"badge{key}")         or discord.utils.get(_bot.emojis, name=key)
+    return str(emoji) if emoji else fallback
+
+
 # Characters whose art no CDN will serve keep their picture in the repo
 # instead, recorded as "local:<filename>". Fandom blocks hotlinking, so those
 # images are attached to the message rather than linked from it.

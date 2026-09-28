@@ -31,6 +31,7 @@ CATEGORIES = [
         ("ma", "anyone, anime only"),
         ("mg", "anyone, games only"),
         ("rolls", "what you have left"),
+        ("limroul", "how deep the rolls go"),
     ]),
     ("\U0001f48d", "Your harem", [
         ("harem", "flip through yours"),
@@ -74,8 +75,8 @@ CATEGORIES = [
         ("wishslot", "one more wish"),
     ]),
     ("\U0001f3c5", "Badges & tower", [
-        ("badges", "perks you can buy"),
-        ("buybadge", "buy one"),
+        ("badges", "seven materials, four levels each"),
+        ("buybadge", "climb one a level"),
         ("tower", "your tower"),
         ("ktup", "climb a floor"),
         ("perks", "everything you have earned"),

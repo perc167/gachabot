@@ -66,6 +66,10 @@ GUILD_SETTINGS = {
         "Head start a wisher gets before others may claim",
     ),
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
+    "roll_rank_limit": (
+        0, 0, 200000,
+        "Deepest claim rank a roll can reach; 0 rolls the whole roster",
+    ),
     "roll_bias": (
         35, 0, 100,
         "How strongly rolls favour well-known characters (0 = flat pool)",

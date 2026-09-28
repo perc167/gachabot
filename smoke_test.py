@@ -1886,15 +1886,25 @@ async def main():
     import perks as perksmod
 
     check("badges are priced and described",
-          all(price > 0 and desc for _k, _i, _n, price, desc, _p in perksmod.BADGES))
+          all(b.base > 0 and b.blurb and len(b.amounts) == perksmod.LEVELS
+              for b in perksmod.BADGES))
     check("badge keys unique",
-          len({b[0] for b in perksmod.BADGES}) == len(perksmod.BADGES))
+          len({b.key for b in perksmod.BADGES}) == len(perksmod.BADGES))
+    check("a badge costs more the higher it goes",
+          all([b.price(n) for n in range(1, perksmod.LEVELS + 1)]
+              == sorted(b.price(n) for n in range(1, perksmod.LEVELS + 1))
+              for b in perksmod.BADGES))
+    check("and grants more the higher it goes",
+          all(list(b.amounts) == sorted(b.amounts) for b in perksmod.BADGES))
+    check("past the top there is no price",
+          all(b.price(perksmod.LEVELS + 1) is None for b in perksmod.BADGES))
+    check("every badge has an icon to fall back on",
+          all(b.fallback for b in perksmod.BADGES))
     check("tower costs only go up",
           [c for c, _ in perksmod.TOWER_FLOORS]
           == sorted(c for c, _ in perksmod.TOWER_FLOORS))
     check("no perk key is a typo",
-          all(set(p).issubset(perksmod.EMPTY)
-              for *_r, p in perksmod.BADGES)
+          all(b.perk in perksmod.EMPTY for b in perksmod.BADGES)
           and all(set(p).issubset(perksmod.EMPTY)
                   for _c, p in perksmod.TOWER_FLOORS))
 
@@ -1902,12 +1912,40 @@ async def main():
     base = perksmod.effective(db, GUILD, CLIMBER)
     check("a new player has no perks", base == perksmod.EMPTY, str(base))
 
-    db.add_badge(GUILD, CLIMBER, "collector")
-    check("badge recorded", db.badges_of(GUILD, CLIMBER) == ["collector"])
-    check("buying twice refused", not db.add_badge(GUILD, CLIMBER, "collector"))
-    check("badge perk applies",
+    db.raise_badge(GUILD, CLIMBER, "iron", 2)
+    check("badge level recorded",
+          db.badge_levels(GUILD, CLIMBER) == {"iron": 2},
+          str(db.badge_levels(GUILD, CLIMBER)))
+    check("a level already held is refused",
+          not db.raise_badge(GUILD, CLIMBER, "iron", 2))
+    check("badge perk applies at its level",
           perksmod.effective(db, GUILD, CLIMBER)["rolls"] == 2)
-    check("badges are per server", db.badges_of(999, CLIMBER) == [])
+    check("a level replaces the one below, it does not stack",
+          db.raise_badge(GUILD, CLIMBER, "iron", 3)
+          and perksmod.effective(db, GUILD, CLIMBER)["rolls"] == 3)
+    db.raise_badge(GUILD, CLIMBER, "iron", 2)  # no going back down
+    check("a badge never goes down", db.badge_level(GUILD, CLIMBER, "iron") == 3)
+    check("badges are per server", db.badge_levels(999, CLIMBER) == {})
+
+    # Diamond takes its cut off everything except its own next level.
+    plain = perksmod.badge_price(db, GUILD, CLIMBER,
+                                 perksmod.BADGES_BY_KEY["gold"], 1)
+    db.raise_badge(GUILD, CLIMBER, "diamond", 2)
+    cheaper = perksmod.badge_price(db, GUILD, CLIMBER,
+                                   perksmod.BADGES_BY_KEY["gold"], 1)
+    check("diamond discounts the other badges", cheaper < plain,
+          f"{cheaper} vs {plain}")
+    diamond = perksmod.BADGES_BY_KEY["diamond"]
+    check("but never its own next level",
+          perksmod.badge_price(db, GUILD, CLIMBER, diamond, 3)
+          == diamond.price(3))
+    db.conn.execute("DELETE FROM badges WHERE guild_id = ? AND user_id = ?"
+                    "  AND badge = ?", (GUILD, CLIMBER, "diamond"))
+    db.conn.commit()
+    db.raise_badge(GUILD, CLIMBER, "iron", 2)
+    db.conn.execute("UPDATE badges SET level = 2 WHERE guild_id = ?"
+                    "  AND user_id = ? AND badge = ?", (GUILD, CLIMBER, "iron"))
+    db.conn.commit()
 
     db.update_player(GUILD, CLIMBER, tower_floor=4)
     stacked = perksmod.effective(db, GUILD, CLIMBER)
@@ -1935,7 +1973,7 @@ async def main():
     try:
         cd.start_claim_cooldown(GUILD, CLIMBER)
         plain = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
-        db.add_badge(GUILD, CLIMBER, "swift")
+        db.raise_badge(GUILD, CLIMBER, "opal", 3)
         cd.start_claim_cooldown(GUILD, CLIMBER)
         shortened = db.get_player(GUILD, CLIMBER)["claim_ready_at"]
     finally:
@@ -1958,6 +1996,28 @@ async def main():
     check("a stale claim time is clamped to the window",
           remaining <= cd.claim_window(GUILD)[0] - utils.now(),
           f"{remaining}s left of a {stale - utils.now()}s row")
+
+    # The six flat badges people already owned have to survive the update.
+    conv = dbmod.Database(os.path.join(tempfile.mkdtemp(), "convert.db"))
+    conv.conn.execute("DELETE FROM badges")
+    for old_key in ("collector", "archivist", "swift"):
+        conv.conn.execute(
+            "INSERT INTO badges (guild_id, user_id, badge, level, bought_at)"
+            " VALUES (?, ?, ?, 1, 0)", (GUILD, CLIMBER, old_key))
+    conv.conn.commit()
+    conv._convert_old_badges()
+    got = conv.badge_levels(GUILD, CLIMBER)
+    check("old badges convert to the new ladder",
+          got.get("iron") == 2 and got.get("gold") == 1 and got.get("opal") == 3,
+          str(got))
+    check("and the old ones are gone",
+          not any(k in got for k in conv.OLD_BADGES), str(got))
+    check("converting keeps at least the perks they paid for",
+          perksmod.effective(conv, GUILD, CLIMBER)["rolls"] >= 2)
+    conv._convert_old_badges()   # running twice must not double anything
+    check("converting twice changes nothing",
+          conv.badge_levels(GUILD, CLIMBER) == got)
+    conv.close()
 
     check("claim reduction is capped",
           perksmod.combine({"claim_percent": 90})["claim_percent"] == 90

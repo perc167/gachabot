@@ -1,10 +1,13 @@
 """SQLite storage layer. One connection, shared across cogs."""
 import random
+import logging
 import sqlite3
 import time
 from typing import Optional
 
 import config
+
+log = logging.getLogger("gacha.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS characters (
@@ -545,6 +548,7 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self._migrate()
+        self._convert_old_badges()
         self.conn.executescript(INDEXES)
         self.conn.commit()
 
@@ -559,6 +563,8 @@ class Database:
             # character who rolls one time in this many and never through
             # the pool. Below 0, a secret character who no longer rolls.
             ("characters", "secret_odds", "INTEGER NOT NULL DEFAULT 0"),
+            # Badges used to be owned or not; now each is climbed to a level.
+            ("badges", "level", "INTEGER NOT NULL DEFAULT 1"),
             ("marriages", "note_image", "TEXT"),
             ("players", "harem_sort", "TEXT NOT NULL DEFAULT ''"),
             ("players", "showcase_id", "INTEGER NOT NULL DEFAULT 0"),
@@ -1626,6 +1632,14 @@ class Database:
         # are their own, decided in _secret_roll.
         clause = " AND c.secret_odds = 0"
         extra = ()
+        # $limroul: the server can shut off everyone past a claim rank, which
+        # is how a big roster is made to feel like a small one. Characters
+        # with no rank at all - a server's own, a secret - are never cut,
+        # since a rank they do not have cannot be too low.
+        limit = self.get_setting(guild_id, "roll_rank_limit")
+        if limit > 0:
+            clause += " AND (c.claim_rank <= 0 OR c.claim_rank <= ?)"
+            extra = (*extra, limit)
         if blocked:
             clause = (" AND c.source NOT IN ("
                       + ",".join("?" * len(blocked)) + ")")
@@ -1741,6 +1755,19 @@ class Database:
         ).rowcount
         self.conn.commit()
         return changed
+
+    def deepest_rollable(self, guild_id: int) -> int:
+        """The lowest claim rank a roll here can reach, 0 when uncapped."""
+        limit = self.get_setting(guild_id, "roll_rank_limit")
+        if limit <= 0:
+            return 0
+        row = self.conn.execute(
+            "SELECT MAX(claim_rank) AS deepest FROM characters"
+            " WHERE claim_rank > 0 AND claim_rank <= ?"
+            "   AND (guild_id = 0 OR guild_id = ?) AND secret_odds = 0",
+            (limit, guild_id),
+        ).fetchone()
+        return row["deepest"] or 0
 
     def random_character(
         self, guild_id: int, include_claimed: bool, bias: int = 0,
@@ -2596,6 +2623,49 @@ class Database:
             )
         ]
 
+    # The six badges that existed before badges had levels, and the level of
+    # the new material that is worth at least as much. Nobody ends up with
+    # less than they paid for; Archivist gave a little of two things, so it
+    # converts to the first level of both.
+    OLD_BADGES = {
+        "collector": [("iron", 2)],      # +2 rolls
+        "prospector": [("gold", 2)],     # +4% grab -> Gold II is 6%
+        "devoted": [("paper", 2)],       # +2 wishlist slots
+        "swift": [("opal", 3)],          # 15% off the claim wait
+        "lucky": [("emerald", 3)],       # +15% daily -> Emerald III is 18%
+        "archivist": [("iron", 1), ("gold", 1)],
+    }
+
+    def _convert_old_badges(self):
+        """Move anyone holding a pre-levels badge onto the new ladder."""
+        names = tuple(self.OLD_BADGES)
+        marks = ",".join("?" * len(names))
+        rows = self.conn.execute(
+            f"SELECT guild_id, user_id, badge, bought_at FROM badges"
+            f" WHERE badge IN ({marks})",
+            names,
+        ).fetchall()
+        if not rows:
+            return
+
+        for row in rows:
+            for key, level in self.OLD_BADGES[row["badge"]]:
+                # Somebody holding both Collector and Archivist converts to
+                # Iron II and Iron I; the higher one has to win.
+                self.conn.execute(
+                    "INSERT INTO badges (guild_id, user_id, badge, level,"
+                    " bought_at) VALUES (?, ?, ?, ?, ?)"
+                    " ON CONFLICT (guild_id, user_id, badge) DO UPDATE SET"
+                    "   level = MAX(level, excluded.level)",
+                    (row["guild_id"], row["user_id"], key, level,
+                     row["bought_at"]),
+                )
+        self.conn.execute(
+            f"DELETE FROM badges WHERE badge IN ({marks})", names
+        )
+        self.conn.commit()
+        log.info("converted %s old badge(s) to levelled ones", len(rows))
+
     # ---------- badges and the tower ----------
 
     def add_badge(self, guild_id: int, user_id: int, badge: str) -> bool:
@@ -2610,6 +2680,40 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
+    def badge_levels(self, guild_id: int, user_id: int) -> dict:
+        """{badge key: level} for everything this player has climbed."""
+        return {
+            row["badge"]: row["level"]
+            for row in self.conn.execute(
+                "SELECT badge, level FROM badges"
+                " WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            )
+        }
+
+    def badge_level(self, guild_id: int, user_id: int, badge: str) -> int:
+        row = self.conn.execute(
+            "SELECT level FROM badges"
+            " WHERE guild_id = ? AND user_id = ? AND badge = ?",
+            (guild_id, user_id, badge),
+        ).fetchone()
+        return row["level"] if row else 0
+
+    def raise_badge(self, guild_id: int, user_id: int, badge: str,
+                    level: int) -> bool:
+        """Set a badge to `level`. False if they are already there or past it."""
+        if self.badge_level(guild_id, user_id, badge) >= level:
+            return False
+        self.conn.execute(
+            "INSERT INTO badges (guild_id, user_id, badge, level, bought_at)"
+            " VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT (guild_id, user_id, badge) DO UPDATE SET"
+            "   level = excluded.level, bought_at = excluded.bought_at",
+            (guild_id, user_id, badge, level, int(time.time())),
+        )
+        self.conn.commit()
+        return True
+
     def badges_of(self, guild_id: int, user_id: int) -> list:
         return [
             row["badge"]
@@ -2620,10 +2724,11 @@ class Database:
             )
         ]
 
-    def badge_holders(self, guild_id: int, badge: str) -> int:
+    def badge_holders(self, guild_id: int, badge: str, level: int = 1) -> int:
         return self.conn.execute(
-            "SELECT COUNT(*) AS c FROM badges WHERE guild_id = ? AND badge = ?",
-            (guild_id, badge),
+            "SELECT COUNT(*) AS c FROM badges"
+            " WHERE guild_id = ? AND badge = ? AND level >= ?",
+            (guild_id, badge, level),
         ).fetchone()["c"]
 
     def top_towers(self, guild_id: int, limit: int = 10) -> list:
@@ -3256,6 +3361,24 @@ class Database:
             " WHERE w.guild_id = ? AND w.user_id = ? ORDER BY c.likes DESC",
             (guild_id, user_id),
         ).fetchall()
+
+    def random_wish(self, guild_id: int, user_id: int,
+                    include_claimed: bool) -> Optional[sqlite3.Row]:
+        """One character off this player's wishlist, for the Amethyst badge."""
+        join, claimed = "", ""
+        args = [guild_id, user_id]
+        if not include_claimed:
+            join = (" LEFT JOIN marriages m"
+                    " ON m.character_id = c.id AND m.guild_id = ?")
+            claimed = " AND m.character_id IS NULL"
+            args = [guild_id, guild_id, user_id]
+        return self.conn.execute(
+            f"SELECT c.* FROM wishes w"
+            f" JOIN characters c ON c.id = w.character_id{join}"
+            f" WHERE w.guild_id = ? AND w.user_id = ?{claimed}"
+            f" ORDER BY RANDOM() LIMIT 1",
+            args,
+        ).fetchone()
 
     def wishers_of(self, guild_id: int, character_id: int) -> list:
         rows = self.conn.execute(

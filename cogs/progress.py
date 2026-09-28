@@ -1,9 +1,12 @@
 """Badges and the karuda tower.
 
-Two long-term karuda sinks. Badges are one-off purchases with a fixed perk;
-the tower is a ladder you climb a floor at a time, each costing more than the
-last. Both feed the same perks table, so a player sees one combined effect
-rather than having to add things up themselves.
+Two long-term karuda sinks. Badges are seven materials of four levels each,
+climbed one level at a time; the tower is a ladder of floors. Both feed the
+same perks table, so a player sees one combined effect rather than having to
+add things up themselves.
+
+A badge level replaces the one below it rather than stacking on it, so the
+number shown beside a badge is what it is worth, not what it adds.
 """
 import discord
 from discord.ext import commands
@@ -20,80 +23,112 @@ class Progress(commands.Cog):
     def _icon(self):
         return utils.shard_icon(config.SHARD_TYPES[0][0])
 
+    def _badge_icon(self, badge):
+        """The uploaded badge emoji, or the plain one until it is uploaded."""
+        return utils.badge_icon(badge.key, badge.fallback)
+
     @commands.command(name="badges", aliases=["badge", "badgelist"])
     @commands.guild_only()
     async def badges(self, ctx, member: discord.Member = None):
-        """Badges you can buy, and the ones you have."""
+        """Every badge, the level you have, and what the next one costs."""
         member = member or ctx.author
         db = self.bot.db
         gid = ctx.guild.id
-        owned = set(db.badges_of(gid, member.id))
+        levels = db.badge_levels(gid, member.id)
         balance = db.get_player(gid, member.id)["karuda"]
         icon = self._icon()
+        mine = member.id == ctx.author.id
 
-        lines = []
-        for key, mark, name, price, description, _perk in perks.BADGES:
-            if key in owned:
-                lines.append(f"{mark}  **{name}** ✓\n　{description}")
-            else:
-                affordable = "" if balance >= price else "  *(too dear for now)*"
-                lines.append(
-                    f"{mark}  **{name}** — {icon} {price:,}{affordable}"
-                    f"\n　{description}"
-                )
+        lines, owned_levels, spent = [], 0, 0
+        for badge in perks.BADGES:
+            level = levels.get(badge.key, 0)
+            owned_levels += level
+            spent += sum(badge.price(n) for n in range(1, level + 1))
+            mark = self._badge_icon(badge)
+            roman = perks.ROMAN[level - 1] if level else "—"
 
+            head = f"{mark} **{badge.name} {roman}**"
+            if level:
+                head += f" · {badge.describe(level)}"
+
+            if level >= perks.LEVELS:
+                lines.append(f"{head}\n　**maxed**")
+                continue
+
+            # The price is the buyer's, so Diamond's discount is visible on
+            # every other line rather than hidden until they try to buy.
+            price = perks.badge_price(db, gid, member.id, badge, level + 1)
+            full = badge.price(level + 1)
+            cost = f"{icon} {price:,}"
+            if price < full:
+                cost += f" ~~{full:,}~~"
+            step = f"{perks.ROMAN[level]} · {badge.describe(level + 1)}"
+            lines.append(f"{head}\n　next: {step} — {cost}")
+
+        top = perks.LEVELS * len(perks.BADGES)
         embed = discord.Embed(
-            title="Badges",
-            description="\n\n".join(lines),
+            title=f"Badges — {member.display_name}",
+            description="\n".join(lines),
             colour=config.CARD_COLOUR,
         )
         embed.set_footer(
-            text=f"{len(owned)}/{len(perks.BADGES)} owned · "
-                 f"{balance:,} karuda · {ctx.prefix}buybadge <name>"
+            text=f"{owned_levels}/{top} levels · {spent:,} spent · "
+                 f"{balance:,} karuda"
+                 + (f" · {ctx.prefix}buybadge <name>" if mine else "")
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="buybadge", aliases=["bb"])
+    @commands.command(name="buybadge", aliases=["bb", "upgradebadge"])
     @commands.guild_only()
     async def buybadge(self, ctx, *, name: str):
-        """Buy a badge by name."""
+        """Climb a badge one level. `$buybadge gold`"""
         db = self.bot.db
         gid = ctx.guild.id
         wanted = name.strip().lower()
-        match = next(
-            (
-                entry
-                for entry in perks.BADGES
-                if entry[0] == wanted or entry[2].lower() == wanted
-            ),
+        badge = next(
+            (b for b in perks.BADGES
+             if b.key == wanted or b.name.lower() == wanted),
             None,
         )
-        if not match:
-            names = ", ".join(entry[2] for entry in perks.BADGES)
+        if not badge:
+            names = ", ".join(b.name for b in perks.BADGES)
             await ctx.send(f"No badge called `{name}`. There is: {names}.")
             return
 
-        key, mark, badge_name, price, description, _perk = match
-        if key in db.badges_of(gid, ctx.author.id):
-            await ctx.send(f"You already have {mark} **{badge_name}**.")
+        level = db.badge_level(gid, ctx.author.id, badge.key)
+        mark = self._badge_icon(badge)
+        if level >= perks.LEVELS:
+            await ctx.send(
+                f"{mark} **{badge.name} {perks.ROMAN[-1]}** is as high as"
+                f" it goes, and you are there."
+            )
             return
+
+        price = perks.badge_price(db, gid, ctx.author.id, badge, level + 1)
         balance = db.get_player(gid, ctx.author.id)["karuda"]
         if balance < price:
             await ctx.send(
-                f"{mark} **{badge_name}** costs {price:,};"
-                f" you have {balance:,}."
+                f"{mark} **{badge.name} {perks.ROMAN[level]}** costs"
+                f" {price:,}; you have {balance:,}."
             )
             return
 
         db.add_karuda(gid, ctx.author.id, -price)
-        db.add_badge(gid, ctx.author.id, key)
+        db.raise_badge(gid, ctx.author.id, badge.key, level + 1)
         earned = perks.effective(db, gid, ctx.author.id)
+
         embed = discord.Embed(
-            title=f"{mark}  {badge_name}",
-            description=f"{description}\n\nYour perks: _{perks.describe(earned)}_",
+            title=f"{mark}  {badge.name} {perks.ROMAN[level]}",
+            description=f"{badge.describe(level + 1)}"
+                        f"\n\nYour perks: _{perks.describe(earned)}_",
             colour=config.CARD_COLOUR,
         )
-        embed.set_footer(text=f"-{price:,} karuda")
+        nxt = badge.price(level + 2)
+        embed.set_footer(
+            text=f"-{price:,} karuda"
+                 + (f" · {perks.ROMAN[level + 1]} costs {nxt:,}" if nxt else
+                    " · maxed")
+        )
         await ctx.send(embed=embed)
 
     @commands.command(name="tower", aliases=["kt", "karudatower"])
@@ -187,7 +222,7 @@ class Progress(commands.Cog):
         db = self.bot.db
         gid = ctx.guild.id
         earned = perks.effective(db, gid, member.id)
-        owned = db.badges_of(gid, member.id)
+        owned = db.badge_levels(gid, member.id)
         floor = db.get_player(gid, member.id)["tower_floor"]
 
         base_rolls = db.get_setting(gid, "roll_limit")
