@@ -1263,7 +1263,7 @@ $vc lb</code>"""),
          <p>Levels start counting the moment the bot is in your server.
          Chatting earns XP once a minute, and voice earns it too when
          there's someone to talk to.</p>
-         <code class="cmdline">$rank · $levels</code>"""),
+         <code class="cmdline">$level · $leaderboard</code>"""),
         ("Reward the milestones", """
          <p>Hand out roles at levels. Anyone already past a level gets the
          role with one command.</p>

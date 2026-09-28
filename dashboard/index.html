@@ -1135,7 +1135,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       var reset = el("button", {type: "button", cls: "btn ghost small", text: "Back to the default"});
       reset.addEventListener("click", function(){ act("POST", "/api/rankbg", {image: null}); });
       form.appendChild(card("Rank card background",
-        "Everyone's $rank card uses this, unless they've set their own with $rank background. Wide pictures work best (934 by 282).",
+        "Everyone's $level card uses this, unless they've set their own with $level background. Wide pictures work best (934 by 282).",
         [preview, field("Upload a picture (up to 8 MB)", file), d.background ? el("div", {cls: "actions"}, [reset]) : null]));
 
       // ---- Paper's own profile on this server: at once too

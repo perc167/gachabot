@@ -333,13 +333,14 @@ CATEGORIES = [
         ("invoke test", "preview one"),
     ]),
     ("\U0001f4c8", "Levels", [
-        ("rank", "your level"),
-        ("levels", "level leaderboard"),
+        ("level", "your level card"),
+        ("leaderboard", "level leaderboard"),
         ("levels settings", "how it's set up"),
         ("levels role", "level roles"),
         ("levels ignore list", "no-XP channels"),
     ]),
     ("\U0001f527", "Level setup", [
+        ("levels", "every level setting"),
         ("levels role add", "role at a level"),
         ("levels role remove", "drop one"),
         ("levels sync", "hand out earned roles"),
@@ -391,9 +392,9 @@ CATEGORIES = [
         ("event", "server events"),
         ("event start", "start one now"),
         ("event stop", "end one early"),
-        ("rank background", "your card's picture"),
+        ("level background", "your card's picture"),
         ("levels card", "the server's card picture"),
-        ("levels month", "this month's top XP"),
+        ("leaderboard month", "this month's top XP"),
         ("levels boost", "premium XP boosts"),
         ("levels boost add", "boost a role or channel"),
         ("levels boost remove", "stop a boost"),
@@ -645,6 +646,17 @@ class Help(commands.Cog):
                 value=" ".join(f"`{prefix}{alias}`" for alias in sorted(found.aliases)),
                 inline=False,
             )
+        if isinstance(found, commands.Group) and found.commands:
+            lines = [f"`{prefix}{sub.qualified_name}` · "
+                     + (sub.short_doc or "").rstrip(".")
+                     for sub in sorted(found.commands, key=lambda c: c.name)]
+            text = ""
+            for line in lines:
+                if len(text) + len(line) + 1 > 1000:
+                    text += "\n…"
+                    break
+                text += ("\n" if text else "") + line
+            embed.add_field(name="Commands", value=text, inline=False)
         await ctx.send(embed=embed)
 
 

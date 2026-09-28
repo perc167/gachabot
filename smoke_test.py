@@ -48,6 +48,13 @@ async def main():
     # Alias collisions would have raised on load, but assert the count anyway.
     aliases = [a for c in b.commands for a in c.aliases]
     check("aliases unique", len(aliases) == len(set(aliases)))
+    check("$rank is $level, and $leaderboard is the level board",
+          b.get_command("rank").qualified_name == "level"
+          and b.get_command("leaderboard").cog_name == "Levels"
+          and b.get_command("leaderboard month") is not None
+          and b.get_command("lb").name == "top")
+    check("level commands work outside the gacha channels",
+          getattr(b.get_command("level").cog, "works_everywhere", False))
 
     db = b.db
     cd = b.cooldowns

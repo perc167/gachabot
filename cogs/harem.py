@@ -317,7 +317,7 @@ class Harem(commands.Cog):
             view=NoteButton(db, gid, ctx.author.id, view.chosen),
         )
 
-    @commands.command(name="top", aliases=["lb", "leaderboard", "topserv", "ts"])
+    @commands.command(name="top", aliases=["lb", "topserv", "ts"])
     @commands.guild_only()
     async def top(self, ctx):
         """Biggest harems in this server."""

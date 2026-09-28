@@ -1,4 +1,4 @@
-"""Rank cards: the picture $rank sends.
+"""Rank cards: the picture $level sends.
 
 Every server gets the card. Paper Premium lets a server set its own
 background, and its members their own. Backgrounds are stored as the

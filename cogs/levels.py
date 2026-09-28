@@ -189,6 +189,10 @@ def match_members(rows: list, members) -> tuple:
 
 
 class Levels(commands.Cog):
+    # Levels aren't part of the gacha, so a server that keeps the gacha to
+    # one channel still lets everyone check their level anywhere.
+    works_everywhere = True
+
     def __init__(self, bot):
         self.bot = bot
         self.last_counted = {}  # (guild, user) -> when a message last paid
@@ -277,7 +281,7 @@ class Levels(commands.Cog):
 
     async def card_file(self, member):
         """A member's rank card as a file to send, or None if it can't be
-        drawn. Used by $rank and under level-up messages."""
+        drawn. Used by $level and under level-up messages."""
         gid = member.guild.id
         try:
             row = self.db.level_row(gid, member.id)
@@ -431,7 +435,7 @@ class Levels(commands.Cog):
 
     # ----------------------------------------------------------- viewing
 
-    @commands.group(name="rank", aliases=["xp", "level", "lvl"],
+    @commands.group(name="level", aliases=["rank", "lvl", "xp"],
                     invoke_without_command=True)
     @commands.guild_only()
     async def rank(self, ctx, member: discord.Member = None):
@@ -489,15 +493,15 @@ class Levels(commands.Cog):
             await ctx.send(str(e))
             return
         if not image:
-            await ctx.send(f"Attach a picture to `{ctx.prefix}rank background`.")
+            await ctx.send(f"Attach a picture to `{ctx.prefix}level background`.")
             return
         self.db.set_rank_background(gid, ctx.author.id, image)
-        await ctx.send(f"Saved. Try `{ctx.prefix}rank`.")
+        await ctx.send(f"Saved. Try `{ctx.prefix}level`.")
 
-    @commands.group(name="levels", aliases=["levelboard", "toplevels"],
+    @commands.group(name="leaderboard", aliases=["levelboard", "toplevels", "xplb"],
                     invoke_without_command=True)
     @commands.guild_only()
-    async def levels(self, ctx):
+    async def leaderboard(self, ctx):
         """The server's level leaderboard."""
         rows = self.db.top_levels(ctx.guild.id, limit=100)
         medals = ("\U0001f947", "\U0001f948", "\U0001f949")
@@ -518,7 +522,7 @@ class Levels(commands.Cog):
             embeds.append(embed)
         await Paginator(embeds, ctx.author.id).start(ctx)
 
-    @levels.command(name="month", aliases=["monthly", "thismonth"])
+    @leaderboard.command(name="month", aliases=["monthly", "thismonth"])
     async def levels_month(self, ctx, which: str = None):
         """Premium: who earned the most XP this month. `last` for last month."""
         if not self.db.is_premium(ctx.guild.id):
@@ -548,6 +552,13 @@ class Levels(commands.Cog):
 
     # ---------------------------------------------------------- settings
 
+    @commands.group(name="levels", aliases=["levelsettings"],
+                    invoke_without_command=True)
+    @commands.guild_only()
+    async def levels(self, ctx):
+        """How levelling is set up here, and the commands that change it."""
+        await ctx.invoke(self.levels_settings)
+
     @levels.command(name="settings", aliases=["config"])
     async def levels_settings(self, ctx):
         """How levelling is set up here."""
@@ -575,7 +586,11 @@ class Levels(commands.Cog):
         ]
         embed = discord.Embed(title="Level settings", description="\n".join(lines),
                               colour=self.colour(gid))
-        embed.set_footer(text=f"Change them here, or on the web with {ctx.prefix}dashboard")
+        embed.add_field(
+            name="Changing them",
+            value=f"`{ctx.prefix}help levels` for the commands, or `{ctx.prefix}dashboard`"
+                  f" on the web. The leaderboard is `{ctx.prefix}leaderboard`.",
+            inline=False)
         await ctx.send(embed=embed)
 
     async def save_one(self, ctx, changes: dict, done: str):
@@ -870,7 +885,7 @@ class Levels(commands.Cog):
             await ctx.send(f"Attach a picture to `{ctx.prefix}levels card`.")
             return
         self.db.set_rank_background(gid, 0, image)
-        await ctx.send(f"Saved. Everyone's `{ctx.prefix}rank` uses it now, unless"
+        await ctx.send(f"Saved. Everyone's `{ctx.prefix}level` card uses it now, unless"
                        " they've set their own.")
 
     @levels.command(name="reset")
@@ -925,7 +940,7 @@ class Levels(commands.Cog):
             return
 
         # Rows come best first. Inside one level, a few XP of lead keeps them
-        # in that order on $levels, without ever tipping into the next level.
+        # in that order on $leaderboard, without ever tipping into the next level.
         raised = 0
         for position, (_name, member, level) in enumerate(
                 sorted(matched, key=lambda m: rows_index(rows, m[0]))):
