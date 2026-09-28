@@ -206,6 +206,20 @@ body{background:transparent}
 .brow{display:grid;grid-template-columns:1fr 130px 38px;gap:8px;align-items:center;
   margin-bottom:8px}
 .prem-page{margin-top:26px}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:6px}
+.plan{position:relative;display:flex;flex-direction:column;gap:6px;background:rgba(10,8,20,.4);
+  border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px}
+.plan.best{border-color:rgba(229,197,90,.6);box-shadow:0 0 0 1px rgba(229,197,90,.2) inset}
+.plan.owned{opacity:.7}
+.plan h3{margin:0;font-family:var(--display);font-size:16px}
+.plan .price{font-family:var(--display);font-weight:600;color:var(--gold);font-size:18px}
+.plan p{margin:0 0 6px;font-size:13.5px;color:var(--dim);flex:1}
+.plan .tag{position:absolute;top:-9px;right:12px;background:var(--gold);color:#1a1405;
+  font-size:11px;font-weight:700;border-radius:99px;padding:2px 9px}
+.plan .have{font-size:13.5px;color:var(--gold);font-weight:600}
+.btn.gold.soft{background:rgba(229,197,90,.16);color:var(--gold);border:1px solid rgba(229,197,90,.5)}
+.btn.gold.soft:hover{background:rgba(229,197,90,.26)}
+.plans-head{margin:18px 0 4px;font-family:var(--display);font-size:15px}
 .tickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 14px}
 .tickgrid .switch.off{opacity:.45}
 .bpcard{position:relative;border-radius:14px;overflow:hidden;margin-bottom:14px;
@@ -797,36 +811,62 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     }));
   }
 
+  // One card per plan on sale. Plans the server has (or has better) are marked
+  // instead of sold again.
+  function planCards(p, forGuild){
+    var wrap = el("div", {cls: "plans"});
+    (p.plans || []).forEach(function(pl){
+      if (!pl.on_sale) return;
+      var action;
+      if (pl.owned) action = el("span", {cls: "have", text: "\u2713 This server has it"});
+      else {
+        var label = pl.key === "premium" && p.trial ? "Start your " + p.trial_days + "-day free trial"
+                  : pl.once ? "Buy once" : p.active ? "Upgrade" : "Subscribe";
+        action = button(label, "btn " + (pl.key === "lifetime" ? "gold" : "gold soft"),
+                        "/api/premium/checkout", forGuild, {plan: pl.key});
+      }
+      wrap.appendChild(el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "") + (pl.owned ? " owned" : "")}, [
+        pl.key === "lifetime" ? el("span", {cls: "tag", text: "Pay once"}) : null,
+        el("h3", {text: pl.name}),
+        el("div", {cls: "price", text: pl.price || ""}),
+        el("p", {text: pl.line}), action]));
+    });
+    return wrap;
+  }
+
   function showPremium(p){
     var box = $("premium"); box.textContent = "";
     var panel = el("div", {cls: "prem"});
+    var upgrades = (p.plans || []).some(function(pl){ return pl.on_sale && !pl.owned; });
     if (p.active) {
       var until = new Date(p.until * 1000).toLocaleDateString(undefined,
         {year: "numeric", month: "long", day: "numeric"});
-      panel.append(el("h2", {text: p.trialing ? "✨ Your free trial is on" : "✨ Paper Premium is on"}),
-        el("p", {text: p.trialing
+      panel.append(el("h2", {text: p.tier === "lifetime" ? "\u2728 Paper Lifetime: yours for good"
+                                  : p.trialing ? "\u2728 Your free trial is on"
+                                  : "\u2728 " + p.tier_name + " is on"}),
+        el("p", {text: p.tier === "lifetime" ? "Paid once, never charged again. Thank you for supporting Paper."
+          : p.trialing
           ? "Everything below is unlocked until " + until + ". After that it's " +
             (p.price || "the monthly price") + ", unless you cancel before then in Manage billing."
           : (p.ending ? "It ends on " : "It renews by ") + until + ". Thank you for supporting Paper."}));
       if (p.billing) panel.appendChild(button("Manage billing", "btn ghost", "/api/premium/portal"));
+      if (upgrades) panel.append(el("h3", {cls: "plans-head", text: "Go further"}), planCards(p));
     } else {
       panel.append(
-        el("h2", {text: "✨ Paper Premium"}),
-        el("p", {}, ["Everything in Paper stays free. Premium adds the extras other bots charge more for, for everyone on this server",
-          p.price ? el("span", {}, [" for ", el("span", {cls: "price", text: p.price})]) : null, ":"]),
+        el("h2", {text: "\u2728 Paper Premium"}),
+        el("p", {}, ["Everything in Paper stays free. Premium adds the extras other bots charge more for, for everyone on this server:"]),
         perks(p.perks),
-        p.for_sale ? button(p.trial ? "Start your " + p.trial_days + "-day free trial" : "Upgrade this server",
-                            "btn gold", "/api/premium/checkout")
+        p.for_sale ? planCards(p)
                    : el("p", {cls: "pp-note", text: "Coming soon. It isn't on sale just yet."}));
     }
     box.appendChild(panel);
   }
-  function button(label, cls, path, forGuild){
+  function button(label, cls, path, forGuild, body){
     var b = el("button", {type: "button", cls: cls, text: label});
     b.addEventListener("click", function(){
       if (forGuild) guildId = forGuild;
       b.disabled = true; b.textContent = "Opening Stripe…";
-      api("POST", path).then(function(r){
+      api("POST", path, body).then(function(r){
         if (r.ok && r.data.url) { location.href = r.data.url; return; }
         b.disabled = false; b.textContent = label;
         alert((r.data.problems || ["Something went wrong. Try again."])[0]);
@@ -1325,11 +1365,18 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     only("view-premium");
     var sale = me.premium_sale || {};
     $("pp-intro").textContent = "Everything in Paper stays free. Premium adds the extras other bots" +
-      " charge more for, to one server and everyone in it" +
-      (sale.price ? ", for " + sale.price : "") + ". Every server can try it free for " +
+      " charge more for, to one server and everyone in it. Every server can try Premium free for " +
       (sale.trial_days || 7) + " days first:";
     var list = $("pp-perks"); list.textContent = "";
     list.appendChild(perks(sale.perks));
+    // The plans, to read here; each server's own page has the buttons.
+    var onSale = (sale.plans || []).filter(function(pl){ return pl.on_sale; });
+    if (onSale.length) list.appendChild(el("div", {cls: "plans"}, onSale.map(function(pl){
+      return el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "")}, [
+        pl.key === "lifetime" ? el("span", {cls: "tag", text: "Pay once"}) : null,
+        el("h3", {text: pl.name}), el("div", {cls: "price", text: pl.price || ""}),
+        el("p", {text: pl.line})]);
+    })));
     $("pp-note").hidden = !!sale.for_sale;
     $("pp-note").textContent = "Coming soon: Premium isn't on sale just yet. Check back soon.";
     var box = $("pp-servers"); box.textContent = "";
@@ -1353,8 +1400,11 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         action = el("a", {cls: "btn ghost small up", text: "Add Paper", target: "_blank", rel: "noopener",
                           href: me.invite + "&guild_id=" + s.id + "&disable_guild_select=true"});
       } else if (sale.for_sale) {
-        action = button(s.trial ? "Try free" : "Upgrade", "btn gold small up",
-                        "/api/premium/checkout", s.id);
+        action = el("button", {type: "button", cls: "btn gold small up",
+                               text: s.trial ? "Try free or choose a plan" : "Choose a plan"});
+        action.addEventListener("click", function(){
+          history.pushState(null, "", "/dashboard?guild=" + s.id); route();
+        });
       }
       if (action) card.appendChild(action);
       box.appendChild(card);

@@ -47,6 +47,10 @@ PERK_GROUPS = [
     ("\U0001f3a8", "Make Paper yours", [
         "Give Paper its own name, picture, banner and bio on your server",
     ]),
+    ("\U0001f3d7\ufe0f", "With Plus or Lifetime", [
+        "Build your whole server in one command: roles, channels, a staff area,"
+        " logs and a how-to-mod forum, with Paper set up in them",
+    ]),
 ]
 
 

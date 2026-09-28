@@ -186,6 +186,30 @@ async def main():
           not db.is_premium(GUILD + 9) and not db.trial_available(GUILD + 9))
     check("a server that subscribed before gets no trial", not db.trial_available(GUILD))
 
+    # Plans: Plus and Lifetime outrank Premium, upgrades take over, and an
+    # old or lower plan never undoes a better one.
+    PL = GUILD + 30
+    sub_meta = lambda tier: {"guild_id": str(PL), "tier": tier}
+    billing.apply_subscription(db, {"id": "sub_p", "status": "active", "customer": "cus_p",
+                                    "current_period_end": future, "metadata": sub_meta("premium")})
+    check("Premium is Premium, not Plus", db.premium_tier(PL) == "premium" and not db.is_plus(PL))
+    took_over = billing.apply_subscription(
+        db, {"id": "sub_plus", "status": "active", "current_period_end": future,
+             "metadata": sub_meta("plus")})
+    check("upgrading to Plus takes over, and names the old plan to stop",
+          db.is_plus(PL) and took_over == "sub_p")
+    billing.apply_subscription(db, {"id": "sub_p", "status": "canceled", "metadata": sub_meta("premium")})
+    check("the old Premium ending doesn't end Plus", db.is_plus(PL))
+    billing.apply_subscription(db, {"id": "sub_p2", "status": "active", "current_period_end": future,
+                                    "metadata": sub_meta("premium")})
+    check("a lower plan never replaces a higher one", db.premium_tier(PL) == "plus")
+    replaced = billing.apply_lifetime(db, {"customer": "cus_p", "metadata": {"buyer_id": "9"}}, PL)
+    check("Lifetime is for good, and stops the running plan",
+          db.premium_tier(PL) == "lifetime" and db.is_plus(PL) and replaced == "sub_plus"
+          and db.premium_of(PL)["until"] == billing.FOREVER)
+    billing.apply_subscription(db, {"id": "sub_plus", "status": "canceled", "metadata": sub_meta("plus")})
+    check("no subscription event touches Lifetime", db.premium_tier(PL) == "lifetime")
+
     # Server events: only with Premium, only while they run, and a karuda
     # rush never pushes a grab past the whole character.
     EV = GUILD + 20
@@ -409,6 +433,128 @@ async def main():
     check("a reaction role is found by message and emoji",
           db.reaction_role(99, ss.emoji_key("❤"))["role_id"] == 7
           and db.remove_reaction_role(SG, 99) == 1 and db.reaction_role(99, "❤") is None)
+
+    # The server builder, on a pretend server: everything it makes, Paper
+    # hooked up to it, and nothing made twice.
+    from cogs import builder as bd
+
+    class _Role:
+        def __init__(self, rid, name, default=False, kw=None):
+            self.id, self.name, self._default, self.kw = rid, name, default, kw or {}
+
+        def is_default(self):
+            return self._default
+
+    class _Me:
+        guild_permissions = discord.Permissions(manage_roles=True, manage_channels=True,
+                                                kick_members=True, ban_members=True,
+                                                moderate_members=True, view_audit_log=True)
+
+    class _Chan:
+        def __init__(self, guild, cid, name, kind, category=None, overwrites=None, topic=None):
+            self.guild, self.id, self.name, self.kind = guild, cid, name, kind
+            self.category, self.overwrites, self.topic = category, overwrites or {}, topic
+            self.threads = []
+
+        @property
+        def channels(self):
+            return [c for c in self.guild.channels if c.category is self]
+
+        async def create_thread(self, name, content):
+            self.threads.append((name, content))
+
+    class _Guild:
+        def __init__(self, gid):
+            self.id, self.features, self.me = gid, ["ROLE_ICONS"], _Me()
+            self.roles = [_Role(gid, "@everyone", default=True)]
+            self.channels = []
+            self.next = gid * 100
+
+        def _id(self):
+            self.next += 1
+            return self.next
+
+        @property
+        def default_role(self):
+            return self.roles[0]
+
+        @property
+        def categories(self):
+            return [c for c in self.channels if c.kind == "category"]
+
+        def get_role(self, rid):
+            return next((r for r in self.roles if r.id == rid), None)
+
+        def get_channel(self, cid):
+            return next((c for c in self.channels if c.id == cid), None)
+
+        async def create_role(self, **kw):
+            role = _Role(self._id(), kw["name"], kw=kw)
+            self.roles.append(role)
+            return role
+
+        async def _chan(self, name, kind, category=None, overwrites=None, topic=None):
+            chan = _Chan(self, self._id(), name, kind, category, overwrites, topic)
+            self.channels.append(chan)
+            return chan
+
+        async def create_category(self, name, overwrites=None, reason=None):
+            return await self._chan(name, "category", None, overwrites)
+
+        async def create_text_channel(self, name, category=None, overwrites=None, topic=None,
+                                      reason=None):
+            return await self._chan(name, "text", category, overwrites, topic)
+
+        async def create_voice_channel(self, name, category=None, overwrites=None, reason=None):
+            return await self._chan(name, "voice", category, overwrites)
+
+        async def create_forum(self, name, category=None, overwrites=None, reason=None):
+            return await self._chan(name, "forum", category, overwrites)
+
+    BG = PAID + 80
+    fake_guild = _Guild(BG)
+    fake_bot = NS(db=db, get_cog=lambda name: lv if name == "Levels" else None)
+    run = bd.Build(fake_bot, fake_guild, "$")
+    await run.run(set(bd.PARTS))
+    names = {r.name for r in fake_guild.roles}
+    owner = discord.utils.get(fake_guild.roles, name=bd.fancy("OWNER"))
+    check("the builder makes the staff, level and punishment roles",
+          {bd.fancy("OWNER"), bd.fancy("Trial"), bd.fancy("Member"), bd.fancy("Level 50"),
+           "Jailed", "imuted", bd.divider("hierarchy")} <= names, str(sorted(names)))
+    check("a role only gets permissions Paper has, and says so",
+          not owner.kw["permissions"].administrator
+          and any("OWNER" in p for p in run.problems))
+    check("role icons where the server has them, no gradient where it doesn't",
+          owner.kw.get("display_icon") == "👑" and "secondary_colour" not in owner.kw)
+    by_name = {c.name: c for c in fake_guild.channels}
+    check("the builder makes the staff area, logs, forum and community channels",
+          {"jail", "moderator-only", "jail vc", "mod vc", "logs", "mod-logs", "how-to-mod",
+           "welcome", "rules", "general", "gacha", "level-ups", "Join To Create",
+           "MUST READ", bd.category_name("mod")} <= set(by_name), str(sorted(by_name)))
+    check("the forum gets the mod guide and the commands",
+          [t for t, _c in by_name["how-to-mod"].threads]
+          == ["MOD GUIDE: HOW TO MOD", "MOD GUIDE: COMMANDS"]
+          and "$jail" in by_name["how-to-mod"].threads[1][1])
+    check("staff channels are hidden from everyone else",
+          by_name[bd.category_name("mod")].overwrites[fake_guild.default_role].view_channel is False
+          and by_name["jail"].overwrites[discord.utils.get(fake_guild.roles, name="Jailed")].view_channel)
+    check("Paper is hooked up: jail, mod log, staff, welcome, levels, voice, gacha",
+          db.get_mod_config(BG, "jail_channel") == by_name["jail"].id
+          and db.get_mod_config(BG, "log_channel") == by_name["mod-logs"].id
+          and owner.id in db.staff_roles_of(BG)
+          and db.greeting(BG, "welcome")["channel_id"] == by_name["welcome"].id
+          and lv.setting(BG, "channel") == by_name["level-ups"].id
+          and db.get_vc_setting(BG, "create_channel") == by_name["Join To Create"].id
+          and db.allowed_channels(BG) == {by_name["gacha"].id}
+          and len(db.level_roles_of(BG)) == 5 and len(db.autoroles_of(BG)) == 1)
+    count = (len(fake_guild.roles), len(fake_guild.channels))
+    again = bd.Build(fake_bot, fake_guild, "$")
+    await again.run(set(bd.PARTS))
+    check("running it again makes nothing new",
+          (len(fake_guild.roles), len(fake_guild.channels)) == count and not again.made)
+    check("the guides use the server's prefix", "!jail" in bd.Build(fake_bot, fake_guild, "!")
+          .guide("mod-commands.md") and "$" not in bd.Build(fake_bot, fake_guild, "!")
+          .guide("mod-commands.md").split("\n", 3)[3])
 
     # Utility: snipes expire, reminders come due.
     from cogs import utility as ut

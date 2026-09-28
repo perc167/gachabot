@@ -55,6 +55,7 @@ COGS = [
     "cogs.customizer",
     "cogs.utility",
     "cogs.serversetup",
+    "cogs.builder",
     "cogs.backups",
     "cogs.dashboard",
     "cogs.aliases",

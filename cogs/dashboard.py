@@ -48,6 +48,7 @@ import botprofile
 import oauth
 import webparts
 import premium
+from cogs.admin import is_bot_owner
 from cogs.levels import BOOST_PLACES, BOOST_RANGE
 
 from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
@@ -208,24 +209,56 @@ class Dashboard(commands.Cog):
         db = self.bot.db
         base = public_url()
         link = f"{base}/dashboard?guild={ctx.guild.id}" if base else ""
-        if db.is_premium(ctx.guild.id):
+        tier = db.premium_tier(ctx.guild.id)
+        plans = "\n".join(
+            f"**{name}**" + (f" ({billing.plan_label(key)})" if billing.plan_label(key) else "")
+            + f": {line}"
+            for key, (_env, _mode, _tier, name, line) in billing.PLANS.items()
+            if billing.plan_on_sale(key) and billing.RANK[key] > billing.RANK.get(tier, 0))
+        if tier:
             row = db.premium_of(ctx.guild.id)
-            text = (f"\u2728 **{ctx.guild.name}** has Paper Premium until"
-                    f" <t:{row['until']}:D>.")
+            name = billing.PLANS[tier][3]
+            text = (f"\u2728 **{ctx.guild.name}** has {name} for good. Thank you!"
+                    if tier == "lifetime" else
+                    f"\u2728 **{ctx.guild.name}** has {name} until <t:{row['until']}:D>.")
+            if plans:
+                text += "\n\nGo further:\n" + plans
             if link:
-                text += f"\nManage billing on the dashboard: <{link}>"
+                text += f"\nManage it on the dashboard: <{link}>"
         else:
-            price = billing.price_label()
-            text = ("\u2728 **Paper Premium** for this server"
-                    + (f", {price}" if price else "") + ". Everything in Paper"
+            text = ("\u2728 **Paper Premium** for this server. Everything in Paper"
                     " stays free; Premium adds these for everyone here:\n\n"
-                    + premium.perk_lines()
-                    + f"\n\nTry it free for {billing.TRIAL_DAYS} days.")
-            if link and billing.configured():
-                text += f"\nAn admin can upgrade on the dashboard: <{link}>"
-            elif not billing.configured():
-                text += "\nIt isn't on sale just yet."
-        await ctx.send(text, allowed_mentions=discord.AllowedMentions.none())
+                    + premium.perk_lines())
+            if billing.configured():
+                text += (f"\n\n{plans}\n\nTry Premium free for {billing.TRIAL_DAYS} days."
+                         + (f" An admin can pick a plan on the dashboard: <{link}>" if link else ""))
+            else:
+                text += "\n\nIt isn't on sale just yet."
+        await ctx.send(text[:2000], allowed_mentions=discord.AllowedMentions.none())
+
+    @commands.command(name="giveplan", aliases=["grantpremium"])
+    @is_bot_owner()
+    async def giveplan(self, ctx, guild_id: int, plan: str, days: int = 30):
+        """Owner only: give a server premium, plus or lifetime (days for the
+        first two, 30 by default), or `off` to take it away."""
+        db = self.bot.db
+        plan = plan.lower()
+        if plan == "off":
+            db.set_premium(guild_id, status="canceled", until=int(time.time()),
+                           customer="", subscription="")
+            await ctx.send(f"Server {guild_id} has no plan now.")
+            return
+        if plan not in billing.PLANS:
+            await ctx.send("Say premium, plus, lifetime or off.")
+            return
+        lifetime = plan == "lifetime"
+        until = billing.FOREVER if lifetime else int(time.time()) + days * 86400
+        db.set_premium(guild_id, status="lifetime" if lifetime else "active", until=until,
+                       customer="", subscription="", tier=plan)
+        guild = self.bot.get_guild(guild_id)
+        await ctx.send(f"**{guild.name if guild else guild_id}** has"
+                       f" {billing.PLANS[plan][3]}"
+                       + (" for good." if lifetime else f" until <t:{until}:D>."))
 
     # ---------------------------------------------------------- showcase
 
@@ -378,6 +411,7 @@ class Dashboard(commands.Cog):
             "site": SITE_URL,
             "premium_sale": {"for_sale": billing.configured(),
                              "price": billing.price_label(),
+                             "plans": self.plans(),
                              "trial_days": billing.TRIAL_DAYS,
                              "perks": premium.perk_groups()},
         }, headers=HEADERS)
@@ -634,14 +668,28 @@ class Dashboard(commands.Cog):
 
     # ------------------------------------------------------------ premium
 
+    def plans(self, guild=None) -> list:
+        """The plans, cheapest first, and which this server has already."""
+        tier = self.bot.db.premium_tier(guild.id) if guild else None
+        have = billing.RANK.get(tier, 0)
+        return [{"key": key, "name": name, "line": line, "price": billing.plan_label(key),
+                 "on_sale": billing.plan_on_sale(key), "once": mode == "payment",
+                 "owned": billing.RANK[key] <= have}
+                for key, (_env, mode, _tier, name, line) in billing.PLANS.items()]
+
     def premium_state(self, guild) -> dict:
         row = self.bot.db.premium_of(guild.id)
         active = self.bot.db.is_premium(guild.id)
+        tier = self.bot.db.premium_tier(guild.id)
         return {
             "active": active,
+            "tier": tier,
+            "tier_name": billing.PLANS[tier][3] if tier else "",
+            "plans": self.plans(guild),
             "until": row["until"] if row and active else 0,
             # A cancelled subscription still runs to the end of the month.
-            "ending": bool(row and active and row["status"] not in ("active", "trialing")),
+            "ending": bool(row and active and row["status"] not in
+                           ("active", "trialing", "lifetime")),
             "billing": bool(row and row["customer"]),
             "for_sale": billing.configured(),
             "price": billing.price_label(),
@@ -656,10 +704,18 @@ class Dashboard(commands.Cog):
         if error:
             return error
         guild, member = found[0], found[1]
-        if not billing.configured():
-            return problem(503, "Premium isn't on sale yet.")
-        if self.bot.db.is_premium(guild.id):
-            return problem(409, "This server already has Premium.")
+        try:
+            body = await request.json()
+        except ValueError:
+            body = {}
+        plan = (body or {}).get("plan") or "premium"
+        if plan not in billing.PLANS:
+            return problem(400, "There's no such plan.")
+        if not billing.plan_on_sale(plan):
+            return problem(503, f"{billing.PLANS[plan][3]} isn't on sale yet.")
+        tier = self.bot.db.premium_tier(guild.id)
+        if billing.RANK.get(tier, 0) >= billing.RANK[plan]:
+            return problem(409, f"This server has {billing.PLANS[tier][3]} already.")
         back = f"{public_url()}/dashboard?guild={guild.id}"
         row = self.bot.db.premium_of(guild.id)
         try:
@@ -667,7 +723,8 @@ class Dashboard(commands.Cog):
                 guild.id, guild.name, member.id,
                 success_url=back + "&premium=thanks", cancel_url=back,
                 customer=row["customer"] if row else "",
-                trial=self.bot.db.trial_available(guild.id))
+                trial=plan == "premium" and self.bot.db.trial_available(guild.id),
+                plan=plan)
         except (billing.BillingError, OSError) as e:
             return problem(502, f"Couldn't start the payment: {e}")
         return web.json_response({"url": url}, headers=HEADERS)

@@ -391,6 +391,7 @@ CATEGORIES = [
     ]),
     ("\u2728", "Premium", [
         ("upgrade", "Paper Premium"),
+        ("serversetup", "build the server (Plus)"),
         ("event", "server events"),
         ("event start", "start one now"),
         ("event stop", "end one early"),
@@ -564,6 +565,7 @@ CATEGORIES = [
         ("delimage", "remove an image"),
         ("missingart", "who has no picture"),
         ("genkey", "mint premium keys"),
+        ("giveplan", "give a server a plan"),
         ("backup", "DM the owners a backup"),
         ("restore", "restore a backup (DM)"),
         ("keystats", "keys made and spent"),

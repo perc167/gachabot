@@ -321,7 +321,9 @@ CREATE TABLE IF NOT EXISTS guild_premium (
     buyer_id     INTEGER NOT NULL DEFAULT 0,
     updated_at   INTEGER NOT NULL DEFAULT 0,
     -- One free trial per server, ever.
-    trial_used   INTEGER NOT NULL DEFAULT 0
+    trial_used   INTEGER NOT NULL DEFAULT 0,
+    -- premium, plus (with the server builder) or lifetime (plus, for good)
+    tier         TEXT NOT NULL DEFAULT 'premium'
 );
 
 -- Premium: events an admin schedules. strength is a percent for xp and
@@ -644,6 +646,7 @@ class Database:
             ("players", "tuto_step", "INTEGER NOT NULL DEFAULT 1"),
             ("players", "tuto_silent", "INTEGER NOT NULL DEFAULT 0"),
             ("guild_premium", "trial_used", "INTEGER NOT NULL DEFAULT 0"),
+            ("guild_premium", "tier", "TEXT NOT NULL DEFAULT 'premium'"),
             # Every message someone has sent, for the leaderboard.
             ("levels", "messages", "INTEGER NOT NULL DEFAULT 0"),
         ):
@@ -973,11 +976,12 @@ class Database:
     # ---------- premium ----------
 
     def set_premium(self, guild_id: int, status: str, until: int, customer: str,
-                    subscription: str, buyer_id: int = 0):
+                    subscription: str, buyer_id: int = 0, tier: str = None):
         row = self.premium_of(guild_id)
         trial = status == "trialing" or bool(row and row["trial_used"])
         self._upsert("guild_premium", {
             "trial_used": 1 if trial else 0,
+            "tier": tier or (row["tier"] if row else "premium"),
             "guild_id": guild_id, "status": status, "until": int(until),
             # A later event may not carry these; don't forget them.
             "customer": customer or (row["customer"] if row else ""),
@@ -997,6 +1001,17 @@ class Database:
     def is_premium(self, guild_id: int) -> bool:
         row = self.premium_of(guild_id)
         return bool(row and row["until"] > time.time())
+
+    def premium_tier(self, guild_id: int):
+        """'premium', 'plus' or 'lifetime' while it lasts, else None."""
+        row = self.premium_of(guild_id)
+        if not row or row["until"] <= time.time():
+            return None
+        return "lifetime" if row["status"] == "lifetime" else (row["tier"] or "premium")
+
+    def is_plus(self, guild_id: int) -> bool:
+        """Premium Plus or Lifetime: the server builder."""
+        return self.premium_tier(guild_id) in ("plus", "lifetime")
 
     def add_event(self, guild_id: int, kind: str, strength: int, starts_at: int,
                   ends_at: int, channel_id: int, created_by: int) -> int:
