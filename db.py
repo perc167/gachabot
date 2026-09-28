@@ -474,6 +474,7 @@ CREATE TABLE IF NOT EXISTS levels (
     paid_through INTEGER NOT NULL DEFAULT 0,
     voice_day    INTEGER NOT NULL DEFAULT 0,
     voice_today  INTEGER NOT NULL DEFAULT 0,
+    messages     INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (guild_id, user_id)
 );
 
@@ -564,6 +565,8 @@ class Database:
             ("players", "tuto_step", "INTEGER NOT NULL DEFAULT 1"),
             ("players", "tuto_silent", "INTEGER NOT NULL DEFAULT 0"),
             ("guild_premium", "trial_used", "INTEGER NOT NULL DEFAULT 0"),
+            # Every message someone has sent, for the leaderboard.
+            ("levels", "messages", "INTEGER NOT NULL DEFAULT 0"),
         ):
             existing = {
                 row["name"]
@@ -1236,6 +1239,22 @@ class Database:
             f"UPDATE levels SET {sets} WHERE guild_id = ? AND user_id = ?",
             (*fields.values(), guild_id, user_id))
         self.conn.commit()
+
+    def add_messages(self, counts: dict):
+        """{(guild_id, user_id): messages} added in one go. The bot counts in
+        memory and saves once a minute rather than writing every message."""
+        if not counts:
+            return
+        with self.conn:
+            self.conn.executemany(
+                "INSERT INTO levels (guild_id, user_id, messages) VALUES (?, ?, ?)"
+                " ON CONFLICT (guild_id, user_id)"
+                " DO UPDATE SET messages = messages + excluded.messages",
+                [(g, u, n) for (g, u), n in counts.items()])
+
+    def vc_seconds_many(self, guild_id: int, user_ids: list, now: int = None) -> dict:
+        """vc_seconds for several people at once."""
+        return {uid: self.vc_seconds(guild_id, uid, now) for uid in user_ids}
 
     def top_levels(self, guild_id: int, limit: int = 100) -> list:
         return self.conn.execute(

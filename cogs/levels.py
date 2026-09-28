@@ -32,6 +32,7 @@ import typing
 import discord
 from discord.ext import commands, tasks
 
+import boardcard
 import config
 import rankcard
 import utils
@@ -188,6 +189,80 @@ def match_members(rows: list, members) -> tuple:
     return exact, guessed, missing
 
 
+BOARD_PAGE = 10         # people on a page of the leaderboard picture
+BOARD_LIMIT = 100       # people on the whole board
+
+
+class BoardView(discord.ui.View):
+    """Page buttons for the leaderboard picture. Each page is drawn the
+    first time someone flips to it, then kept."""
+
+    def __init__(self, cog, ctx, people, subtitle: str, footer: str):
+        super().__init__(timeout=180)
+        self.cog, self.guild, self.owner_id = cog, ctx.guild, ctx.author.id
+        self.people, self.subtitle, self.footer = people, subtitle, footer
+        self.pages = max(1, -(-len(people) // BOARD_PAGE))
+        self.index = 0
+        self.drawn = {}
+        self.message = None
+        self.sync()
+
+    async def render(self, page: int) -> bytes:
+        if page not in self.drawn:
+            self.drawn[page] = await self.cog.board_page(
+                self.guild, self.people, page, self.pages, self.subtitle, self.footer)
+        return self.drawn[page]
+
+    def sync(self):
+        self.where.label = f"{self.index + 1}/{self.pages}"
+        self.first.disabled = self.back.disabled = self.index == 0
+        self.forward.disabled = self.last.disabled = self.index >= self.pages - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "Run the command yourself to flip pages.", ephemeral=True)
+            return False
+        return True
+
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.edit(view=None)
+            except discord.HTTPException:
+                pass
+
+    async def go(self, interaction: discord.Interaction, page: int):
+        self.index = max(0, min(self.pages - 1, page))
+        self.sync()
+        # Drawing a new page can take longer than Discord waits for a reply.
+        await interaction.response.defer()
+        png = await self.render(self.index)
+        await interaction.edit_original_response(
+            attachments=[discord.File(io.BytesIO(png), filename="leaderboard.png")],
+            view=self)
+
+    @discord.ui.button(label="\u23ee", style=discord.ButtonStyle.secondary)
+    async def first(self, interaction, button):
+        await self.go(interaction, 0)
+
+    @discord.ui.button(label="\u25c0", style=discord.ButtonStyle.secondary)
+    async def back(self, interaction, button):
+        await self.go(interaction, self.index - 1)
+
+    @discord.ui.button(label="1/1", style=discord.ButtonStyle.secondary, disabled=True)
+    async def where(self, interaction, button):
+        pass
+
+    @discord.ui.button(label="\u25b6", style=discord.ButtonStyle.secondary)
+    async def forward(self, interaction, button):
+        await self.go(interaction, self.index + 1)
+
+    @discord.ui.button(label="\u23ed", style=discord.ButtonStyle.secondary)
+    async def last(self, interaction, button):
+        await self.go(interaction, self.pages - 1)
+
+
 class Levels(commands.Cog):
     # Levels aren't part of the gacha, so a server that keeps the gacha to
     # one channel still lets everyone check their level anywhere.
@@ -197,6 +272,7 @@ class Levels(commands.Cog):
         self.bot = bot
         self.last_counted = {}  # (guild, user) -> when a message last paid
         self.pruned_for = 0     # the month old monthly XP was last cleared in
+        self.message_counts = {}  # (guild, user) -> messages not saved yet
 
     @property
     def db(self):
@@ -207,6 +283,11 @@ class Levels(commands.Cog):
 
     async def cog_unload(self):
         self.voice_xp.cancel()
+        self.save_message_counts()
+
+    def save_message_counts(self):
+        counts, self.message_counts = self.message_counts, {}
+        self.db.add_messages(counts)
 
     async def cog_check(self, ctx):
         # A group's own checks don't run for its subcommands, and every one
@@ -364,6 +445,9 @@ class Levels(commands.Cog):
         if message.author.bot or not message.guild:
             return
         guild = message.guild
+        # Every message counts toward the leaderboard's total, XP or not.
+        counted = (guild.id, message.author.id)
+        self.message_counts[counted] = self.message_counts.get(counted, 0) + 1
         if message.channel.id in self.db.level_ignored_in(guild.id):
             return
         key = (guild.id, message.author.id)
@@ -388,6 +472,7 @@ class Levels(commands.Cog):
     async def voice_xp(self):
         day = today()
         week = weekly.week_now()
+        self.save_message_counts()
         month = month_now()
         if self.pruned_for != month:
             # Last month stays viewable; anything older goes.
@@ -498,16 +583,93 @@ class Levels(commands.Cog):
         self.db.set_rank_background(gid, ctx.author.id, image)
         await ctx.send(f"Saved. Try `{ctx.prefix}level`.")
 
+    # ------------------------------------------------------- leaderboard
+
+    async def person(self, guild, user_id: int) -> tuple:
+        """(display name, username, avatar bytes) for someone on the board,
+        whether or not they're still in the server."""
+        user = guild.get_member(user_id) or self.bot.get_user(user_id)
+        if user is None:
+            return "former member", "", b""
+        try:
+            face = await user.display_avatar.replace(size=128, format="png").read()
+        except (discord.HTTPException, ValueError):
+            face = b""
+        return user.display_name, user.name, face
+
+    async def board_page(self, guild, people: list, page: int, pages: int,
+                         subtitle: str, footer: str) -> bytes:
+        """One page of the leaderboard as a picture. people is the whole
+        board, [(user_id, xp shown)], best first; ten go on a page."""
+        gid = guild.id
+        chunk = people[page * BOARD_PAGE:(page + 1) * BOARD_PAGE]
+        found = await asyncio.gather(*(self.person(guild, uid) for uid, _xp in chunk))
+        entries = []
+        for n, ((uid, shown), (name, username, face)) in enumerate(zip(chunk, found)):
+            row = self.db.level_row(gid, uid)
+            level, into, needed = level_for(row["xp"])
+            entries.append({
+                "place": page * BOARD_PAGE + n + 1, "name": name, "fallback": username,
+                "avatar": face, "level": level, "into": into, "needed": needed,
+                "xp": shown,
+                "messages": row["messages"] + self.message_counts.get((gid, uid), 0),
+                "voice": self.db.vc_seconds(gid, uid),
+            })
+        icon = None
+        if guild.icon:
+            try:
+                icon = await guild.icon.replace(size=128, format="png").read()
+            except (discord.HTTPException, ValueError):
+                icon = None
+        background = self.db.rank_background(gid, 0) if self.db.is_premium(gid) else None
+        # Drawing takes a moment; keep it off the bot's main loop.
+        return await asyncio.to_thread(
+            boardcard.render, guild.name, entries, self.colour(gid), background, icon,
+            page + 1, pages, footer, subtitle)
+
+    async def send_board(self, ctx, people: list, subtitle: str, footer: str,
+                         fallback):
+        """The board as pictures with page buttons, or as the plain list
+        (fallback) if the picture can't be drawn."""
+        if not people:
+            await fallback()
+            return
+        view = BoardView(self, ctx, people, subtitle, footer)
+        try:
+            png = await view.render(0)
+        except Exception:  # noqa: BLE001 - the numbers must still go out
+            logging.getLogger("levels").exception("leaderboard picture failed")
+            await fallback()
+            return
+        view.message = await ctx.send(
+            file=discord.File(io.BytesIO(png), filename="leaderboard.png"),
+            view=view if view.pages > 1 else None)
+
+    def standing(self, ctx, people: list) -> str:
+        """Where the person who asked is, for the bottom of the board."""
+        place = next((n + 1 for n, (uid, _xp) in enumerate(people)
+                      if uid == ctx.author.id), 0)
+        if not place:
+            return f"You're not on this board yet  \u00b7  {ctx.prefix}level for your card"
+        return (f"You're #{place} of {len(people):,}  \u00b7  {ctx.prefix}level"
+                " for your card")
+
     @commands.group(name="leaderboard", aliases=["levelboard", "toplevels", "xplb"],
                     invoke_without_command=True)
     @commands.guild_only()
     async def leaderboard(self, ctx):
         """The server's level leaderboard."""
-        rows = self.db.top_levels(ctx.guild.id, limit=100)
+        rows = self.db.top_levels(ctx.guild.id, limit=BOARD_LIMIT)
+        people = [(row["user_id"], row["xp"]) for row in rows]
+        await self.send_board(ctx, people, "LEVEL LEADERBOARD",
+                              self.standing(ctx, people),
+                              lambda: self.board_as_text(ctx, rows))
+
+    async def board_as_text(self, ctx, rows):
         medals = ("\U0001f947", "\U0001f948", "\U0001f949")
         lines = [
             f"{medals[i] if i < 3 else f'`{i + 1:>2}.`'} <@{row['user_id']}>"
-            f" · level **{level_for(row['xp'])[0]}** · {row['xp']:,} XP"
+            f" \u00b7 level **{level_for(row['xp'])[0]}** \u00b7 {row['xp']:,} XP"
             for i, row in enumerate(rows)
         ]
         pages = utils.paginate(lines, 10)
@@ -532,10 +694,17 @@ class Levels(commands.Cog):
         month = month_now()
         if which and which.lower() in ("last", "previous", "prev"):
             month = month_before(month)
-        rows = self.db.monthly_top(ctx.guild.id, month)
+        rows = self.db.monthly_top(ctx.guild.id, month, limit=BOARD_LIMIT)
+        people = [(row["user_id"], row["xp"]) for row in rows]
+        await self.send_board(
+            ctx, people, f"TOP XP \u00b7 {month_name(month).upper()}",
+            self.standing(ctx, people) + "  \u00b7  resets on the 1st (UTC)",
+            lambda: self.month_as_text(ctx, rows, month))
+
+    async def month_as_text(self, ctx, rows, month: int):
         medals = ("\U0001f947", "\U0001f948", "\U0001f949")
         lines = [f"{medals[i] if i < 3 else f'`{i + 1:>2}.`'} <@{row['user_id']}>"
-                 f" · {row['xp']:,} XP" for i, row in enumerate(rows)]
+                 f" \u00b7 {row['xp']:,} XP" for i, row in enumerate(rows)]
         pages = utils.paginate(lines, 10)
         embeds = []
         for number, page in enumerate(pages):
@@ -545,7 +714,7 @@ class Levels(commands.Cog):
                 colour=self.colour(ctx.guild.id))
             footer = "Resets on the 1st (UTC)"
             if len(pages) > 1:
-                footer = f"Page {number + 1}/{len(pages)} · " + footer
+                footer = f"Page {number + 1}/{len(pages)} \u00b7 " + footer
             embed.set_footer(text=footer)
             embeds.append(embed)
         await Paginator(embeds, ctx.author.id).start(ctx)

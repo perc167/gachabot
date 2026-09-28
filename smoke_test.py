@@ -4,6 +4,7 @@ database. No Discord connection, no token needed.
     python smoke_test.py
 """
 import asyncio
+import io
 import os
 import sys
 import tempfile
@@ -40,6 +41,14 @@ async def main():
     b = botmod.GachaBot()
     for cog in botmod.COGS:
         await b.load_extension(cog)
+    # The cogs' timers wait for a Discord login this test never makes; stop
+    # them, or the first await below lets them start and complain.
+    from discord.ext import tasks as _tasks
+    for cog in b.cogs.values():
+        for attr in dir(cog):
+            loop = getattr(cog, attr, None)
+            if isinstance(loop, _tasks.Loop):
+                loop.cancel()
     names = sorted(c.qualified_name for c in b.commands)
     check("all cogs load", len(b.cogs) == len(botmod.COGS), f"{len(b.cogs)} cogs")
     check("commands registered", len(names) >= 25, f"{len(names)} commands")
@@ -258,6 +267,27 @@ async def main():
           lv.boosted(member, 100, room) == 165)
     check("boosts do nothing without Premium",
           lv.boosted(NS(guild=NS(id=FREE), roles=[NS(id=900)]), 100, room) == 100)
+
+    # The leaderboard picture: messages are counted, and a page draws,
+    # podium and all, even for people who've left the server.
+    import boardcard
+    db.add_messages({(PAID, ALICE): 5, (PAID, BOB): 2})
+    db.add_messages({(PAID, ALICE): 1})
+    check("messages are counted", db.level_row(PAID, ALICE)["messages"] == 6)
+    check("voice time reads short", boardcard.hours(45 * 3600) == "45h"
+          and boardcard.hours(5400) == "1.5h" and boardcard.hours(1200) == "20m")
+    lv.message_counts[(PAID, BOB)] = 3
+    fake_guild = NS(id=PAID, name="Paper's server", icon=None,
+                    get_member=lambda uid: None)
+    people = [(ALICE, 900), (BOB, 500), (ALICE + 1, 300), (BOB + 1, 100)]
+    png = await lv.board_page(fake_guild, people, 0, 1, "LEVEL LEADERBOARD", "footer")
+    from PIL import Image as _Image
+    board = _Image.open(io.BytesIO(png))
+    check("the leaderboard draws, podium first",
+          board.size == (boardcard.WIDTH, boardcard.height_for(4, True)), str(board.size))
+    check("a page after the first has no podium",
+          boardcard.height_for(10, False) > boardcard.height_for(10, True) - boardcard.PODIUM)
+    lv.message_counts.clear()
 
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
