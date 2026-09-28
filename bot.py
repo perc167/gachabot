@@ -52,6 +52,7 @@ COGS = [
     "cogs.events",
     "cogs.champions",
     "cogs.automod",
+    "cogs.customizer",
     "cogs.backups",
     "cogs.dashboard",
     "cogs.aliases",

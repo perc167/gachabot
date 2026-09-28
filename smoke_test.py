@@ -212,6 +212,111 @@ async def main():
     check("a level reset keeps what was paid",
           db.level_row(GUILD, ALICE)["paid_through"] == 10)
 
+    # Premium perks: everyone on a Premium server gets the gacha perks, and
+    # nobody anywhere else does.
+    import perks
+    import premium
+    from types import SimpleNamespace as NS
+    PAID, FREE = GUILD + 5, GUILD + 6          # GUILD + 5 subscribed above
+    paid_perks = perks.effective(db, PAID, ALICE)
+    free_perks = perks.effective(db, FREE, ALICE)
+    check("a Premium server's players get the gacha perks",
+          all(paid_perks[k] - free_perks[k] == v for k, v in premium.GACHA_PERK.items()))
+    check("a free server's players get none of them",
+          free_perks["karuda_percent"] == 0 and free_perks["rolls"] == 0)
+    check("the perks read as words", "karuda" in perks.describe(paid_perks))
+    check("the Premium list fits in one Discord message",
+          len(premium.perk_lines()) < 1500, str(len(premium.perk_lines())))
+    check("Stripe's price reads as words",
+          billing.describe_price({"unit_amount": 299, "currency": "usd",
+                                  "recurring": {"interval": "month"}}) == "$2.99 a month"
+          and billing.describe_price({"unit_amount": 500, "currency": "sek"}) == "5.00 SEK"
+          and billing.describe_price({}) == "")
+
+    # XP boosts: the best role boost, times the channel's (or its
+    # category's, or a thread's channel's), and only on Premium.
+    lv = b.get_cog("Levels")
+    db.set_level_boost(PAID, 900, 150)          # a role
+    db.set_level_boost(PAID, 901, 120)          # a smaller role
+    db.set_level_boost(PAID, 700, 200)          # a category
+    member = NS(guild=NS(id=PAID), roles=[NS(id=900), NS(id=901)])
+    room = NS(id=800, category_id=700, parent=None)
+    check("the best role boost counts", lv.boosted(member, 100) == 150)
+    check("a boosted category boosts its channels too",
+          lv.boosted(member, 100, room) == 300)
+    check("a thread counts as its channel",
+          lv.boosted(member, 100, NS(id=801, parent=room)) == 300)
+    db.set_level_boost(PAID, 800, 110)
+    check("a channel's own boost beats its category's",
+          lv.boosted(member, 100, room) == 165)
+    check("boosts do nothing without Premium",
+          lv.boosted(NS(guild=NS(id=FREE), roles=[NS(id=900)]), 100, room) == 100)
+
+    # The monthly leaderboard: months roll over, and only XP earned counts.
+    check("months roll over the year", levelsmod.month_before(202601) == 202512
+          and levelsmod.month_before(202607) == 202606)
+    check("a month has a name", levelsmod.month_name(202609) == "September 2026")
+    db.add_monthly_xp(PAID, ALICE, 202609, 40)
+    db.add_monthly_xp(PAID, ALICE, 202609, 60)
+    db.add_monthly_xp(PAID, BOB, 202609, 70)
+    db.add_monthly_xp(PAID, BOB, 202608, 999)
+    check("monthly XP adds up, month by month",
+          [(r["user_id"], r["xp"]) for r in db.monthly_top(PAID, 202609)]
+          == [(ALICE, 100), (BOB, 70)])
+    db.prune_monthly(202609)
+    check("old months are cleared", not db.monthly_top(PAID, 202608)
+          and db.monthly_top(PAID, 202609))
+
+    # Paper's own profile: pictures are checked, Premium is checked before
+    # Discord is asked, and what Discord answers is remembered.
+    import botprofile
+    png = b"\x89PNG\r\n\x1a\n" + b"\0" * 32
+    check("a PNG becomes a data URI",
+          botprofile.image_data(png).startswith("data:image/png;base64,"))
+
+    def profile_refused(call):
+        try:
+            call()
+        except botprofile.ProfileError:
+            return True
+        return False
+    check("a picture that isn't one is refused",
+          profile_refused(lambda: botprofile.image_data(b"hello")))
+    check("a picture over the limit is refused",
+          profile_refused(lambda: botprofile.image_data(png + b"\0" * premium.PICTURE_LIMIT)))
+    asked = []
+
+    async def fake_discord(route, **kwargs):
+        asked.append(kwargs["json"])
+        return {"avatar": "abc123" if kwargs["json"].get("avatar") else None}
+    real_request, b.http.request = b.http.request, fake_discord
+    try:
+        try:
+            await botprofile.update(b, NS(id=FREE), "test", bio="hi")
+            check("a bio needs Premium", False)
+        except botprofile.ProfileError:
+            check("a bio needs Premium", not asked)
+        await botprofile.update(b, NS(id=PAID), "test", avatar=png, bio=" Hello ")
+        row = db.bot_profile(PAID)
+        check("a Premium server can set Paper's picture and bio",
+              row["avatar"] == "abc123" and row["bio"] == "Hello"
+              and asked[-1]["avatar"].startswith("data:image/png"))
+        await botprofile.update(b, NS(id=PAID), "test", nick="Mochi")
+        check("changing the name keeps the picture",
+              db.bot_profile(PAID)["avatar"] == "abc123" and asked[-1] == {"nick": "Mochi"})
+        await botprofile.reset(b, NS(id=PAID), "test", name_too=False)
+        check("a reset puts Paper's own back, and keeps the name",
+              db.bot_profile(PAID) is None and "nick" not in asked[-1]
+              and asked[-1]["avatar"] is None)
+        before = len(asked)
+        try:
+            await botprofile.update(b, NS(id=FREE), "test", nick="x" * 40)
+            check("a name that's too long is refused", False)
+        except botprofile.ProfileError:
+            check("a name that's too long is refused", len(asked) == before)
+    finally:
+        b.http.request = real_request
+
     # 2. Seed import path.
     import json
 

@@ -64,6 +64,7 @@ AREA_OF = {
     "Staff points": "mod",
     "Voice rooms": "voice", "Voice hours": "voice",
     "Levels": "levels", "Level setup": "levels",
+    "Automod": "mod",
 }
 
 # How many characters the browser section carries. The whole roster is a
@@ -465,6 +466,13 @@ code,kbd{
 .premium-band{border-color:rgba(229,197,90,.45);
   background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10))}
 .btn.gold{background:var(--gold);color:#1a1405}
+.pgroups{flex-basis:100%;display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.pgroup{background:rgba(10,8,20,.35);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px 4px}
+.pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold)}
+.pgroup ul{margin:0 0 8px;padding-left:17px;font-size:14px;color:var(--dim)}
+.pgroup li{margin-bottom:3px}
 .btn.gold:hover{background:#f0d27a}
 .nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
   padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
@@ -975,12 +983,12 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
   <div class="band premium-band">
     <div>
       <h2>✨ Paper Premium</h2>
-      <p>Everything in Paper stays free. Premium makes a server feel alive:
-      Double XP and karuda events, rank cards with your own background, weekly
-      champions, smarter automod, and a weekly staff report. Try it free for
-      7 days.</p>
+      <p>Everything in Paper stays free. Premium adds the extras other bots
+      charge more for, for less, and for everyone on the server at once.
+      Try it free for 7 days.</p>
     </div>
     <a class="btn gold" href="__DASHBOARD__?premium=1">Try it free</a>
+    <div class="pgroups">__PREMIUM_HTML__</div>
   </div>
 </section>
 <section id="characters">
@@ -1376,6 +1384,12 @@ $levels ignore #bot-spam</code>
 
     secret_button, secret_html = secret_markup()
 
+    import premium
+    premium_html = "".join(
+        f'<div class="pgroup"><h3>{icon} {esc(title)}</h3><ul>'
+        + "".join(f"<li>{esc(line)}</li>" for line in lines) + "</ul></div>"
+        for icon, title, lines in premium.PERK_GROUPS)
+
     link = invite_url or bot_invite
     invite = (f'<a class="btn" href="{esc(link)}">Add Paper to your server</a>'
               if link else
@@ -1400,6 +1414,7 @@ $levels ignore #bot-spam</code>
             .replace("__CHARACTERS_HTML__", "\n".join(cards))
             .replace("__SECRET_BUTTON__", secret_button)
             .replace("__SECRET_HTML__", secret_html)
+            .replace("__PREMIUM_HTML__", premium_html)
             .replace("__DASHBOARD__", DASHBOARD_URL)
             .replace("__LOGIN__", BOT_URL + "/login?next=site"))
 

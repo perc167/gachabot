@@ -143,14 +143,16 @@ class KarudaView(discord.ui.View):
 
         rate = db.get_setting(self.guild_id, "karuda_rate")
         percent = db.get_setting(self.guild_id, "karuda_grab_percent")
-        percent += perks.effective(db, self.guild_id, user.id)["grab_percent"]
+        earned = perks.effective(db, self.guild_id, user.id)
+        percent += earned["grab_percent"]
         # A grab is a cut of the character's worth, not the whole thing -
         # paying full value made grinding the only sensible way to play.
         owner_id = db.owner_of(self.guild_id, self.character["id"])
         worth = utils.value_with_keys(db, self.guild_id, self.character, rate)
         base = max(1, worth * percent // 100)
         amount = base if owner_id == user.id else max(1, int(base * 0.6))
-        amount = max(1, int(amount * random.uniform(0.8, 1.2)))
+        amount = max(1, int(amount * random.uniform(0.8, 1.2)
+                            * (100 + earned["karuda_percent"]) / 100))
 
         total = db.add_karuda(self.guild_id, user.id, amount)
         cooldowns.start_karuda_cooldown(self.guild_id, user.id)

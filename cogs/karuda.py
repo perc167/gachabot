@@ -6,6 +6,7 @@ from discord.ext import commands
 
 import config
 import perks
+import premium
 import utils
 from cogs import tea
 from utils import fmt_duration
@@ -247,7 +248,8 @@ class Karuda(commands.Cog):
             key, name, _fallback, multiplier, _weight, colour = config.roll_shard(
                 random
             )
-            bonus = perks.effective(db, gid, ctx.author.id)["daily_percent"]
+            earned = perks.effective(db, gid, ctx.author.id)
+            bonus = earned["daily_percent"] + earned["karuda_percent"]
             rush = db.event_strength(gid, "karuda") or 100  # a Premium event
             amount = round(
                 random.randint(DAILY_MIN, DAILY_MAX)
@@ -258,7 +260,8 @@ class Karuda(commands.Cog):
             )
             drops.append((key, name, multiplier, colour, amount))
         db.update_player(
-            gid, ctx.author.id, daily_ready_at=utils.now() + DAILY_COOLDOWN
+            gid, ctx.author.id, daily_ready_at=utils.now() + (
+                premium.DAILY_COOLDOWN if db.is_premium(gid) else DAILY_COOLDOWN)
         )
 
         view = ShardDrops(

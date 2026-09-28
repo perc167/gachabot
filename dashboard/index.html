@@ -187,6 +187,14 @@ body{background:transparent}
 .prem p{margin:0 0 12px;color:var(--dim)}
 .prem ul{margin:0 0 16px;padding-left:18px;color:var(--text);font-size:14.5px}
 .prem li{margin-bottom:3px}
+.pgroups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;
+  margin:4px 0 18px}
+.pgroup{background:rgba(10,8,20,.35);border:1px solid rgba(255,255,255,.07);
+  border-radius:12px;padding:12px 14px 6px}
+.pgroup h3{display:flex;align-items:center;gap:7px;margin:0 0 7px;font-size:14.5px;
+  font-family:var(--display);color:var(--gold)}
+.pgroup .pi{font-size:16px}
+.prem .pgroup ul{margin:0 0 6px;padding-left:17px;font-size:13.5px;color:var(--text)}
 .prem .price{font-family:var(--display);font-weight:600;color:var(--gold)}
 .btn.gold{background:var(--gold);color:#1a1405}
 .btn.gold:hover{background:#f0d27a}
@@ -198,6 +206,15 @@ body{background:transparent}
 .brow{display:grid;grid-template-columns:1fr 130px 38px;gap:8px;align-items:center;
   margin-bottom:8px}
 .prem-page{margin-top:26px}
+.bpcard{position:relative;border-radius:14px;overflow:hidden;margin-bottom:14px;
+  background:rgba(10,8,20,.45);border:1px solid rgba(255,255,255,.07);max-width:420px}
+.bpbanner{height:92px;background:linear-gradient(120deg,rgba(124,107,240,.5),rgba(238,127,168,.35))}
+.bpbanner img{width:100%;height:100%;object-fit:cover;display:block}
+.bpavatar{position:absolute;left:16px;top:52px;width:72px;height:72px;border-radius:50%;
+  border:5px solid #15121f;background:#15121f;object-fit:cover}
+.bpwho{padding:40px 16px 12px}
+.bpwho b{font-family:var(--display);font-size:16px}
+.bpwho .hint{margin:4px 0 0;white-space:pre-wrap;word-break:break-word}
 .pp-note{color:var(--gold);margin:0}
 .prem-link{color:var(--gold)}
 @media(max-width:520px){.prem-link{display:none}}
@@ -298,7 +315,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   <div class="prem prem-page">
     <h2>✨ Paper Premium</h2>
     <p id="pp-intro"></p>
-    <ul id="pp-perks"></ul>
+    <div id="pp-perks"></div>
     <p class="pp-note" id="pp-note" hidden></p>
   </div>
   <div class="servers-head"><h1>Pick a server</h1>
@@ -392,8 +409,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 
   <section class="card">
     <h2>XP boosts <span class="prem-tag">✨ Premium</span></h2>
-    <p class="sub">Roles that earn extra XP, like 1.5x for Boosters. If someone has
-      more than one, the biggest boost counts.</p>
+    <p class="sub">Roles and channels that earn extra XP, like 1.5x for Boosters or
+      2x in #events. The biggest role boost someone has counts, times the boost of
+      the channel they're in.</p>
     <div class="lock" id="boost-lock" hidden>✨ XP boosts come with Paper Premium.
       <button type="button" id="boost-upgrade">See Premium</button></div>
     <div id="boost-list"></div>
@@ -596,9 +614,16 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   function addBoost(role, percent){
     var row = document.createElement("div"); row.className = "brow";
     var s = document.createElement("select");
-    s.appendChild(option("", "Pick a role\u2026"));
-    state.roles.forEach(function(r){ s.appendChild(option(r.id, r.name)); });
-    s.value = role || ""; s.setAttribute("aria-label", "Role");
+    s.appendChild(option("", "Pick a role or channel\u2026"));
+    var roles = document.createElement("optgroup"); roles.label = "Roles";
+    state.roles.forEach(function(r){ roles.appendChild(option(r.id, "@" + r.name)); });
+    var chans = document.createElement("optgroup"); chans.label = "Channels and categories";
+    (state.boost_places || []).forEach(function(c){
+      chans.appendChild(option(c.id, c.category ? c.name.toUpperCase() + " (category)"
+                                     : (c.voice ? "🔊 " : "#") + c.name));
+    });
+    s.append(roles, chans);
+    s.value = role || ""; s.setAttribute("aria-label", "Role or channel");
     var n = document.createElement("input"); n.type = "number";
     n.min = state.boost_range[0]; n.max = state.boost_range[1];
     n.value = percent || 150; n.setAttribute("aria-label", "Percent of normal XP");
@@ -759,16 +784,13 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   }
 
   // ---- Paper Premium: what it is, and the one button that matters
-  var PERKS = [
-    "Server events: Double XP, karuda rushes and bonus rolls for everyone",
-    "Rank cards with your server's own background, and members' own",
-    "Weekly champions: a role and a shout-out for the top chatter and top voice member",
-    "Smarter automod: spam, blocked words, links and shouting",
-    "XP boost roles, like 1.5x XP for Boosters",
-    "A weekly staff report, up to 50 warn punishments, and case history as a spreadsheet"
-  ];
-  function perks(){
-    return el("ul", {}, PERKS.map(function(t){ return el("li", {text: t}); }));
+  // The perks come from the bot (premium.py), grouped: Gacha, Levels...
+  function perks(groups){
+    return el("div", {cls: "pgroups"}, (groups || []).map(function(g){
+      return el("div", {cls: "pgroup"}, [
+        el("h3", {}, [el("span", {cls: "pi", text: g.icon}), g.title]),
+        el("ul", {}, g.perks.map(function(t){ return el("li", {text: t}); }))]);
+    }));
   }
 
   function showPremium(p){
@@ -786,9 +808,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     } else {
       panel.append(
         el("h2", {text: "✨ Paper Premium"}),
-        el("p", {}, ["Everything in Paper stays free. Premium adds extras for this server",
+        el("p", {}, ["Everything in Paper stays free. Premium adds the extras other bots charge more for, for everyone on this server",
           p.price ? el("span", {}, [" for ", el("span", {cls: "price", text: p.price})]) : null, ":"]),
-        perks(),
+        perks(p.perks),
         p.for_sale ? button(p.trial ? "Start your " + p.trial_days + "-day free trial" : "Upgrade this server",
                             "btn gold", "/api/premium/checkout")
                    : el("p", {cls: "pp-note", text: "Coming soon. It isn't on sale just yet."}));
@@ -1116,6 +1138,46 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         "Everyone's $rank card uses this, unless they've set their own with $rank background. Wide pictures work best (934 by 282).",
         [preview, field("Upload a picture (up to 8 MB)", file), d.background ? el("div", {cls: "actions"}, [reset]) : null]));
 
+      // ---- Paper's own profile on this server: at once too
+      var pr = d.profile;
+      var look = el("div", {cls: "bpcard"}, [
+        el("div", {cls: "bpbanner"}, pr.banner ? [el("img", {src: pr.banner, alt: ""})] : []),
+        el("img", {cls: "bpavatar", src: pr.avatar || pr.default_avatar, alt: ""}),
+        el("div", {cls: "bpwho"}, [el("b", {text: pr.nick || pr.name}),
+          el("p", {cls: "hint", text: pr.bio || "Paper's own bio"})])]);
+      var nick = el("input", {type: "text", value: pr.nick, maxLength: pr.nick_limit, placeholder: pr.name});
+      var bio = el("textarea", {value: pr.bio, maxLength: pr.bio_limit, placeholder: "Paper's own bio"});
+      nick.value = pr.nick; bio.value = pr.bio;
+      [nick, bio].forEach(function(i){ i.dataset.nosave = "1"; });
+      if (!d.premium) bio.disabled = true;
+      var saveWords = el("button", {type: "button", cls: "btn gold small", text: "Save name and bio"});
+      saveWords.addEventListener("click", function(){
+        var body = {nick: nick.value};
+        if (d.premium) body.bio = bio.value;
+        act("POST", "/api/botprofile", body);
+      });
+      function upload(kind){
+        var f = el("input", {type: "file", accept: "image/png,image/jpeg,image/gif,image/webp"});
+        f.dataset.nosave = "1";
+        if (!d.premium) f.disabled = true;
+        f.addEventListener("change", function(){
+          var file = f.files[0]; if (!file) return;
+          if (file.size > 8 * 1024 * 1024) { alert("That picture is over 8 MB."); return; }
+          var reader = new FileReader();
+          reader.onload = function(){ var b = {}; b[kind] = reader.result; act("POST", "/api/botprofile", b); };
+          reader.readAsDataURL(file);
+        });
+        return f;
+      }
+      var backToPaper = el("button", {type: "button", cls: "btn ghost small", text: "Back to Paper's own"});
+      backToPaper.addEventListener("click", function(){ act("POST", "/api/botprofile", {reset: true}); });
+      form.appendChild(card("Make Paper yours",
+        "Give Paper its own name, picture, banner and bio, just on this server. The name is free; the rest comes with Premium.",
+        [look, el("div", {cls: "row"}, [field("Name", nick), field("Profile picture", upload("avatar")),
+                                        field("Banner", upload("banner"))]),
+         field("Bio (About Me)", bio),
+         el("div", {cls: "actions"}, [saveWords, backToPaper])]));
+
       // ---- champions and the staff report: these use Save
       var chChannel = select([["", "Don't announce"]].concat(d.channels.map(function(c){ return [c.id, "#" + c.name]; })), d.champ_channel);
       var chChat = select(roleOptions(d.roles, "No role"), d.champ_chat_role);
@@ -1206,11 +1268,12 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     current = null;
     only("view-premium");
     var sale = me.premium_sale || {};
-    $("pp-intro").textContent = "Everything in Paper stays free. Premium adds extras to one server" +
+    $("pp-intro").textContent = "Everything in Paper stays free. Premium adds the extras other bots" +
+      " charge more for, to one server and everyone in it" +
       (sale.price ? ", for " + sale.price : "") + ". Every server can try it free for " +
       (sale.trial_days || 7) + " days first:";
     var list = $("pp-perks"); list.textContent = "";
-    PERKS.forEach(function(t){ list.appendChild(el("li", {text: t})); });
+    list.appendChild(perks(sale.perks));
     $("pp-note").hidden = !!sale.for_sale;
     $("pp-note").textContent = "Coming soon: Premium isn't on sale just yet. Check back soon.";
     var box = $("pp-servers"); box.textContent = "";

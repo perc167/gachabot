@@ -346,6 +346,26 @@ CREATE TABLE IF NOT EXISTS weekly_activity (
     PRIMARY KEY (guild_id, user_id, week)
 );
 
+-- XP earned each calendar month (UTC), month as YYYYMM, for the Premium
+-- monthly leaderboard. Kept for every server, so it's already full on the
+-- day a server upgrades.
+-- Paper's own profile on a server (Premium, botprofile.py): the bio as set,
+-- and the hashes Discord gave the pictures. Empty means Paper's own.
+CREATE TABLE IF NOT EXISTS bot_profiles (
+    guild_id INTEGER PRIMARY KEY,
+    bio      TEXT NOT NULL DEFAULT '',
+    avatar   TEXT NOT NULL DEFAULT '',
+    banner   TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS monthly_xp (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    month    INTEGER NOT NULL,
+    xp       INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, month)
+);
+
 -- Settings for the Premium extras: champions and the staff report.
 CREATE TABLE IF NOT EXISTS premium_settings (
     guild_id INTEGER NOT NULL,
@@ -968,6 +988,37 @@ class Database:
 
     def prune_weekly(self, before_week: int):
         self.conn.execute("DELETE FROM weekly_activity WHERE week < ?", (before_week,))
+        self.conn.commit()
+
+    def bot_profile(self, guild_id: int):
+        rows = self._select("bot_profiles", guild_id=guild_id)
+        return rows[0] if rows else None
+
+    def save_bot_profile(self, guild_id: int, bio: str, avatar: str, banner: str):
+        if bio or avatar or banner:
+            self._upsert("bot_profiles", {"guild_id": guild_id, "bio": bio,
+                                          "avatar": avatar, "banner": banner})
+        else:
+            self._delete("bot_profiles", guild_id=guild_id)
+
+    def custom_bot_profiles(self) -> list:
+        return self.conn.execute("SELECT * FROM bot_profiles").fetchall()
+
+    def add_monthly_xp(self, guild_id: int, user_id: int, month: int, xp: int):
+        self.conn.execute(
+            "INSERT INTO monthly_xp (guild_id, user_id, month, xp)"
+            " VALUES (?, ?, ?, ?) ON CONFLICT (guild_id, user_id, month)"
+            " DO UPDATE SET xp = xp + excluded.xp",
+            (guild_id, user_id, month, xp))
+        self.conn.commit()
+
+    def monthly_top(self, guild_id: int, month: int, limit: int = 100) -> list:
+        return self.conn.execute(
+            "SELECT user_id, xp FROM monthly_xp WHERE guild_id = ? AND month = ?"
+            " AND xp > 0 ORDER BY xp DESC LIMIT ?", (guild_id, month, limit)).fetchall()
+
+    def prune_monthly(self, before_month: int):
+        self.conn.execute("DELETE FROM monthly_xp WHERE month < ?", (before_month,))
         self.conn.commit()
 
     def get_premium_setting(self, guild_id: int, key: str, default: int = 0) -> int:

@@ -27,6 +27,7 @@ import logging
 import random
 import re
 import time
+import typing
 
 import discord
 from discord.ext import commands, tasks
@@ -40,6 +41,12 @@ from views import Confirm, Paginator
 KARUDA_EVERY = 5            # levels between karuda payouts
 MAX_LEVEL = 500
 BOOST_RANGE = (105, 300)    # Premium XP boosts, as a percent
+# What an XP boost can be on. Roles first, so a bare name finds the role.
+BOOST_PLACES = (discord.TextChannel, discord.VoiceChannel, discord.StageChannel,
+                discord.ForumChannel, discord.CategoryChannel)
+BoostTarget = typing.Union[discord.Role, discord.TextChannel, discord.VoiceChannel,
+                           discord.StageChannel, discord.ForumChannel,
+                           discord.CategoryChannel]
 
 # key: (default, lowest, highest, what it is)
 SETTINGS = {
@@ -110,6 +117,21 @@ def today() -> int:
     return int(time.time() // 86400)
 
 
+def month_now(when: float = None) -> int:
+    """This calendar month in UTC, as YYYYMM."""
+    t = time.gmtime(time.time() if when is None else when)
+    return t.tm_year * 100 + t.tm_mon
+
+
+def month_before(month: int) -> int:
+    year, mon = divmod(month, 100)
+    return (year - 1) * 100 + 12 if mon == 1 else month - 1
+
+
+def month_name(month: int) -> str:
+    return time.strftime("%B %Y", time.strptime(str(month), "%Y%m"))
+
+
 IMPORT_LINE = re.compile(r"^\s*(?:#?\d+[.)]?\s+)?@?(\S+?)[\s,;:|]+(?:level\s*)?(\d+)\b",
                          re.IGNORECASE)
 
@@ -170,6 +192,7 @@ class Levels(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.last_counted = {}  # (guild, user) -> when a message last paid
+        self.pruned_for = 0     # the month old monthly XP was last cleared in
 
     @property
     def db(self):
@@ -216,21 +239,34 @@ class Levels(commands.Cog):
 
     # ------------------------------------------------------------ earning
 
-    def boosted(self, member, amount: int) -> int:
-        """Premium servers: the best boost role a member has, times any XP
-        event running now."""
+    def boosted(self, member, amount: int, channel=None) -> int:
+        """Premium servers: the best boost role a member has, times the
+        boost of the channel they earned it in (or its category), times any
+        XP event running now.
+
+        Role and channel boosts share one table: a Discord id is never both
+        a role and a channel, so the ids can't collide."""
         guild_id = member.guild.id
         if not self.db.is_premium(guild_id):
             return amount
-        have = {r.id for r in getattr(member, "roles", [])}
-        best = max((row["percent"] for row in self.db.level_boosts_of(guild_id)
-                    if row["role_id"] in have), default=100)
+        boosts = {row["role_id"]: row["percent"]
+                  for row in self.db.level_boosts_of(guild_id)}
+        role = max((boosts[r.id] for r in getattr(member, "roles", [])
+                    if r.id in boosts), default=100)
+        place = 100
+        if channel is not None:
+            # A thread counts as the channel it's in.
+            parent = getattr(channel, "parent", None) or channel
+            place = boosts.get(parent.id) or boosts.get(
+                getattr(parent, "category_id", None)) or 100
         event = self.db.event_strength(guild_id, "xp") or 100
-        return round(amount * best / 100 * event / 100)
+        return round(amount * role / 100 * place / 100 * event / 100)
 
     async def give_xp(self, member, amount: int, channel=None):
         """Add XP, and if that's a level up, pay out and announce it."""
         guild = member.guild
+        if amount > 0:
+            self.db.add_monthly_xp(guild.id, member.id, month_now(), amount)
         row = self.db.level_row(guild.id, member.id)
         xp = row["xp"] + amount
         level = level_for(xp)[0]
@@ -338,7 +374,7 @@ class Levels(commands.Cog):
         high = self.setting(guild.id, "msg_max")
         amount = random.randint(min(low, high), max(low, high))
         if amount:
-            gained = self.boosted(message.author, amount)
+            gained = self.boosted(message.author, amount, message.channel)
             if weekly.tracking(self.db, guild.id):
                 self.db.add_weekly(guild.id, message.author.id, weekly.week_now(),
                                    chat=gained)
@@ -348,6 +384,11 @@ class Levels(commands.Cog):
     async def voice_xp(self):
         day = today()
         week = weekly.week_now()
+        month = month_now()
+        if self.pruned_for != month:
+            # Last month stays viewable; anything older goes.
+            self.db.prune_monthly(month_before(month))
+            self.pruned_for = month
         for guild in self.bot.guilds:
             xp_on = bool(self.setting(guild.id, "voice") and self.setting(guild.id, "voice_xp"))
             # Weekly champions count voice minutes by the same rules, even
@@ -381,7 +422,8 @@ class Levels(commands.Cog):
         self.db.update_level_row(member.guild.id, member.id, voice_day=day,
                                  voice_today=spent + amount)
         # The daily cap counts plain XP, so a boost can't reach it sooner.
-        await self.give_xp(member, self.boosted(member, amount))
+        where = member.voice.channel if member.voice else None
+        await self.give_xp(member, self.boosted(member, amount, where))
 
     @voice_xp.before_loop
     async def before_voice_xp(self):
@@ -473,6 +515,34 @@ class Levels(commands.Cog):
                 colour=self.colour(ctx.guild.id))
             if len(pages) > 1:
                 embed.set_footer(text=f"Page {number + 1}/{len(pages)}")
+            embeds.append(embed)
+        await Paginator(embeds, ctx.author.id).start(ctx)
+
+    @levels.command(name="month", aliases=["monthly", "thismonth"])
+    async def levels_month(self, ctx, which: str = None):
+        """Premium: who earned the most XP this month. `last` for last month."""
+        if not self.db.is_premium(ctx.guild.id):
+            await ctx.send("The monthly leaderboard comes with Paper Premium."
+                           f" `{ctx.prefix}upgrade` to see how to get it.")
+            return
+        month = month_now()
+        if which and which.lower() in ("last", "previous", "prev"):
+            month = month_before(month)
+        rows = self.db.monthly_top(ctx.guild.id, month)
+        medals = ("\U0001f947", "\U0001f948", "\U0001f949")
+        lines = [f"{medals[i] if i < 3 else f'`{i + 1:>2}.`'} <@{row['user_id']}>"
+                 f" · {row['xp']:,} XP" for i, row in enumerate(rows)]
+        pages = utils.paginate(lines, 10)
+        embeds = []
+        for number, page in enumerate(pages):
+            embed = discord.Embed(
+                title=f"Top XP in {month_name(month)}",
+                description="\n".join(page) or "Nobody has earned XP this month yet.",
+                colour=self.colour(ctx.guild.id))
+            footer = "Resets on the 1st (UTC)"
+            if len(pages) > 1:
+                footer = f"Page {number + 1}/{len(pages)} · " + footer
+            embed.set_footer(text=footer)
             embeds.append(embed)
         await Paginator(embeds, ctx.author.id).start(ctx)
 
@@ -719,24 +789,38 @@ class Levels(commands.Cog):
         await ctx.send(f"**{member.display_name}** is level **{level}** now.",
                        allowed_mentions=discord.AllowedMentions.none())
 
+    def boost_label(self, guild, target_id: int) -> str:
+        """How a boost's role or channel reads in a message."""
+        if guild.get_role(target_id):
+            return f"<@&{target_id}>"
+        place = guild.get_channel(target_id)
+        if isinstance(place, discord.CategoryChannel):
+            return f"the **{place.name}** category"
+        return f"<#{target_id}>" if place else "a deleted role or channel"
+
     @levels.group(name="boost", aliases=["boosts"], invoke_without_command=True)
     async def levels_boost(self, ctx):
-        """Premium: roles that earn extra XP."""
+        """Premium: roles and channels that earn extra XP."""
         rows = self.db.level_boosts_of(ctx.guild.id)
-        lines = [f"<@&{r['role_id']}> earns **{r['percent'] / 100:g}x** XP" for r in rows]
+        lines = [f"{self.boost_label(ctx.guild, r['role_id'])} earns"
+                 f" **{r['percent'] / 100:g}x** XP" for r in rows]
         note = "" if self.db.is_premium(ctx.guild.id) else (
             "\n\n*XP boosts are a Paper Premium feature, so they're paused on"
             f" this server. `{ctx.prefix}upgrade` to see how to get it.*")
         await ctx.send(embed=discord.Embed(
             title="XP boosts",
             description=("\n".join(lines) or
-                         f"None yet. e.g. `{ctx.prefix}levels boost add @Booster 150`")
+                         f"None yet. e.g. `{ctx.prefix}levels boost add @Booster 150`"
+                         f" or `{ctx.prefix}levels boost add #general 200`")
+            + ("\n\nThe best role boost someone has counts, times the boost of"
+               " the channel they're in." if lines else "")
             + note, colour=self.colour(ctx.guild.id)))
 
     @levels_boost.command(name="add", aliases=["set"])
     @commands.has_permissions(manage_guild=True)
-    async def levels_boost_add(self, ctx, role: discord.Role, percent: int):
-        """Premium: a role earns this percent of normal XP, e.g. 150 for 1.5x."""
+    async def levels_boost_add(self, ctx, target: BoostTarget, percent: int):
+        """Premium: a role, channel or category earns this percent of normal
+        XP, e.g. 150 for 1.5x."""
         if not self.db.is_premium(ctx.guild.id):
             await ctx.send("XP boosts are a Paper Premium feature."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
@@ -745,20 +829,22 @@ class Levels(commands.Cog):
         if not low <= percent <= high:
             await ctx.send(f"Pick from {low} (1.05x) to {high} (3x).")
             return
-        if role.is_default():
+        if isinstance(target, discord.Role) and target.is_default():
             await ctx.send("Pick a role other than @everyone.")
             return
-        self.db.set_level_boost(ctx.guild.id, role.id, percent)
-        await ctx.send(f"**{role.name}** earns **{percent / 100:g}x** XP now.",
+        self.db.set_level_boost(ctx.guild.id, target.id, percent)
+        await ctx.send(f"{self.boost_label(ctx.guild, target.id)} earns"
+                       f" **{percent / 100:g}x** XP now.",
                        allowed_mentions=discord.AllowedMentions.none())
 
     @levels_boost.command(name="remove")
     @commands.has_permissions(manage_guild=True)
-    async def levels_boost_remove(self, ctx, role: discord.Role):
-        """Stop a role's XP boost."""
-        gone = self.db.remove_level_boost(ctx.guild.id, role.id)
-        await ctx.send(f"**{role.name}** earns normal XP again." if gone
-                       else f"**{role.name}** had no boost.",
+    async def levels_boost_remove(self, ctx, target: BoostTarget):
+        """Stop a role's or channel's XP boost."""
+        label = self.boost_label(ctx.guild, target.id)
+        gone = self.db.remove_level_boost(ctx.guild.id, target.id)
+        await ctx.send(f"{label} earns normal XP again." if gone
+                       else f"{label} had no boost.",
                        allowed_mentions=discord.AllowedMentions.none())
 
     @levels.command(name="card")

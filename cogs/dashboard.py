@@ -31,8 +31,10 @@ It also serves /api/servers, the public list of servers the bot is in, for
 the scrolling strip on the website. Only a server's name, icon and member
 count go out, and any server can leave the list with `$sitelist off`.
 """
+import asyncio
 import base64
 import json
+import logging
 import os
 import secrets
 import time
@@ -42,9 +44,11 @@ from aiohttp import web
 from discord.ext import commands
 
 import billing
+import botprofile
 import oauth
 import webparts
-from cogs.levels import BOOST_RANGE
+import premium
+from cogs.levels import BOOST_PLACES, BOOST_RANGE
 
 from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
                          MESSAGE_LIMIT, MESSAGE_VARIABLES, SETTINGS, level_for,
@@ -63,6 +67,7 @@ NEXT_COOKIE = "paper_next"
 SESSION_DAYS = 7
 # Where the dashboard's Home link goes: the public website.
 SITE_URL = os.getenv("SITE_URL", "https://gachabot.perc-1fc.workers.dev").rstrip("/")
+log = logging.getLogger("dashboard")
 
 HEADERS = {
     "Cache-Control": "no-store",
@@ -107,6 +112,7 @@ class Dashboard(commands.Cog):
         self.showcase_cache = (0, None)  # (when, response body)
 
     async def cog_load(self):
+        self.price_task = asyncio.create_task(self.load_price())
         port = os.getenv("PORT")
         if not port:
             return
@@ -128,6 +134,7 @@ class Dashboard(commands.Cog):
         app.router.add_post("/api/events/{event}/stop", self.api_event_stop)
         app.router.add_post("/api/rankbg", self.api_rankbg)
         app.router.add_get("/api/rankbg.jpg", self.api_rankbg_get)
+        app.router.add_post("/api/botprofile", self.api_botprofile)
         app.router.add_post("/stripe/webhook", self.stripe_webhook)
         app.router.add_get("/api/part/{part}", self.api_part_get)
         app.router.add_post("/api/part/{part}", self.api_part_save)
@@ -140,8 +147,17 @@ class Dashboard(commands.Cog):
         await web.TCPSite(self.runner, "0.0.0.0", int(port)).start()
 
     async def cog_unload(self):
+        self.price_task.cancel()
         if self.runner:
             await self.runner.cleanup()
+
+    async def load_price(self):
+        """The Premium price from Stripe, for buttons and $upgrade. Doesn't
+        hold up the bot starting, and a failure only means no price shown."""
+        try:
+            await billing.load_price_label()
+        except (billing.BillingError, OSError, asyncio.TimeoutError):
+            log.warning("couldn't read the Premium price from Stripe")
 
     # ------------------------------------------------------------ the link
 
@@ -200,15 +216,11 @@ class Dashboard(commands.Cog):
                 text += f"\nManage billing on the dashboard: <{link}>"
         else:
             price = billing.price_label()
-            text = ("**Paper Premium** for this server"
-                    + (f", {price}" if price else "") + ":\n"
-                    "\u2022 Server events: Double XP, karuda rushes, bonus rolls\n"
-                    "\u2022 Rank card backgrounds for the server and its members\n"
-                    "\u2022 Weekly champions for the top chatter and voice member\n"
-                    "\u2022 Smarter automod: spam, blocked words, links, shouting\n"
-                    "\u2022 XP boost roles, a weekly staff report, up to 50 warn"
-                    " punishments and case history as a spreadsheet\n"
-                    "\u2022 Try it free for 7 days")
+            text = ("\u2728 **Paper Premium** for this server"
+                    + (f", {price}" if price else "") + ". Everything in Paper"
+                    " stays free; Premium adds these for everyone here:\n\n"
+                    + premium.perk_lines()
+                    + f"\n\nTry it free for {billing.TRIAL_DAYS} days.")
             if link and billing.configured():
                 text += f"\nAn admin can upgrade on the dashboard: <{link}>"
             elif not billing.configured():
@@ -366,7 +378,8 @@ class Dashboard(commands.Cog):
             "site": SITE_URL,
             "premium_sale": {"for_sale": billing.configured(),
                              "price": billing.price_label(),
-                             "trial_days": billing.TRIAL_DAYS},
+                             "trial_days": billing.TRIAL_DAYS,
+                             "perks": premium.perk_groups()},
         }, headers=HEADERS)
 
     def invite_permissions(self):
@@ -461,6 +474,15 @@ class Dashboard(commands.Cog):
             "boosts": [{"role": str(r["role_id"]), "percent": r["percent"]}
                        for r in self.bot.db.level_boosts_of(guild.id)],
             "boost_range": list(BOOST_RANGE),
+            # Channels and categories a boost can be on, beside the roles.
+            "boost_places": [{"id": str(c.id), "name": c.name,
+                              "category": isinstance(c, discord.CategoryChannel),
+                              "voice": isinstance(c, (discord.VoiceChannel,
+                                                      discord.StageChannel))}
+                             for c in sorted(guild.channels, key=lambda c: (
+                                 not isinstance(c, discord.CategoryChannel),
+                                 c.position))
+                             if isinstance(c, BOOST_PLACES)],
         }
 
     async def api_get(self, request):
@@ -553,13 +575,18 @@ class Dashboard(commands.Cog):
                 try:
                     role_id, percent = int(row["role"]), int(row["percent"])
                 except (TypeError, ValueError, KeyError):
-                    problems.append("Every XP boost needs a role and a percent.")
+                    problems.append("Every XP boost needs a role or channel,"
+                                    " and a percent.")
                     continue
+                # A role, or a channel or category: ids never clash.
                 role = guild.get_role(role_id)
-                if not role or role.is_default():
-                    problems.append("XP boosts need a role from this server.")
+                place = guild.get_channel(role_id)
+                if not isinstance(place, BOOST_PLACES):
+                    place = None
+                if not (role or place) or (role and role.is_default()):
+                    problems.append("XP boosts need a role or channel from this server.")
                 elif role_id in seen_roles:
-                    problems.append(f"{role.name} has two boosts. Pick one.")
+                    problems.append(f"{(role or place).name} has two boosts. Pick one.")
                 elif not low <= percent <= high:
                     problems.append(f"Boosts go from {low}% to {high}%.")
                 else:
@@ -621,6 +648,7 @@ class Dashboard(commands.Cog):
             "trial": billing.configured() and self.bot.db.trial_available(guild.id),
             "trial_days": billing.TRIAL_DAYS,
             "trialing": bool(row and active and row["status"] == "trialing"),
+            "perks": premium.perk_groups(),
         }
 
     async def api_checkout(self, request):
@@ -761,6 +789,46 @@ class Dashboard(commands.Cog):
                 return problem(400, str(e) if isinstance(e, rankcard.BadImage)
                                else "That picture didn't come through. Try again.")
             self.bot.db.set_rank_background(guild.id, 0, image)
+        return web.json_response(webparts.extras_state(self.bot, guild), headers=HEADERS)
+
+    async def api_botprofile(self, request):
+        """Paper's own name, picture, banner and bio on this server. Acts at
+        once, like the rank card background. The name is free; the rest is
+        Premium (botprofile.update checks)."""
+        found, error = self.who(request)
+        if error:
+            return error
+        guild, member = found[0], found[1]
+        try:
+            body = await request.json()
+        except ValueError:
+            return problem(400, "That wasn't valid JSON.")
+        if not isinstance(body, dict):
+            return problem(400, "That wasn't valid JSON.")
+        reason = f"Dashboard, by {member} ({member.id})"
+        try:
+            if body.get("reset"):
+                await botprofile.reset(self.bot, guild, reason)
+            else:
+                fields = {}
+                for key in ("nick", "bio"):
+                    if key in body:
+                        if body[key] is not None and not isinstance(body[key], str):
+                            return problem(400, "That has to be text.")
+                        fields[key] = body[key]
+                for key in ("avatar", "banner"):
+                    if key in body:
+                        if body[key] is None:
+                            fields[key] = None
+                            continue
+                        try:
+                            fields[key] = base64.b64decode(
+                                str(body[key]).split(",")[-1], validate=True)
+                        except ValueError:
+                            return problem(400, "That picture didn't come through. Try again.")
+                await botprofile.update(self.bot, guild, reason, **fields)
+        except botprofile.ProfileError as e:
+            return problem(402 if "Premium" in str(e) else 400, str(e))
         return web.json_response(webparts.extras_state(self.bot, guild), headers=HEADERS)
 
     async def api_rankbg_get(self, request):

@@ -52,8 +52,38 @@ def configured() -> bool:
                 and os.getenv("STRIPE_WEBHOOK_SECRET", "").strip())
 
 
+_fetched_label = ""     # the price as Stripe describes it, once asked
+SYMBOLS = {"usd": "$", "eur": "€", "gbp": "£", "cad": "CA$", "aud": "A$"}
+
+
 def price_label() -> str:
-    return os.getenv("PREMIUM_PRICE_LABEL", "").strip()
+    """What Premium costs, for buttons: PREMIUM_PRICE_LABEL if it's set,
+    otherwise read from the Stripe price itself, so it can't disagree with
+    what Stripe charges."""
+    return os.getenv("PREMIUM_PRICE_LABEL", "").strip() or _fetched_label
+
+
+def describe_price(price: dict) -> str:
+    """A Stripe price as words, e.g. "$2.99 a month"."""
+    amount = price.get("unit_amount")
+    currency = (price.get("currency") or "").lower()
+    if not isinstance(amount, int):
+        return ""
+    money = f"{amount / 100:.2f}"
+    symbol = SYMBOLS.get(currency)
+    money = f"{symbol}{money}" if symbol else f"{money} {currency.upper()}"
+    recurring = price.get("recurring") or {}
+    interval, count = recurring.get("interval"), recurring.get("interval_count") or 1
+    if interval:
+        money += f" a {interval}" if count == 1 else f" every {count} {interval}s"
+    return money
+
+
+async def load_price_label():
+    """Ask Stripe what the price is, for price_label()."""
+    global _fetched_label
+    if configured() and not os.getenv("PREMIUM_PRICE_LABEL", "").strip():
+        _fetched_label = describe_price(await _call("GET", f"/v1/prices/{price_id()}"))
 
 
 async def _call(method: str, path: str, form: dict = None) -> dict:

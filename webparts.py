@@ -12,6 +12,7 @@ import time
 
 import discord
 
+import botprofile
 import config
 import weekly
 from cogs import automod as automod_cog
@@ -441,6 +442,7 @@ def extras_state(bot, guild) -> dict:
         "champ_chat_role": str(get(gid, "champ_chat_role") or ""),
         "champ_voice_role": str(get(gid, "champ_voice_role") or ""),
         "report_on": bool(get(gid, "report_on")),
+        "profile": botprofile.state(bot, guild),
         "channels": _channels(guild),
         "roles": _roles(guild),
     }

@@ -9,6 +9,8 @@ Perks are deliberately small. A stacked-out player rolls about half again as
 often as a new one, not ten times.
 """
 
+import premium
+
 # key, icon, name, price, description, perks
 BADGES = [
     ("collector", "\U0001f4d6", "Collector", 3000,
@@ -59,6 +61,7 @@ EMPTY = {
     "claim_percent": 0,
     "wish_slots": 0,
     "daily_percent": 0,
+    "karuda_percent": 0,
 }
 
 
@@ -88,6 +91,8 @@ def describe(perks: dict) -> str:
         parts.append(f"+{perks['wish_slots']} wishes")
     if perks.get("daily_percent"):
         parts.append(f"+{perks['daily_percent']}% daily")
+    if perks.get("karuda_percent"):
+        parts.append(f"+{perks['karuda_percent']}% karuda")
     return " · ".join(parts) or "nothing yet"
 
 
@@ -106,13 +111,16 @@ def tower_perks(floor: int) -> dict:
 
 
 def effective(db, guild_id: int, user_id: int) -> dict:
-    """Every perk a player currently has, from badges and their tower."""
+    """Every perk a player currently has, from badges, their tower, and
+    the server's Premium."""
     owned = db.badges_of(guild_id, user_id)
     badge_perks = [BADGES_BY_KEY[key][5] for key in owned if key in BADGES_BY_KEY]
     player = db.get_player(guild_id, user_id)
     sources = [*badge_perks, tower_perks(player["tower_floor"])]
     if player["soulmate_id"]:
         sources.append(SOULMATE_PERK)
+    if db.is_premium(guild_id):
+        sources.append(premium.GACHA_PERK)
     result = combine(*sources)
     # A claim that costs nothing to wait for would break the claim economy.
     result["claim_percent"] = min(result["claim_percent"], 60)
