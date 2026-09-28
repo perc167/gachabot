@@ -39,42 +39,44 @@ class Progress(commands.Cog):
         icon = self._icon()
         mine = member.id == ctx.author.id
 
-        lines, owned_levels, spent = [], 0, 0
+        lines = [f"You have **{balance:,}** {icon} !", "",
+                 "Melt your karuda into power badges:"]
+        owned_levels = 0
         for badge in perks.BADGES:
             level = levels.get(badge.key, 0)
             owned_levels += level
-            spent += sum(badge.price(n) for n in range(1, level + 1))
             mark = self._badge_icon(badge)
-            roman = perks.ROMAN[level - 1] if level else "—"
 
-            head = f"{mark} **{badge.name} {roman}**"
-            if level:
-                head += f" · {badge.describe(level)}"
-
-            if level >= perks.LEVELS:
-                lines.append(f"{head}\n　**maxed**")
+            if not perks.unlocked(levels, badge):
+                # Locked badges keep their name back, the way Mudae's do -
+                # the list should read as something to uncover.
+                lines.append(f"**???** · Prerequisites: {perks.requirement(badge)}")
                 continue
 
-            # The price is the buyer's, so Diamond's discount is visible on
-            # every other line rather than hidden until they try to buy.
+            head = f"{mark} **{badge.name} {level}**"
+            if level >= perks.LEVELS:
+                lines.append(f"{head} · **maxed** · {badge.describe(level)}")
+                continue
+
             price = perks.badge_price(db, gid, member.id, badge, level + 1)
             full = badge.price(level + 1)
-            cost = f"{icon} {price:,}"
+            cost = f"**{price:,}** {icon}"
             if price < full:
                 cost += f" ~~{full:,}~~"
-            step = f"{perks.ROMAN[level]} · {badge.describe(level + 1)}"
-            lines.append(f"{head}\n　next: {step} — {cost}")
+            lines.append(f"{head} · Next level: {cost}  {badge.describe(level + 1)}")
 
         top = perks.LEVELS * len(perks.BADGES)
+        lines += ["", f"**Karuda tower:** {ctx.prefix}tower",
+                  f"**Buy a level:** {ctx.prefix}buybadge <name>"
+                  if mine else f"**Badges:** {owned_levels}/{top} levels"]
+
         embed = discord.Embed(
-            title=f"Badges — {member.display_name}",
             description="\n".join(lines),
             colour=config.CARD_COLOUR,
         )
-        embed.set_footer(
-            text=f"{owned_levels}/{top} levels · {spent:,} spent · "
-                 f"{balance:,} karuda"
-                 + (f" · {ctx.prefix}buybadge <name>" if mine else "")
+        embed.set_author(
+            name=f"{member.display_name} — {owned_levels}/{top} badge levels",
+            icon_url=member.display_avatar.url if member.display_avatar else None,
         )
         await ctx.send(embed=embed)
 
@@ -95,8 +97,15 @@ class Progress(commands.Cog):
             await ctx.send(f"No badge called `{name}`. There is: {names}.")
             return
 
-        level = db.badge_level(gid, ctx.author.id, badge.key)
+        levels = db.badge_levels(gid, ctx.author.id)
+        level = levels.get(badge.key, 0)
         mark = self._badge_icon(badge)
+        if not perks.unlocked(levels, badge):
+            await ctx.send(
+                f"**{badge.name}** is still locked. You need"
+                f" {perks.requirement(badge)}."
+            )
+            return
         if level >= perks.LEVELS:
             await ctx.send(
                 f"{mark} **{badge.name} {perks.ROMAN[-1]}** is as high as"

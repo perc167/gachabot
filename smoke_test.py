@@ -1900,6 +1900,28 @@ async def main():
           all(b.price(perksmod.LEVELS + 1) is None for b in perksmod.BADGES))
     check("every badge has an icon to fall back on",
           all(b.fallback for b in perksmod.BADGES))
+
+    # The middle three are locked until the starters are climbed, the way
+    # Mudae's are, so the list has something to uncover.
+    starters = {k: 0 for k in perksmod.STARTERS}
+    locked = [b for b in perksmod.BADGES if b.unlock]
+    check("three badges start locked", len(locked) == 3, str(len(locked)))
+    check("the starters are never locked",
+          all(perksmod.unlocked({}, perksmod.BADGES_BY_KEY[k])
+              for k in perksmod.STARTERS))
+    check("a new player cannot reach the locked ones",
+          not any(perksmod.unlocked(starters, b) for b in locked))
+    tier_one = {k: 1 for k in perksmod.STARTERS}
+    check("the starters at I open the first of them",
+          perksmod.unlocked(tier_one, locked[0])
+          and not perksmod.unlocked(tier_one, locked[1]))
+    check("two maxed badges open all of them",
+          all(perksmod.unlocked({"paper": perksmod.LEVELS,
+                                 "diamond": perksmod.LEVELS}, b)
+              for b in locked))
+    check("a locked badge says what it needs",
+          all(perksmod.requirement(b) for b in locked)
+          and not perksmod.requirement(perksmod.BADGES[0]))
     check("tower costs only go up",
           [c for c, _ in perksmod.TOWER_FLOORS]
           == sorted(c for c, _ in perksmod.TOWER_FLOORS))

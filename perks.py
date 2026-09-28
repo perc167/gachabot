@@ -26,9 +26,11 @@ ROMAN = ("I", "II", "III", "IV")
 class Badge:
     """One material: its levels, its price, and the perk it grants."""
 
-    __slots__ = ("key", "name", "fallback", "base", "perk", "amounts", "blurb")
+    __slots__ = ("key", "name", "fallback", "base", "perk", "amounts",
+                 "blurb", "unlock")
 
-    def __init__(self, key, name, fallback, base, perk, amounts, blurb):
+    def __init__(self, key, name, fallback, base, perk, amounts, blurb,
+                 unlock=0):
         self.key = key
         self.name = name
         self.fallback = fallback      # emoji used until the PNG is uploaded
@@ -36,6 +38,10 @@ class Badge:
         self.perk = perk
         self.amounts = amounts        # what each level grants, I to IV
         self.blurb = blurb
+        # 0 is on the shelf from the start. 1, 2 and 3 need the three
+        # starters at that level first, so the later materials are something
+        # to work towards rather than a wall of prices on day one.
+        self.unlock = unlock
 
     def amount(self, level: int) -> int:
         return self.amounts[max(1, min(level, LEVELS)) - 1]
@@ -53,27 +59,58 @@ class Badge:
         return sum(self.base * n for n in range(1, LEVELS + 1))
 
     def describe(self, level: int) -> str:
-        return f"+{self.amount(level)}{self.blurb}"
+        amount = self.amount(level)
+        # "+1 rolls" reads like a typo, so the blurbs carry a {s} the count
+        # fills in. Blurbs without one are unaffected.
+        return f"+{amount}{self.blurb.format(s='' if amount == 1 else 's')}"
 
 
 BADGES = [
     Badge("paper", "Paper", "\U0001f4c4", 800, "wish_slots",
-          (1, 2, 3, 5), " wishlist slots"),
+          (1, 2, 3, 5), " wishlist slot{s}"),
     Badge("iron", "Iron", "\u2699\ufe0f", 1200, "rolls",
-          (1, 2, 3, 4), " rolls per window"),
+          (1, 2, 3, 4), " roll{s} per window"),
     Badge("gold", "Gold", "\U0001f947", 1800, "grab_percent",
           (3, 6, 9, 12), "% from every karuda grab"),
     Badge("emerald", "Emerald", "\U0001f49a", 2600, "daily_percent",
-          (5, 10, 18, 25), "% on your daily drops"),
+          (5, 10, 18, 25), "% on your daily drops", unlock=1),
     Badge("opal", "Opal", "\U0001f52e", 3600, "claim_percent",
-          (5, 10, 15, 20), "% off the claim wait"),
+          (5, 10, 15, 20), "% off the claim wait", unlock=2),
     Badge("amethyst", "Amethyst", "\U0001f49c", 5000, "wish_chance",
-          (4, 8, 12, 18), "% chance a roll is someone you wished for"),
+          (4, 8, 12, 18), "% chance a roll is someone you wished for",
+          unlock=3),
     Badge("diamond", "Diamond", "\U0001f48e", 7000, "badge_discount",
           (5, 10, 15, 25), "% off every other badge"),
 ]
 
 BADGES_BY_KEY = {badge.key: badge for badge in BADGES}
+
+# The three anybody can buy from the start, which the locked ones are
+# measured against.
+STARTERS = [badge.key for badge in BADGES if badge.unlock == 0][:3]
+
+
+def unlocked(levels: dict, badge) -> bool:
+    """Is this badge on the shelf for a player at these levels?
+
+    Two ways in, as in Mudae: the three starters at the badge's own tier, or
+    any two badges already maxed - so a player who went deep on two things
+    is not shut out for having skipped a third.
+    """
+    if not badge.unlock:
+        return True
+    if all(levels.get(key, 0) >= badge.unlock for key in STARTERS):
+        return True
+    return sum(1 for level in levels.values() if level >= LEVELS) >= 2
+
+
+def requirement(badge) -> str:
+    """What it would take, written the way the badge list shows it."""
+    if not badge.unlock:
+        return ""
+    tier = ROMAN[badge.unlock - 1]
+    needed = " + ".join(f"{BADGES_BY_KEY[k].name} {tier}" for k in STARTERS)
+    return f"{needed} or 2 badges {ROMAN[-1]}"
 
 # Tower floors, climbed in order. Each is (cost, what it adds).
 # Costs rise faster than income does, so the top floors are a long project
