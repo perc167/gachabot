@@ -283,10 +283,16 @@ async def main():
     png = await lv.board_page(fake_guild, people, 0, 1, "LEVEL LEADERBOARD", "footer")
     from PIL import Image as _Image
     board = _Image.open(io.BytesIO(png))
-    check("the leaderboard draws, podium first",
-          board.size == (boardcard.WIDTH, boardcard.height_for(4, True)), str(board.size))
-    check("a page after the first has no podium",
-          boardcard.height_for(10, False) > boardcard.height_for(10, True) - boardcard.PODIUM)
+    check("the leaderboard draws, wide enough for Discord to show it big",
+          board.size == (boardcard.WIDTH, boardcard.HEIGHT)
+          and boardcard.WIDTH / boardcard.HEIGHT >= 550 / 350, str(board.size))
+    later = [dict(e, place=e["place"] + 10) for e in
+             [{"place": n, "name": "x" * 40, "avatar": b"", "level": 3, "into": 5,
+               "needed": 10, "xp": 99, "messages": 123456, "voice": 999999}
+              for n in range(1, 11)]]
+    check("a later page draws two columns",
+          _Image.open(io.BytesIO(boardcard.render("s", later, 0x7C6BF0, page=2,
+                                                  pages=3))).size == board.size)
     lv.message_counts.clear()
 
     # The monthly leaderboard: months roll over, and only XP earned counts.
