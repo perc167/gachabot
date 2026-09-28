@@ -345,6 +345,7 @@ CATEGORIES = [
         ("levels role add", "role at a level"),
         ("levels role remove", "drop one"),
         ("levels sync", "hand out earned roles"),
+        ("levels countmessages", "count old messages"),
         ("levels channel", "where level-ups go"),
         ("levels karuda", "karuda per 5 levels"),
         ("levels voice", "voice XP on or off"),

@@ -1303,6 +1303,46 @@ class Database:
             f" GROUP BY channel_id HAVING amount > 0 ORDER BY amount DESC LIMIT ?",
             (guild_id, user_id, since_day, limit)).fetchall()]
 
+    def messages_of(self, guild_id: int) -> dict:
+        """{user id: message count} for everyone on the server."""
+        return {r["user_id"]: r["messages"] for r in self.conn.execute(
+            "SELECT user_id, messages FROM levels WHERE guild_id = ? AND messages > 0",
+            (guild_id,)).fetchall()}
+
+    def activity_messages(self, guild_id: int, since_day: int) -> dict:
+        """{(user, day, channel): messages} from since_day on."""
+        return {(r["user_id"], r["day"], r["channel_id"]): r["messages"]
+                for r in self.conn.execute(
+                    "SELECT user_id, day, channel_id, messages FROM activity"
+                    " WHERE guild_id = ? AND day >= ? AND messages > 0",
+                    (guild_id, since_day)).fetchall()}
+
+    def apply_recount(self, guild_id: int, history: dict, before: dict,
+                      act_history: dict, act_before: dict):
+        """Swap in message counts read from the server's history.
+
+        history is what the channels hold up to the moment the count
+        started; before is what the bot had counted at that moment. Each
+        total moves by the difference, so whatever was counted live while
+        the history was being read is kept rather than lost or doubled."""
+        with self.conn:
+            for uid in set(history) | set(before):
+                delta = history.get(uid, 0) - before.get(uid, 0)
+                if delta:
+                    self.conn.execute(
+                        "INSERT INTO levels (guild_id, user_id, messages) VALUES (?, ?, ?)"
+                        " ON CONFLICT (guild_id, user_id)"
+                        " DO UPDATE SET messages = MAX(0, messages + ?)",
+                        (guild_id, uid, max(0, delta), delta))
+            for key in set(act_history) | set(act_before):
+                delta = act_history.get(key, 0) - act_before.get(key, 0)
+                if delta:
+                    self.conn.execute(
+                        "INSERT INTO activity (guild_id, user_id, day, channel_id, messages)"
+                        " VALUES (?, ?, ?, ?, ?) ON CONFLICT (guild_id, user_id, day, channel_id)"
+                        " DO UPDATE SET messages = MAX(0, messages + ?)",
+                        (guild_id, *key, max(0, delta), delta))
+
     def prune_activity(self, before_day: int):
         self.conn.execute("DELETE FROM activity WHERE day < ?", (before_day,))
         self.conn.commit()

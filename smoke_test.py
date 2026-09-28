@@ -310,6 +310,62 @@ async def main():
     db.prune_activity(day - 30)
     check("old activity is cleared", not db.top_channels(PAID, ALICE, 0, "messages")
           or all(c != 702 for c, _n in db.top_channels(PAID, ALICE, 0, "messages")))
+    # A recount from history: totals become what history holds, plus
+    # whatever was counted live while it ran, never less and never twice.
+    RC = PAID + 50
+    db.add_messages({(RC, ALICE): 90, (RC, BOB): 4})        # counted live so far
+    before = db.messages_of(RC)
+    db.add_messages({(RC, ALICE): 2})                       # sent during the count
+    db.apply_recount(RC, {ALICE: 4543, BOB: 1, 555: 7}, before, {}, {})
+    after = db.messages_of(RC)
+    check("a recount takes history and keeps live counts",
+          after == {ALICE: 4545, BOB: 1, 555: 7}, str(after))
+
+    import datetime as _dt
+
+    def _msg(uid, days_ago=0, bot=False):
+        when = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=days_ago)
+        return NS(author=NS(id=uid, bot=bot), created_at=when)
+
+    class _Place:
+        def __init__(self, cid, name, messages):
+            self.id, self.name, self._messages = cid, name, messages
+
+        def permissions_for(self, me):
+            return NS(view_channel=True, read_message_history=True)
+
+        async def history(self, limit=None, before=None):
+            for m in self._messages:
+                yield m
+
+        async def archived_threads(self, limit=None):
+            for thread in ():
+                yield thread
+
+    class _Status:
+        content = ""
+
+        async def edit(self, content):
+            self.content = content
+
+    status = _Status()
+
+    async def _send(text):
+        status.content = text
+        return status
+
+    RG = PAID + 60
+    general = _Place(900, "general", [_msg(ALICE), _msg(ALICE, 3), _msg(BOB, 100),
+                                      _msg(777, bot=True)])
+    gacha = _Place(901, "gacha", [_msg(ALICE, 1)])
+    fake = NS(id=RG, me=None, text_channels=[general, gacha], voice_channels=[],
+              stage_channels=[], threads=[], forums=[])
+    await lv.recount(NS(guild=fake, prefix="$", send=_send))
+    check("a recount reads every channel, skipping bots",
+          db.messages_of(RG) == {ALICE: 3, BOB: 1} and "Counted 4 messages" in status.content,
+          status.content)
+    check("and fills in the last 30 days for the $level card",
+          dict(db.top_channels(RG, ALICE, _today() - 29, "messages")) == {900: 2, 901: 1})
     check("message rank", db.message_rank(PAID, ALICE) == 1 and db.message_rank(PAID, BOB) == 2
           and db.message_rank(PAID, 999) == 0)
 

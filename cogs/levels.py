@@ -22,6 +22,7 @@ more than a milestone does, so levels are a thank-you, not an income.
 """
 import asyncio
 import difflib
+from collections import Counter
 import io
 import logging
 import random
@@ -277,6 +278,7 @@ class Levels(commands.Cog):
         self.message_counts = {}  # (guild, user) -> messages not saved yet
         self.activity = {}        # (guild, user, day, channel) -> [messages, voice]
         self.activity_pruned_for = 0
+        self.recounting = {}      # guild id -> the task reading its history
 
     @property
     def db(self):
@@ -896,6 +898,106 @@ class Levels(commands.Cog):
                 await self.sync_roles(member, level_for(row["xp"])[0])
                 checked += 1
         await ctx.send(f"Level roles are up to date for **{checked}** members.")
+
+    @levels.command(name="countmessages", aliases=["recount", "backfill", "scanmessages"])
+    @commands.has_permissions(manage_guild=True)
+    async def levels_countmessages(self, ctx):
+        """Count everyone's messages from the server's history, so message
+        totals go back further than when Paper started counting."""
+        gid = ctx.guild.id
+        if gid in self.recounting:
+            await ctx.send("I'm already counting this server's messages. I'll post"
+                           " here when it's done.")
+            return
+        self.recounting[gid] = asyncio.create_task(self.recount(ctx))
+
+    async def history_places(self, guild) -> list:
+        """Every channel and thread whose history I can read."""
+        me = guild.me
+        places = [*guild.text_channels, *guild.voice_channels, *guild.stage_channels,
+                  *guild.threads]
+        for parent in [*guild.text_channels, *guild.forums]:
+            if not parent.permissions_for(me).read_message_history:
+                continue
+            try:
+                async for thread in parent.archived_threads(limit=None):
+                    places.append(thread)
+            except discord.HTTPException:
+                pass
+        seen, readable = set(), []
+        for place in places:
+            if place.id in seen:
+                continue
+            seen.add(place.id)
+            rights = place.permissions_for(me)
+            if rights.view_channel and rights.read_message_history:
+                readable.append(place)
+        return readable
+
+    async def recount(self, ctx):
+        """Read back through every channel and set everyone's message count
+        (and the last 30 days of the $level card) from what's there.
+
+        Nothing is saved until the end, so stopping halfway (a restart)
+        changes nothing. Messages sent while it runs are still counted live,
+        and the totals keep them."""
+        guild = ctx.guild
+        gid = guild.id
+        status = None
+        try:
+            self.save_message_counts()
+            cutoff = discord.utils.utcnow()
+            first_day = today() - ACTIVITY_DAYS + 1
+            before = self.db.messages_of(gid)
+            act_before = self.db.activity_messages(gid, first_day)
+            places = await self.history_places(guild)
+            skipped = len([*guild.text_channels, *guild.voice_channels]) - len(
+                [p for p in places if not isinstance(p, discord.Thread)])
+            status = await ctx.send(
+                f"\U0001f50e Counting everyone's messages across {len(places):,} channels"
+                " and threads. Big servers can take a while; I'll keep this updated.")
+            totals, recent = Counter(), Counter()
+            read = 0
+            last_update = time.monotonic()
+            for n, place in enumerate(places, 1):
+                where = getattr(place, "parent_id", None) or place.id
+                try:
+                    async for message in place.history(limit=None, before=cutoff):
+                        if message.author.bot:
+                            continue
+                        read += 1
+                        totals[message.author.id] += 1
+                        day = int(message.created_at.timestamp() // 86400)
+                        if day >= first_day:
+                            recent[(message.author.id, day, where)] += 1
+                        if time.monotonic() - last_update > 20:
+                            last_update = time.monotonic()
+                            try:
+                                await status.edit(content=(
+                                    f"\U0001f50e Counting messages: {read:,} so far,"
+                                    f" channel {n:,} of {len(places):,}"
+                                    f" (#{place.name})."))
+                            except discord.HTTPException:
+                                pass
+                except discord.HTTPException:
+                    skipped += 1
+            self.save_message_counts()
+            self.db.apply_recount(gid, totals, before, recent, act_before)
+            note = (f" I couldn't read {skipped:,} channel{'s' if skipped != 1 else ''}"
+                    " (no Read Message History there)." if skipped > 0 else "")
+            await status.edit(content=(
+                f"\u2705 Counted {read:,} messages from {len(totals):,} people."
+                f" `{ctx.prefix}level` and `{ctx.prefix}leaderboard` show the full"
+                f" totals now.{note}"))
+        except Exception:  # noqa: BLE001 - say so rather than go quiet
+            logging.getLogger("levels").exception("message recount failed")
+            text = "Something went wrong counting messages, so nothing was changed. Try again later."
+            try:
+                await (status.edit(content=text) if status else ctx.send(text))
+            except discord.HTTPException:
+                pass
+        finally:
+            self.recounting.pop(gid, None)
 
     @levels.command(name="channel")
     @commands.has_permissions(manage_guild=True)
