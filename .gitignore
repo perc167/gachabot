@@ -11,3 +11,4 @@ assets/shards/_preview.png
 *.restore
 *.before-restore*
 paper-backup-*
+.cache/
