@@ -556,6 +556,7 @@ button.card:hover{border-color:var(--rose)}
    disappear into a dark card. */
 .secret-card .art,#album-img{background:#fff}
 .secret-card .art{object-fit:contain}
+.secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:#0C0A14}
 
 #album{background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
@@ -1112,9 +1113,23 @@ def secret_markup() -> tuple:
     if not people:
         return "", ""
 
+    def see_through(path: str) -> bool:
+        """Whether a picture has see-through parts: emotes do, paintings
+        don't. See-through art sits whole on white; the rest fills the card."""
+        from PIL import Image
+        try:
+            with Image.open(os.path.join(ROOT, "site", path)) as image:
+                if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+                    alpha = image.convert("RGBA").getchannel("A")
+                    return alpha.getextrema()[0] < 250
+        except OSError:
+            pass
+        return False
+
     cards = []
     for person in people:
         images = person["images"]
+        fit = "" if see_through(images[0]) else " fill"
         count = f"{len(images)} image" + ("" if len(images) == 1 else "s")
         # A rollable one shows what it is worth and how rare it is; the rest
         # are only here to be looked at.
@@ -1124,7 +1139,7 @@ def secret_markup() -> tuple:
         else:
             tag = f"Secret<span>{count}</span>"
         cards.append(
-            f'<button type="button" class="card secret-card"'
+            f'<button type="button" class="card secret-card{fit}"'
             f' data-name="{esc(person["name"])}"'
             f' data-album="{esc(json.dumps(images))}">'
             f'<img class="art" loading="lazy" alt="{esc(person["name"])}"'
