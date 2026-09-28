@@ -1908,10 +1908,17 @@ async def main():
     check("badges fall back to a plain emoji before the upload",
           all(utils.badge_icon(b.key, b.fallback) == b.fallback
               for b in perksmod.BADGES))
-    utils.set_app_emojis({"badgegold": "<:badgegold:9>", "dust": "<:dust:8>"})
+    utils.set_app_emojis({"badgegold2": "<:gold2:2>", "badgegold": "<:gold:9>",
+                          "dust": "<:dust:8>"})
     check("and use the bot's own emoji once it has them",
-          utils.badge_icon("gold", "x") == "<:badgegold:9>"
+          utils.badge_icon("gold", "x") == "<:gold:9>"
           and utils.shard_icon(config.SHARD_TYPES[0][0]) == "<:dust:8>")
+    check("each level shows its own icon",
+          utils.badge_icon("gold", "x", 2) == "<:gold2:2>")
+    check("a level with no icon falls back to the badge's",
+          utils.badge_icon("gold", "x", 4) == "<:gold:9>")
+    check("level 0 borrows level I, having nothing else to show",
+          utils.badge_icon("gold", "x", 0) == utils.badge_icon("gold", "x", 1))
     check("a badge with no emoji yet still falls back",
           utils.badge_icon("paper", "P") == "P")
     utils.set_app_emojis({})
@@ -1923,9 +1930,16 @@ async def main():
         wanted += [prefix + os.path.splitext(f)[0]
                    for f in os.listdir(path)
                    if f.endswith(".png") and not f.startswith("_")]
-    check("every badge has a file for the bot to upload",
-          all(f"badge{b.key}" in wanted for b in perksmod.BADGES),
+    check("every badge has a file for every level",
+          all(f"badge{b.key}{level}" in wanted
+              for b in perksmod.BADGES
+              for level in range(1, perksmod.LEVELS + 1)),
           str(sorted(wanted)))
+    check("and no icons are left over from an older set",
+          all(name == "" or name[-1].isdigit()
+              for name in wanted if name.startswith("badge")),
+          str([n for n in wanted if n.startswith("badge")
+               and not n[-1].isdigit()]))
     check("the preview sheet is not uploaded as an icon",
           not any(name.startswith("_") for name in wanted))
 

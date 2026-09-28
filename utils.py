@@ -73,9 +73,17 @@ def shard_icon(key: str) -> str:
     return _emoji(key, config.shard(key)[2])
 
 
-def badge_icon(key: str, fallback: str) -> str:
-    """The badge's own emoji, or the plain one before the upload happens."""
-    return _emoji(f"badge{key}", "") or _emoji(key, fallback)
+def badge_icon(key: str, fallback: str, level: int = 1) -> str:
+    """The badge's emoji at this level, or the plain one before the upload.
+
+    Each badge has an icon per level - a bare shape at I, a halo at IV - so
+    the list shows what somebody has climbed to, not just which badge it is.
+    Level 0 borrows the level I icon, since there is nothing else to show.
+    """
+    wanted = max(1, int(level or 1))
+    return (_emoji(f"badge{key}{wanted}", "")
+            or _emoji(f"badge{key}", "")
+            or _emoji(key, fallback))
 
 
 # Characters whose art no CDN will serve keep their picture in the repo

@@ -23,9 +23,9 @@ class Progress(commands.Cog):
     def _icon(self):
         return utils.shard_icon(config.SHARD_TYPES[0][0])
 
-    def _badge_icon(self, badge):
-        """The uploaded badge emoji, or the plain one until it is uploaded."""
-        return utils.badge_icon(badge.key, badge.fallback)
+    def _badge_icon(self, badge, level: int = 1):
+        """The badge's icon at that level, or the plain one for now."""
+        return utils.badge_icon(badge.key, badge.fallback, level)
 
     @commands.command(name="badges", aliases=["badge", "badgelist"])
     @commands.guild_only()
@@ -45,7 +45,7 @@ class Progress(commands.Cog):
         for badge in perks.BADGES:
             level = levels.get(badge.key, 0)
             owned_levels += level
-            mark = self._badge_icon(badge)
+            mark = self._badge_icon(badge, level)
 
             if not perks.unlocked(levels, badge):
                 # Locked badges keep their name back, the way Mudae's do -
@@ -99,7 +99,7 @@ class Progress(commands.Cog):
 
         levels = db.badge_levels(gid, ctx.author.id)
         level = levels.get(badge.key, 0)
-        mark = self._badge_icon(badge)
+        mark = self._badge_icon(badge, level)
         if not perks.unlocked(levels, badge):
             await ctx.send(
                 f"**{badge.name}** is still locked. You need"
@@ -127,7 +127,8 @@ class Progress(commands.Cog):
         earned = perks.effective(db, gid, ctx.author.id)
 
         embed = discord.Embed(
-            title=f"{mark}  {badge.name} {perks.ROMAN[level]}",
+            title=f"{self._badge_icon(badge, level + 1)}  "
+                  f"{badge.name} {perks.ROMAN[level]}",
             description=f"{badge.describe(level + 1)}"
                         f"\n\nYour perks: _{perks.describe(earned)}_",
             colour=config.CARD_COLOUR,
