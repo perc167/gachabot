@@ -352,6 +352,66 @@ CREATE TABLE IF NOT EXISTS weekly_activity (
 -- XP earned each calendar month (UTC), month as YYYYMM, for the Premium
 -- monthly leaderboard. Kept for every server, so it's already full on the
 -- day a server upgrades.
+-- ---- Server setup: roles on join, welcome and goodbye, reaction roles,
+-- auto replies (cogs/serversetup.py). And AFK and reminders (cogs/utility.py).
+CREATE TABLE IF NOT EXISTS autoroles (
+    guild_id INTEGER NOT NULL,
+    role_id  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+);
+
+-- kind is 'welcome' or 'goodbye'. channel 0 is off.
+CREATE TABLE IF NOT EXISTS greetings (
+    guild_id   INTEGER NOT NULL,
+    kind       TEXT NOT NULL,
+    channel_id INTEGER NOT NULL DEFAULT 0,
+    message    TEXT NOT NULL DEFAULT '',
+    embed      INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (guild_id, kind)
+);
+
+CREATE TABLE IF NOT EXISTS reaction_roles (
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    emoji      TEXT NOT NULL,
+    role_id    INTEGER NOT NULL,
+    PRIMARY KEY (message_id, emoji)
+);
+
+CREATE TABLE IF NOT EXISTS autoresponders (
+    guild_id INTEGER NOT NULL,
+    trigger  TEXT NOT NULL,
+    response TEXT NOT NULL,
+    PRIMARY KEY (guild_id, trigger)
+);
+
+CREATE TABLE IF NOT EXISTS autoreacts (
+    guild_id INTEGER NOT NULL,
+    trigger  TEXT NOT NULL,
+    emoji    TEXT NOT NULL,
+    PRIMARY KEY (guild_id, trigger, emoji)
+);
+
+CREATE TABLE IF NOT EXISTS afk (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    reason   TEXT NOT NULL DEFAULT '',
+    since    INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    user_id    INTEGER NOT NULL,
+    due        INTEGER NOT NULL,
+    text       TEXT NOT NULL,
+    made       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS reminders_due ON reminders (due);
+
 -- Messages and seconds in voice, per person, per channel, per day (UTC days
 -- since 1970), for the $level card's chart and top channels. Kept for
 -- ACTIVITY_DAYS; the all-time totals live in levels.messages and vc_time.
@@ -1302,6 +1362,97 @@ class Database:
             f" WHERE guild_id = ? AND user_id = ? AND day >= ?"
             f" GROUP BY channel_id HAVING amount > 0 ORDER BY amount DESC LIMIT ?",
             (guild_id, user_id, since_day, limit)).fetchall()]
+
+    # ---------- server setup ----------
+
+    def autoroles_of(self, guild_id: int) -> list:
+        return [r["role_id"] for r in self._select("autoroles", guild_id=guild_id)]
+
+    def replace_autoroles(self, guild_id: int, role_ids):
+        with self.conn:
+            self.conn.execute("DELETE FROM autoroles WHERE guild_id = ?", (guild_id,))
+            self.conn.executemany("INSERT INTO autoroles (guild_id, role_id) VALUES (?, ?)",
+                                  [(guild_id, r) for r in dict.fromkeys(role_ids)])
+
+    def greeting(self, guild_id: int, kind: str) -> dict:
+        rows = self._select("greetings", guild_id=guild_id, kind=kind)
+        if rows:
+            return dict(rows[0])
+        return {"guild_id": guild_id, "kind": kind, "channel_id": 0, "message": "", "embed": 1}
+
+    def set_greeting(self, guild_id: int, kind: str, **fields):
+        row = self.greeting(guild_id, kind)
+        row.update(fields)
+        self._upsert("greetings", row)
+
+    def reaction_roles_of(self, guild_id: int) -> list:
+        return self._select("reaction_roles", "message_id", guild_id=guild_id)
+
+    def reaction_role(self, message_id: int, emoji: str):
+        rows = self._select("reaction_roles", message_id=message_id, emoji=emoji)
+        return rows[0] if rows else None
+
+    def add_reaction_role(self, guild_id, channel_id, message_id, emoji, role_id):
+        self._upsert("reaction_roles", {"guild_id": guild_id, "channel_id": channel_id,
+                                        "message_id": message_id, "emoji": emoji,
+                                        "role_id": role_id})
+
+    def remove_reaction_role(self, guild_id: int, message_id: int, emoji: str = None) -> int:
+        if emoji is None:
+            return self._delete("reaction_roles", guild_id=guild_id, message_id=message_id)
+        return self._delete("reaction_roles", guild_id=guild_id, message_id=message_id,
+                            emoji=emoji)
+
+    def autoresponders_of(self, guild_id: int) -> list:
+        return self._select("autoresponders", "trigger", guild_id=guild_id)
+
+    def set_autoresponder(self, guild_id: int, trigger: str, response: str):
+        self._upsert("autoresponders", {"guild_id": guild_id, "trigger": trigger,
+                                        "response": response})
+
+    def remove_autoresponder(self, guild_id: int, trigger: str) -> int:
+        return self._delete("autoresponders", guild_id=guild_id, trigger=trigger)
+
+    def autoreacts_of(self, guild_id: int) -> list:
+        return self._select("autoreacts", "trigger", guild_id=guild_id)
+
+    def add_autoreact(self, guild_id: int, trigger: str, emoji: str):
+        self._upsert("autoreacts", {"guild_id": guild_id, "trigger": trigger, "emoji": emoji})
+
+    def remove_autoreact(self, guild_id: int, trigger: str) -> int:
+        return self._delete("autoreacts", guild_id=guild_id, trigger=trigger)
+
+    # ---------- afk and reminders ----------
+
+    def all_afk(self) -> list:
+        return self.conn.execute("SELECT * FROM afk").fetchall()
+
+    def set_afk(self, guild_id: int, user_id: int, reason: str, since: int):
+        self._upsert("afk", {"guild_id": guild_id, "user_id": user_id, "reason": reason,
+                             "since": since})
+
+    def clear_afk(self, guild_id: int, user_id: int) -> int:
+        return self._delete("afk", guild_id=guild_id, user_id=user_id)
+
+    def add_reminder(self, guild_id, channel_id, user_id, due, text) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO reminders (guild_id, channel_id, user_id, due, text, made)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (guild_id, channel_id, user_id, due, text, int(time.time())))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def reminders_of(self, user_id: int) -> list:
+        return self._select("reminders", "due", user_id=user_id)
+
+    def due_reminders(self, now: int) -> list:
+        return self.conn.execute("SELECT * FROM reminders WHERE due <= ? ORDER BY due",
+                                 (now,)).fetchall()
+
+    def remove_reminder(self, reminder_id: int, user_id: int = None) -> int:
+        if user_id is None:
+            return self._delete("reminders", id=reminder_id)
+        return self._delete("reminders", id=reminder_id, user_id=user_id)
 
     def messages_of(self, guild_id: int) -> dict:
         """{user id: message count} for everyone on the server."""

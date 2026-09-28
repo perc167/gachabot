@@ -9,7 +9,7 @@ class Settings(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="settings", aliases=["conf", "serverinfo"])
+    @commands.command(name="settings", aliases=["conf"])
     @commands.guild_only()
     async def settings(self, ctx):
         """Show every tunable and its current value."""

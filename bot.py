@@ -53,6 +53,8 @@ COGS = [
     "cogs.champions",
     "cogs.automod",
     "cogs.customizer",
+    "cogs.utility",
+    "cogs.serversetup",
     "cogs.backups",
     "cogs.dashboard",
     "cogs.aliases",

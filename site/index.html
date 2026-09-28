@@ -233,8 +233,9 @@ code,kbd{
 .group{scroll-margin-top:80px}
 
 /* ---- the parts of the bot: big buttons that are also the tabs ---- */
-.features{display:grid;gap:14px;grid-template-columns:repeat(4,1fr)}
-@media(max-width:980px){.features{grid-template-columns:repeat(2,1fr)}}
+.features{display:grid;gap:14px;grid-template-columns:repeat(5,1fr)}
+@media(max-width:1100px){.features{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.features{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.features{grid-template-columns:1fr}}
 .feature{
   position:relative;cursor:pointer;
@@ -264,8 +265,9 @@ code,kbd{
   color:var(--accent-soft)}
 .feature.on .go{color:var(--text)}
 
-.segs{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);margin-bottom:22px}
-@media(max-width:620px){.segs{grid-template-columns:repeat(2,1fr)}}
+.segs{display:grid;gap:10px;grid-template-columns:repeat(5,1fr);margin-bottom:22px}
+@media(max-width:760px){.segs{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.segs{grid-template-columns:repeat(2,1fr)}}
 .seg{
   font:inherit;color:var(--dim);cursor:pointer;display:flex;align-items:center;
   justify-content:center;gap:9px;padding:14px 12px;border-radius:12px;
@@ -437,7 +439,7 @@ footer p{margin:0 0 6px}
   <div class="stats">
     <div class="stat"><b>102,192</b><i>characters</i></div>
     <div class="stat"><b>13,266</b><i>series</i></div>
-    <div class="stat"><b>407</b><i>commands</i></div>
+    <div class="stat"><b>448</b><i>commands</i></div>
     <div class="stat"><b>20</b><i>tutorial steps</i></div>
   </div>
   </div>
@@ -455,7 +457,7 @@ footer p{margin:0 0 6px}
   <h2>Set it up in a few minutes</h2>
   <p class="sub">Pick what you want to use. Each part has a few short steps,
   in order.</p>
-  <div class="segs" role="group" aria-label="Part of the bot"><button type="button" class="seg" data-tab="gacha" data-name="Gacha" aria-pressed="false"><span aria-hidden="true">🎲</span>Gacha</button><button type="button" class="seg" data-tab="mod" data-name="Moderation" aria-pressed="false"><span aria-hidden="true">🛡️</span>Moderation</button><button type="button" class="seg" data-tab="voice" data-name="Voice" aria-pressed="false"><span aria-hidden="true">🔊</span>Voice</button><button type="button" class="seg" data-tab="levels" data-name="Levels" aria-pressed="false"><span aria-hidden="true">📈</span>Levels</button></div>
+  <div class="segs" role="group" aria-label="Part of the bot"><button type="button" class="seg" data-tab="gacha" data-name="Gacha" aria-pressed="false"><span aria-hidden="true">🎲</span>Gacha</button><button type="button" class="seg" data-tab="mod" data-name="Moderation" aria-pressed="false"><span aria-hidden="true">🛡️</span>Moderation</button><button type="button" class="seg" data-tab="voice" data-name="Voice" aria-pressed="false"><span aria-hidden="true">🔊</span>Voice</button><button type="button" class="seg" data-tab="levels" data-name="Levels" aria-pressed="false"><span aria-hidden="true">📈</span>Levels</button><button type="button" class="seg" data-tab="server" data-name="Server" aria-pressed="false"><span aria-hidden="true">👋</span>Server</button></div>
   <div data-panel="gacha"><p class="sub">Six steps. The first two matter most, the rest is taste.</p><div class="steps"><div class="step"><div class="num">01</div><div><h3>Add the bot</h3>
          <p>Run <code>$invite</code> in a server that already has it, or use
          the button at the top of this page. It asks for what every part
@@ -567,6 +569,24 @@ $levels ignore #bot-spam</code>
          default, and only once per milestone, so it never outpaces
          <code>$daily</code>. <code>$levels karuda 0</code> turns it
          off.</p></div></div></div></div>
+<div data-panel="server"><p class="sub">Two quick ones, and the rest just works.</p><div class="steps"><div class="step"><div class="num">01</div><div><h3>Roles for new members</h3>
+         <p>Pick the roles everyone gets when they join from a menu: no
+         typing role names. Bots never get them.</p>
+         <code class="cmdline">$autorole</code></div></div>
+<div class="step"><div class="num">02</div><div><h3>Welcome and goodbye</h3>
+         <p>One command turns on a friendly welcome with their picture. Change
+         the words whenever you like, with fill-ins for their name, the
+         server and the member count.</p>
+         <code class="cmdline">$welcome #welcome
+$welcome message Hey {user}, welcome to {server}!
+$goodbye #welcome</code>
+         <p class="note">Both are on the <a href="https://gachabot-production-fbd6.up.railway.app/dashboard">dashboard</a>
+         too, under Welcome &amp; roles.</p></div></div>
+<div class="step"><div class="num">03</div><div><h3>The everyday extras</h3>
+         <p>Nothing to set up: snipe deleted and edited messages, go AFK,
+         set reminders, look people and the server up, and copy emojis in.</p>
+         <code class="cmdline">$snipe · $afk · $remind 10m stretch
+$userinfo · $serverinfo · $steal</code></div></div></div></div>
 </section>
 
 <section id="features">
@@ -576,7 +596,8 @@ $levels ignore #bot-spam</code>
   <div class="features"><div class="feature"><span class="ic" aria-hidden="true">🎲</span><h3><a class="pick" href="commands.html#gacha">Gacha</a></h3><p>Roll for 102,192 characters and claim the ones worth keeping.</p><ul><li>Wishlists, likes, trades and gifts</li><li>Karuda, a shop, badges and a tower</li><li>A tutorial that pays people to learn</li></ul><span class="go">283 commands →</span></div>
 <div class="feature"><span class="ic" aria-hidden="true">🛡️</span><h3><a class="pick" href="commands.html#mod">Moderation</a></h3><p>Talk first, then decide. Every action is saved as a numbered case.</p><ul><li>Jail, timeouts, image and reaction mutes</li><li>Warnings with automatic punishments</li><li>Bans, hardbans, lockdowns and staff points</li></ul><span class="go">77 commands →</span></div>
 <div class="feature"><span class="ic" aria-hidden="true">🔊</span><h3><a class="pick" href="commands.html#voice">Voice</a></h3><p>Rooms people make and run themselves, and hours spent in voice.</p><ul><li>Join To Create, deleted when empty</li><li>Lock, hide, rename, permit, ban, transfer</li><li>Hour leaderboard and hour roles</li></ul><span class="go">21 commands →</span></div>
-<div class="feature"><span class="ic" aria-hidden="true">📈</span><h3><a class="pick" href="commands.html#levels">Levels</a></h3><p>XP for chatting and for time in voice, with roles at milestones.</p><ul><li>Rank cards and a leaderboard</li><li>Spam-proof: one message a minute counts</li><li>A little karuda every 5 levels</li></ul><span class="go">26 commands →</span></div></div>
+<div class="feature"><span class="ic" aria-hidden="true">📈</span><h3><a class="pick" href="commands.html#levels">Levels</a></h3><p>XP for chatting and for time in voice, with roles at milestones.</p><ul><li>Rank cards and a leaderboard</li><li>Spam-proof: one message a minute counts</li><li>A little karuda every 5 levels</li></ul><span class="go">27 commands →</span></div>
+<div class="feature"><span class="ic" aria-hidden="true">👋</span><h3><a class="pick" href="commands.html#server">Server</a></h3><p>The everyday tools: roles on join, welcomes, snipes and more.</p><ul><li>Autoroles, welcome and goodbye messages</li><li>Snipe, AFK, reminders, user and server info</li><li>Reaction roles, auto replies, emoji stealing</li></ul><span class="go">40 commands →</span></div></div>
 </section>
 
 <section id="dashboard">

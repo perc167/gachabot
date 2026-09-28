@@ -381,6 +381,49 @@ async def main():
     check("the $level card draws", card is not None
           and _Image.open(card.fp).size == (1280, 800))
 
+    # Server setup: fill-ins, reaction role emojis, auto reply matching.
+    from cogs import serversetup as ss
+    who = NS(display_name="Mochi", mention="<@1>")
+    here = NS(name="Paper", member_count=1234)
+    check("welcome fill-ins", ss.fill("Hi {user} ({user.name}) to {server}, #{count}", who, here)
+          == "Hi <@1> (Mochi) to Paper, #1,234")
+    check("a heart matches with or without its invisible mark",
+          ss.emoji_key("❤️") == ss.emoji_key("❤"))
+    check("a custom emoji is known by its id, whatever it's called",
+          ss.emoji_key("<:paper:123456789012345678>") == ss.emoji_key("<a:renamed:123456789012345678>")
+          == "123456789012345678")
+    check("auto replies match whole words, any case",
+          ss.matches("hello", "well HELLO there") and not ss.matches("hell", "hello")
+          and ss.matches("good night", "ok, good night!") and not ss.matches("cat", "concatenate"))
+    SG = PAID + 70
+    check("a greeting starts off, as an embed", db.greeting(SG, "welcome")["channel_id"] == 0
+          and db.greeting(SG, "welcome")["embed"] == 1)
+    db.set_greeting(SG, "welcome", channel_id=55)
+    db.set_greeting(SG, "welcome", message="hey {user}")
+    row = db.greeting(SG, "welcome")
+    check("greeting settings save one at a time", row["channel_id"] == 55 and row["message"] == "hey {user}"
+          and db.greeting(SG, "goodbye")["channel_id"] == 0)
+    db.replace_autoroles(SG, [5, 6, 5])
+    check("autoroles save without repeats", db.autoroles_of(SG) == [5, 6])
+    db.add_reaction_role(SG, 1, 99, ss.emoji_key("❤️"), 7)
+    check("a reaction role is found by message and emoji",
+          db.reaction_role(99, ss.emoji_key("❤"))["role_id"] == 7
+          and db.remove_reaction_role(SG, 99) == 1 and db.reaction_role(99, "❤") is None)
+
+    # Utility: snipes expire, reminders come due.
+    from cogs import utility as ut
+    tool = b.get_cog("Utility")
+    tool.deleted[42].appendleft({"author": None, "content": "old", "files": [], "stickers": [],
+                                 "at": time.time() - ut.SNIPE_FOR - 5})
+    tool.deleted[42].appendleft({"author": None, "content": "new", "files": [], "stickers": [],
+                                 "at": time.time()})
+    check("only fresh snipes are kept", [i["content"] for i in tool.fresh(tool.deleted, 42)] == ["new"])
+    rid = db.add_reminder(SG, 5, ALICE, int(time.time()) - 1, "stretch")
+    db.add_reminder(SG, 5, ALICE, int(time.time()) + 999, "later")
+    check("due reminders", [r["id"] for r in db.due_reminders(int(time.time()))] == [rid]
+          and len(db.reminders_of(ALICE)) == 2 and db.remove_reminder(rid, BOB) == 0)
+    check("time ago reads short", ut.ago(90) == "1m" and ut.ago(7200) == "2h" and ut.ago(5) == "5s")
+
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
           and levelsmod.month_before(202607) == 202606)

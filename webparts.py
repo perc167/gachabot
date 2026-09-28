@@ -17,6 +17,7 @@ import config
 import weekly
 from cogs import automod as automod_cog
 from cogs import events as events_cog
+from cogs import serversetup
 from cogs.modtools import FREE_WARN_PUNISHMENTS, describe_duration, parse_duration
 from cogs.toggles import GROUPS, TOGGLES
 
@@ -103,6 +104,11 @@ def overview(bot, guild) -> dict:
         "extras": [_count(len(db.events_of(gid)), "event") + " on or coming up",
                    "Weekly champions are " + ("on" if weekly.champions_on(db, gid) else "off"),
                    "Staff report is " + ("on" if db.get_premium_setting(gid, "report_on") else "off")],
+        "welcome": [_count(len(db.autoroles_of(gid)), "autorole"),
+                    "Welcome messages are " + ("on" if guild.get_channel(
+                        db.greeting(gid, "welcome")["channel_id"]) else "off"),
+                    "Goodbye messages are " + ("on" if guild.get_channel(
+                        db.greeting(gid, "goodbye")["channel_id"]) else "off")],
     }
 
 
@@ -487,9 +493,76 @@ def extras_save(bot, guild, body) -> list:
     return []
 
 
+# ------------------------------------------------------ welcome & roles
+
+def welcome_state(bot, guild) -> dict:
+    db = bot.db
+    gid = guild.id
+    greetings = {}
+    for kind in serversetup.KINDS:
+        row = db.greeting(gid, kind)
+        greetings[kind] = {
+            "channel": str(row["channel_id"]) if guild.get_channel(row["channel_id"]) else "",
+            "message": row["message"] or serversetup.DEFAULTS[kind],
+            "embed": bool(row["embed"]),
+        }
+    return {
+        "autoroles": [str(r) for r in db.autoroles_of(gid)],
+        "greetings": greetings,
+        "defaults": serversetup.DEFAULTS,
+        "variables": list(serversetup.VARIABLES),
+        "message_limit": serversetup.MESSAGE_LIMIT,
+        "max_autoroles": serversetup.MAX_AUTOROLES,
+        "channels": _channels(guild),
+        "roles": _roles(guild),
+    }
+
+
+def welcome_save(bot, guild, body) -> list:
+    db = bot.db
+    gid = guild.id
+    problems = []
+    roles = []
+    for value in (body.get("autoroles") or [])[:MAX_ROWS]:
+        role = _usable_role(guild, value)
+        if not role:
+            problems.append("Autoroles have to be roles I can give: below my own role,"
+                            " not another bot's.")
+        elif role not in roles:
+            roles.append(role)
+    if len(roles) > serversetup.MAX_AUTOROLES:
+        problems.append(f"Up to {serversetup.MAX_AUTOROLES} autoroles.")
+    greetings = {}
+    for kind in serversetup.KINDS:
+        given = (body.get("greetings") or {}).get(kind)
+        if given is None:
+            continue
+        channel = None
+        if given.get("channel"):
+            channel = _text_channel(guild, given["channel"])
+            if not channel:
+                problems.append(f"Pick a text channel for {kind} messages.")
+        message = str(given.get("message") or "").strip()
+        if len(message) > serversetup.MESSAGE_LIMIT:
+            problems.append(f"Keep the {kind} message under {serversetup.MESSAGE_LIMIT}"
+                            " characters.")
+        if message == serversetup.DEFAULTS[kind]:
+            message = ""            # the default, so a better default reaches it later
+        greetings[kind] = {"channel_id": channel.id if channel else 0, "message": message,
+                           "embed": 1 if given.get("embed") else 0}
+    if problems:
+        return problems
+    if body.get("autoroles") is not None:
+        db.replace_autoroles(gid, [r.id for r in roles])
+    for kind, fields in greetings.items():
+        db.set_greeting(gid, kind, **fields)
+    return []
+
+
 PARTS = {
     "gacha": (gacha_state, gacha_save),
     "mod": (mod_state, mod_save),
     "voice": (voice_state, voice_save),
+    "welcome": (welcome_state, welcome_save),
     "extras": (extras_state, extras_save),
 }

@@ -57,6 +57,7 @@ AREAS = (
     ("mod", "Moderation"),
     ("voice", "Voice"),
     ("levels", "Levels"),
+    ("server", "Server"),
 )
 AREA_OF = {
     "Jail & mutes": "mod", "Warnings": "mod", "Kicks & bans": "mod",
@@ -65,6 +66,8 @@ AREA_OF = {
     "Voice rooms": "voice", "Voice hours": "voice",
     "Levels": "levels", "Level setup": "levels",
     "Automod": "mod",
+    "Utility": "server", "Welcome & roles": "server",
+    "Auto replies & reaction roles": "server",
 }
 
 # How many characters the browser section carries. The whole roster is a
@@ -396,8 +399,9 @@ code,kbd{
 .group{scroll-margin-top:80px}
 
 /* ---- the parts of the bot: big buttons that are also the tabs ---- */
-.features{display:grid;gap:14px;grid-template-columns:repeat(4,1fr)}
-@media(max-width:980px){.features{grid-template-columns:repeat(2,1fr)}}
+.features{display:grid;gap:14px;grid-template-columns:repeat(5,1fr)}
+@media(max-width:1100px){.features{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.features{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:560px){.features{grid-template-columns:1fr}}
 .feature{
   position:relative;cursor:pointer;
@@ -427,8 +431,9 @@ code,kbd{
   color:var(--accent-soft)}
 .feature.on .go{color:var(--text)}
 
-.segs{display:grid;gap:10px;grid-template-columns:repeat(4,1fr);margin-bottom:22px}
-@media(max-width:620px){.segs{grid-template-columns:repeat(2,1fr)}}
+.segs{display:grid;gap:10px;grid-template-columns:repeat(5,1fr);margin-bottom:22px}
+@media(max-width:760px){.segs{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.segs{grid-template-columns:repeat(2,1fr)}}
 .seg{
   font:inherit;color:var(--dim);cursor:pointer;display:flex;align-items:center;
   justify-content:center;gap:9px;padding:14px 12px;border-radius:12px;
@@ -1287,17 +1292,39 @@ $levels ignore #bot-spam</code>
          <code>$daily</code>. <code>$levels karuda 0</code> turns it
          off.</p>"""),
     ]
+    server_steps = [
+        ("Roles for new members", """
+         <p>Pick the roles everyone gets when they join from a menu: no
+         typing role names. Bots never get them.</p>
+         <code class="cmdline">$autorole</code>"""),
+        ("Welcome and goodbye", """
+         <p>One command turns on a friendly welcome with their picture. Change
+         the words whenever you like, with fill-ins for their name, the
+         server and the member count.</p>
+         <code class="cmdline">$welcome #welcome
+$welcome message Hey {user}, welcome to {server}!
+$goodbye #welcome</code>
+         <p class="note">Both are on the <a href="__DASHBOARD__">dashboard</a>
+         too, under Welcome &amp; roles.</p>"""),
+        ("The everyday extras", """
+         <p>Nothing to set up: snipe deleted and edited messages, go AFK,
+         set reminders, look people and the server up, and copy emojis in.</p>
+         <code class="cmdline">$snipe · $afk · $remind 10m stretch
+$userinfo · $serverinfo · $steal</code>"""),
+    ]
     steps_by_area = {"gacha": gacha_steps, "mod": mod_steps,
-                     "voice": voice_steps, "levels": level_steps}
+                     "voice": voice_steps, "levels": level_steps,
+                     "server": server_steps}
     labels = dict(AREAS)
     subs = {
         "gacha": "Six steps. The first two matter most, the rest is taste.",
         "mod": "Five steps. After the third, every command works.",
         "voice": "Three steps. The first one is all you need.",
         "levels": "It works out of the box. The rest is up to you.",
+        "server": "Two quick ones, and the rest just works.",
     }
     icons = {"gacha": "\U0001f3b2", "mod": "\U0001f6e1\ufe0f",
-             "voice": "\U0001f50a", "levels": "\U0001f4c8"}
+             "voice": "\U0001f50a", "levels": "\U0001f4c8", "server": "\U0001f44b"}
     tabs_html = "".join(
         f'<button type="button" class="seg" data-tab="{key}" data-name="{label}"'
         f' aria-pressed="false"><span aria-hidden="true">{icons[key]}</span>'
@@ -1330,6 +1357,11 @@ $levels ignore #bot-spam</code>
          ["Rank cards and a leaderboard",
           "Spam-proof: one message a minute counts",
           "A little karuda every 5 levels"]),
+        ("server", "\U0001f44b", "Server",
+         "The everyday tools: roles on join, welcomes, snipes and more.",
+         ["Autoroles, welcome and goodbye messages",
+          "Snipe, AFK, reminders, user and server info",
+          "Reaction roles, auto replies, emoji stealing"]),
     ]
     features_html = "\n".join(
         f'<div class="feature"><span class="ic" aria-hidden="true">{icon}</span>'

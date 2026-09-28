@@ -206,6 +206,8 @@ body{background:transparent}
 .brow{display:grid;grid-template-columns:1fr 130px 38px;gap:8px;align-items:center;
   margin-bottom:8px}
 .prem-page{margin-top:26px}
+.tickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 14px}
+.tickgrid .switch.off{opacity:.45}
 .bpcard{position:relative;border-radius:14px;overflow:hidden;margin-bottom:14px;
   background:rgba(10,8,20,.45);border:1px solid rgba(255,255,255,.07);max-width:420px}
 .bpbanner{height:92px;background:linear-gradient(120deg,rgba(124,107,240,.5),rgba(238,127,168,.35))}
@@ -721,6 +723,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
             sub: "Join To Create rooms and roles for hours in voice."},
     levels: {icon: "📈", title: "Levels",
              sub: "XP, level roles and level-up messages." },
+    welcome: {icon: "\uD83D\uDC4B", title: "Welcome & roles",
+              sub: "Roles for new members, and welcome and goodbye messages."},
     extras: {icon: "\u2728", title: "Premium extras",
              sub: "Server events, rank card backgrounds, weekly champions and the staff report."}
   };
@@ -766,7 +770,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         setTimeout(openOverview, 2000);
       $("thanks").hidden = !/[?&]premium=thanks/.test(location.search) || r.data.premium.active;
       var box = $("parts"); box.textContent = "";
-      ["gacha", "mod", "voice", "levels", "extras"].forEach(function(key, i){
+      ["gacha", "mod", "voice", "levels", "welcome", "extras"].forEach(function(key, i){
         var info = PARTS[key];
         var card = el("button", {type: "button", cls: "part"}, [
           el("span", {cls: "ic", text: info.icon}),
@@ -1192,6 +1196,58 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       return function(){
         return {champ_channel: chChannel.value, champ_chat_role: chChat.value,
                 champ_voice_role: chVoice.value, report_on: report.input.checked};
+      };
+    },
+
+    welcome: function(d, form){
+      // ---- autoroles: tick the roles
+      var chosen = new Set(d.autoroles);
+      var boxes = el("div", {cls: "tickgrid"});
+      d.roles.forEach(function(r){
+        var t = toggle(r.name, chosen.has(r.id));
+        t.input.value = r.id;
+        if (!r.usable) { t.input.disabled = true; t.row.title = "Above my role, or another bot's"; t.row.classList.add("off"); }
+        boxes.appendChild(t.row);
+      });
+      form.appendChild(card("Autoroles",
+        "Tick the roles new members get as soon as they join, up to " + d.max_autoroles +
+        ". Bots never get them. Greyed-out roles are above Paper's own role.", [boxes]));
+
+      // ---- welcome and goodbye
+      var readers = {};
+      ["welcome", "goodbye"].forEach(function(kind){
+        var g = d.greetings[kind];
+        var where = select([["", "Off"]].concat(d.channels.map(function(c){
+          return [c.id, "#" + c.name + (c.category ? "  \u00B7  " + c.category : "")]; })), g.channel);
+        var text = el("textarea", {maxLength: d.message_limit});
+        text.value = g.message;
+        var chips = el("div", {cls: "chips"});
+        d.variables.forEach(function(v){
+          var c = el("button", {type: "button", cls: "chip", text: v});
+          c.addEventListener("click", function(){
+            var at = text.selectionStart || text.value.length;
+            text.value = text.value.slice(0, at) + v + text.value.slice(text.selectionEnd || at);
+            text.focus(); partChanged();
+          });
+          chips.appendChild(c);
+        });
+        var reset = el("button", {type: "button", cls: "linkish", text: "Use the default"});
+        reset.addEventListener("click", function(){ text.value = d.defaults[kind]; partChanged(); });
+        var style = toggle("Show it as an embed with their picture", g.embed);
+        form.appendChild(card(kind === "welcome" ? "Welcome messages" : "Goodbye messages",
+          kind === "welcome" ? "Greets everyone who joins, and pings them." :
+                               "Says goodbye when someone leaves. It never pings.",
+          [field("Send in", where), field("Message", text), chips, reset, style.row]));
+        readers[kind] = function(){
+          return {channel: where.value, message: text.value, embed: style.input.checked};
+        };
+      });
+      return function(){
+        return {
+          autoroles: Array.prototype.filter.call(boxes.querySelectorAll("input"),
+            function(i){ return i.checked; }).map(function(i){ return i.value; }),
+          greetings: {welcome: readers.welcome(), goodbye: readers.goodbye()}
+        };
       };
     },
 
