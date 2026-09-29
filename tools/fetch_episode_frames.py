@@ -33,6 +33,7 @@ Needs onnxruntime, numpy and Pillow:  pip install onnxruntime numpy Pillow
 """
 import argparse
 import csv
+import difflib
 import io
 import json
 import os
@@ -193,14 +194,76 @@ def dull(image) -> bool:
 # --------------------------------------------------------------------------
 # fancaps: search, episodes, frames
 # --------------------------------------------------------------------------
+CATALOGUE = os.path.join(ROOT, "data", "fancaps_catalogue.json")
+
+
+def simple(title: str) -> str:
+    """A title with its punctuation and its noise words taken out."""
+    text = (title or "").lower()
+    for curly, plain in (("\u2019", "'"), ("\u2018", "'"), ("\u201c", ""),
+                         ("\u201d", ""), ("\u2013", " "), ("\u2014", " ")):
+        text = text.replace(curly, plain)
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    drop = {"the", "a", "an", "tv", "season", "series", "part", "anime"}
+    return " ".join(word for word in text.split() if word not in drop)
+
+
+def catalogue() -> dict:
+    """Every anime the site carries: {simplified title: path}.
+
+    Taken once from its A-Z listing and cached. The site's own search is not
+    usable for this: it answers "Naruto" with Kiff and Yu-Gi-Oh, and taking
+    its first result would have bound characters to the wrong show.
+    """
+    if os.path.exists(CATALOGUE):
+        with io.open(CATALOGUE, encoding="utf-8") as handle:
+            return json.load(handle)
+
+    index = {}
+    for letter in "0abcdefghijklmnopqrstuvwxyz":
+        page = fetch(SITE + "/anime/showList.php?" + letter).decode(
+            "utf-8", "replace")
+        for path in set(re.findall(r'showimages\.php\?(\d+-[^"&]+)', page)):
+            name = path.split("-", 1)[1].replace("_", " ")
+            index.setdefault(simple(name), path)
+        print("  catalogue {}: {:,} series so far".format(letter, len(index)),
+              flush=True)
+
+    with io.open(CATALOGUE, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(index, handle, ensure_ascii=False, indent=0)
+    return index
+
+
 def find_series(title: str, cache: dict) -> str:
-    """The site's path for a series, or "" if it does not carry it."""
+    """The site's path for a series, or "" if it does not carry it.
+
+    Matched against the catalogue and scored, so a near miss is rejected
+    rather than quietly becoming the wrong series.
+    """
     if title in cache:
         return cache[title]
-    query = urllib.parse.urlencode({"q": title, "animeCB": "Anime"})
-    page = fetch(f"{SITE}/search.php?{query}").decode("utf-8", "replace")
-    found = re.findall(r"showimages\.php\?(\d+-[A-Za-z0-9_]+)", page)
-    cache[title] = found[0] if found else ""
+
+    index = catalogue()
+    wanted = simple(title)
+    best, score = "", 0.0
+    for name, path in index.items():
+        if not name:
+            continue
+        if name == wanted:
+            best, score = path, 1.0
+            break
+        # A show and its sequels share a prefix - "frieren beyond journey s
+        # end" against the same plus "2" - so one containing the other from
+        # the start counts, scaled by how much is left over.
+        if name.startswith(wanted) or wanted.startswith(name):
+            overlap = min(len(name), len(wanted)) / max(len(name), len(wanted))
+            ratio = 0.80 + 0.19 * overlap
+        else:
+            ratio = difflib.SequenceMatcher(None, wanted, name).ratio()
+        if ratio > score:
+            best, score = path, ratio
+
+    cache[title] = best if score >= 0.82 else ""
     return cache[title]
 
 
