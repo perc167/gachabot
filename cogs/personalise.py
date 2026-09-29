@@ -229,9 +229,12 @@ class Personalise(commands.Cog):
             embed=discord.Embed(
                 title="⭐  Wishes",
                 description=(
-                    f"When somebody you wished for rolls, you are pinged and"
-                    f" nobody else may claim them for **{seconds}s**.\n\n"
-                    f"You are using **{used}** of **{limit}** slots"
+                    (f"When somebody you wished for rolls, you are pinged and"
+                     f" nobody else may claim them for **{seconds}s**.\n\n"
+                     if seconds else
+                     "When somebody you wished for rolls, you are pinged. Anyone can"
+                     " claim them straight away, so be quick.\n\n")
+                    + f"You are using **{used}** of **{limit}** slots"
                     f"{f' ({extra} earned)' if extra else ''}."
                 ),
                 colour=db.get_pref(ctx.guild.id, "cardcolour",

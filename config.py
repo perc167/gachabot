@@ -59,11 +59,13 @@ GUILD_SETTINGS = {
     "max_marriages": (0, 0, 5000, "Harem size cap (0 = unlimited)"),
     "claim_window_seconds": (45, 5, 600, "How long a roll stays claimable"),
     "karuda_rate": (100, 10, 500, "Karuda payout multiplier, as a percent"),
+    # Sniping is instant, as in Mudae: a wisher is pinged, but anyone may
+    # claim at once. A server can still give wishers a head start.
     "wish_protect_seconds": (
-        15,
+        0,
         0,
         300,
-        "Head start a wisher gets before others may claim",
+        "Head start a wisher gets before others may claim (0 = snipe at once)",
     ),
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
     "roll_rank_limit": (
@@ -78,8 +80,8 @@ GUILD_SETTINGS = {
     "custom_limit": (50, 0, 2000, "Custom characters a server may add"),
     "dk_snipe": (1, 0, 1, "Let others take the shard you leave behind (0/1)"),
     "dk_protect_seconds": (
-        20, 0, 600,
-        "How long a daily drop is yours alone before others may snipe it",
+        0, 0, 600,
+        "How long a daily drop is yours alone before others may snipe it (0 = at once)",
     ),
     "dk_snipe_percent": (
         50, 1, 100,

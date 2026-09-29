@@ -649,12 +649,30 @@ class Database:
         self._migrate()
         self._convert_old_badges()
         self._refund_old_towers()
+        self._instant_snipes()
         self.conn.executescript(INDEXES)
         self.conn.commit()
 
     # What the floors of the old, climb-in-order tower cost, for refunding it.
     OLD_TOWER_COSTS = (2500, 4000, 6500, 10000, 16000, 25000, 40000, 65000,
                        100000, 160000)
+
+    def _instant_snipes(self):
+        """Sniping became instant (both waits default to 0). A server that
+        had saved a wait - the dashboard saves every setting at once - is
+        put on the new default, once. Admins can set a wait again after."""
+        done = self.conn.execute(
+            "SELECT value FROM guild_settings WHERE guild_id = 0 AND key = ?",
+            ("pref:instant_snipes",)).fetchone()
+        if done:
+            return
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM guild_settings WHERE key IN"
+                " ('wish_protect_seconds', 'dk_protect_seconds')")
+            self.conn.execute(
+                "INSERT OR REPLACE INTO guild_settings (guild_id, key, value)"
+                " VALUES (0, ?, 1)", ("pref:instant_snipes",))
 
     def _refund_old_towers(self):
         """The tower used to be climbed in a fixed order, a set perk per

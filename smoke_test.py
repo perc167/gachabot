@@ -957,9 +957,20 @@ async def main():
     rolling_cog = b.get_cog("Rolling")
     cv = ClaimView(rolling_cog, GUILD, top, ALICE, [BOB])
     check("ClaimView builds", len(cv.children) == 1)
-    check("wish protection armed", cv.protect_until > utils.now())
+    check("wishes can be sniped at once by default", cv.protect_until <= utils.now())
+    db.set_setting(GUILD, "wish_protect_seconds", 15)
+    cv_guarded = ClaimView(rolling_cog, GUILD, top, ALICE, [BOB])
+    check("a server can still give wishers a head start", cv_guarded.protect_until > utils.now())
+    db.conn.execute("DELETE FROM guild_settings WHERE guild_id = ? AND key = ?",
+                    (GUILD, "wish_protect_seconds"))
     cv_nowish = ClaimView(rolling_cog, GUILD, top, ALICE, [])
     check("no protection without wishers", cv_nowish.protect_until <= utils.now())
+    db.set_setting(GUILD + 99, "dk_protect_seconds", 10)
+    db.conn.execute("DELETE FROM guild_settings WHERE guild_id = 0 AND key = 'pref:instant_snipes'")
+    db._instant_snipes()
+    check("saved snipe waits are cleared once",
+          db.get_setting(GUILD + 99, "dk_protect_seconds") == 0
+          and db.get_pref(0, "instant_snipes", 0) == 1)
     kv = KarudaView(rolling_cog, GUILD, top)
     check("KarudaView builds", len(kv.children) == 1)
     pages = views.Paginator([embed, embed], ALICE)
