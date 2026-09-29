@@ -13,7 +13,8 @@ from discord.ext import commands
 
 import config
 import utils
-from views import choose_character
+import wishes
+from views import Confirm, choose_character
 
 # key: (what it renames, the default, an example)
 RENAMES = {
@@ -137,52 +138,83 @@ class Personalise(commands.Cog):
     @commands.command(name="starwish", aliases=["star", "sw", "firstwish"])
     @commands.guild_only()
     async def starwish(self, ctx, *, name: str = None):
-        """The one wish you care about most.
-
-        A starred wish is listed first and called out when they roll. It does
-        not change the odds - nothing here quietly sells you a better chance.
-        """
+        """A wish that rolls five times as often as a normal one, for wish
+        slots: the first costs 2, the next 4, the next 6. `$starwish <name>`
+        stars someone, `$starwish` shows yours, `$starwish remove <name>`
+        gives the slots back."""
         db = self.bot.db
-        gid = ctx.guild.id
-        starred = db.get_player_pref(gid, ctx.author.id, "star_wish")
+        gid, uid = ctx.guild.id, ctx.author.id
+        starred = db.starwishes_of(gid, uid)
 
         if name is None:
-            if not starred:
-                await ctx.send(
-                    f"You have not starred a wish. `{ctx.prefix}starwish"
-                    f" <name>` does it."
-                )
+            lines = [f"\u2b50 **{row['name']}** \u00b7 {row['series']}" for row in starred]
+            next_cost = wishes.next_star_cost(len(starred))
+            await ctx.send(embed=discord.Embed(
+                title="\u2b50 Your starwishes",
+                description=("\n".join(lines) if lines else "None yet.")
+                + f"\n\nA starwish rolls **{wishes.STAR_WEIGHT}x** as often as a normal"
+                  f" wish. Your next one costs **{next_cost}** wish slots; you have"
+                  f" **{max(0, wishes.room(db, gid, uid))}** free."
+                  f"\n`{ctx.prefix}starwish <name>` to add one,"
+                  f" `{ctx.prefix}starwish remove <name>` to give one up.",
+                colour=config.CARD_COLOUR))
+            return
+
+        words = name.strip().split(maxsplit=1)
+        if words[0].lower() in ("remove", "unstar", "drop", "delete"):
+            if len(words) < 2 or not starred:
+                await ctx.send(f"Say who: `{ctx.prefix}starwish remove <name>`."
+                               if starred else "You have no starwishes.")
                 return
-            character = db.get_character(int(starred))
+            query = words[1].lower()
+            rows = [r for r in starred if query in r["name"].lower()]
+            character = await choose_character(ctx, rows, "Which one?", config.CARD_COLOUR) \
+                if rows else None
             if not character:
-                await ctx.send("Your starred wish is no longer in the pool.")
+                await ctx.send(f"`{words[1]}` isn't one of your starwishes.")
                 return
-            embed, art = utils.character_card(db, gid, character,
-                                              footer="Your starred wish")
-            await ctx.send(embed=embed, **art)
+            db.remove_starwish(gid, uid, character["id"])
+            await ctx.send(f"**{character['name']}** isn't a starwish any more, and"
+                           f" the slots are yours again.")
             return
 
-        if name.strip().lower() in ("reset", "clear", "none"):
-            db.set_player_pref(gid, ctx.author.id, "star_wish", "")
-            await ctx.send("Star removed.")
+        matches = db.find_by_name_or_alias(gid, uid, name)
+        if not matches:
+            await ctx.send(f"No character matching `{name}`.")
             return
-
-        wished = {row["id"] for row in db.wishes_of(gid, ctx.author.id)}
-        rows = [r for r in db.find_by_name_or_alias(gid, ctx.author.id, name)
-                if r["id"] in wished]
-        if not rows:
-            await ctx.send(
-                f"`{name}` is not on your wishlist — `{ctx.prefix}wish"
-                f" {name}` first."
-            )
-            return
-        character = await choose_character(ctx, rows, "Which one?",
-                                           config.CARD_COLOUR)
+        character = await choose_character(ctx, matches, "Which one?", config.CARD_COLOUR)
         if not character:
             return
-        db.set_player_pref(gid, ctx.author.id, "star_wish",
-                           str(character["id"]))
-        await ctx.send(f"⭐ **{character['name']}** is your starred wish.")
+        if any(r["id"] == character["id"] for r in starred):
+            await ctx.send(f"**{character['name']}** is already one of your starwishes.")
+            return
+        if db.owner_of(gid, character["id"]) == uid:
+            await ctx.send(f"You already own **{character['name']}**.")
+            return
+
+        cost = wishes.next_star_cost(len(starred))
+        was_wished = any(r["id"] == character["id"] for r in db.wishes_of(gid, uid))
+        # A plain wish for them is folded in, so its slot counts towards it.
+        free = wishes.room(db, gid, uid) + (1 if was_wished else 0)
+        if free < cost:
+            await ctx.send(
+                f"A starwish costs **{cost}** wish slots right now and you have **{free}**"
+                f" free. Drop some wishes with `{ctx.prefix}unwish`, or get more slots"
+                f" in `{ctx.prefix}shop`.")
+            return
+        left = free - cost
+        view = Confirm({uid})
+        view.message = await ctx.send(
+            f"\u2b50 Starwish **{character['name']}**? This sacrifices **{cost}** of your"
+            f" wish slots" + (" (their wish is folded in)" if was_wished else "")
+            + f", leaving you **{left}** free. They'll roll {wishes.STAR_WEIGHT}x as often"
+              " as a normal wish.", view=view)
+        await view.wait()
+        if not view.accepted or view.declined_by:
+            await ctx.send("No starwish. Your slots are untouched.")
+            return
+        db.add_starwish(gid, uid, character["id"])
+        await ctx.send(f"\u2b50 **{character['name']}** is a starwish now.")
 
     @commands.command(name="wishprotect", aliases=["wp"])
     @commands.guild_only()
@@ -190,16 +222,16 @@ class Personalise(commands.Cog):
         """How long a wish holds a roll for you."""
         db = self.bot.db
         seconds = db.get_setting(ctx.guild.id, "wish_protect_seconds")
-        limit = db.get_setting(ctx.guild.id, "wish_limit")
-        extra = db.get_player(ctx.guild.id, ctx.author.id)["extra_wish_slots"]
-        used = len(db.wishes_of(ctx.guild.id, ctx.author.id))
+        limit = wishes.capacity(db, ctx.guild.id, ctx.author.id)
+        extra = limit - db.get_setting(ctx.guild.id, "wish_limit")
+        used = wishes.used(db, ctx.guild.id, ctx.author.id)
         await ctx.send(
             embed=discord.Embed(
                 title="⭐  Wishes",
                 description=(
                     f"When somebody you wished for rolls, you are pinged and"
                     f" nobody else may claim them for **{seconds}s**.\n\n"
-                    f"You are using **{used}** of **{limit + extra}** slots"
+                    f"You are using **{used}** of **{limit}** slots"
                     f"{f' ({extra} earned)' if extra else ''}."
                 ),
                 colour=db.get_pref(ctx.guild.id, "cardcolour",

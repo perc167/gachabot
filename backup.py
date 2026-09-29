@@ -34,6 +34,7 @@ NEEDED_TABLES = {"players", "marriages", "characters", "guild_settings"}
 REFERENCES = (
     "SELECT character_id FROM marriages",
     "SELECT character_id FROM wishes",
+    "SELECT character_id FROM starwishes",
     "SELECT character_id FROM character_likes",
     "SELECT character_id FROM character_keys",
     "SELECT character_id FROM character_aliases",

@@ -148,6 +148,18 @@ CREATE TABLE IF NOT EXISTS wishes (
 CREATE INDEX IF NOT EXISTS idx_wishes_character
     ON wishes (guild_id, character_id);
 
+-- Starwishes (wishes.py): a wish that costs more slots and tilts rolls
+-- harder. Not a flag on wishes, because a starwish needs no plain wish.
+CREATE TABLE IF NOT EXISTS starwishes (
+    guild_id     INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    added_at     INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, character_id)
+);
+CREATE INDEX IF NOT EXISTS idx_starwishes_character
+    ON starwishes (guild_id, character_id);
+
 -- Per-guild prefix. Separate from guild_settings, which only holds numbers.
 CREATE TABLE IF NOT EXISTS guild_prefixes (
     guild_id INTEGER PRIMARY KEY,
@@ -1752,6 +1764,7 @@ class Database:
             "DELETE FROM marriages WHERE character_id = ?", (character_id,)
         )
         self.conn.execute("DELETE FROM wishes WHERE character_id = ?", (character_id,))
+        self.conn.execute("DELETE FROM starwishes WHERE character_id = ?", (character_id,))
         self.conn.execute(
             "DELETE FROM character_images WHERE character_id = ?", (character_id,)
         )
@@ -1918,9 +1931,9 @@ class Database:
             clause += " AND (c.claim_rank <= 0 OR c.claim_rank <= ?)"
             extra = (*extra, limit)
         if blocked:
-            clause = (" AND c.source NOT IN ("
-                      + ",".join("?" * len(blocked)) + ")")
-            extra = tuple(blocked)
+            clause += (" AND c.source NOT IN ("
+                       + ",".join("?" * len(blocked)) + ")")
+            extra = (*extra, *blocked)
         if gender:
             clause += " AND c.gender = ?"
             extra = (*extra, gender)
@@ -2363,15 +2376,19 @@ class Database:
     # rather than claiming success and leaving you to check.
 
     def clear_wishes(self, guild_id: int, user_id: int = None) -> int:
-        if user_id is None:
-            cur = self.conn.execute(
-                "DELETE FROM wishes WHERE guild_id = ?", (guild_id,))
-        else:
-            cur = self.conn.execute(
-                "DELETE FROM wishes WHERE guild_id = ? AND user_id = ?",
-                (guild_id, user_id))
+        """Wishes and starwishes both. Returns how many went."""
+        gone = 0
+        for table in ("wishes", "starwishes"):
+            if user_id is None:
+                cur = self.conn.execute(
+                    f"DELETE FROM {table} WHERE guild_id = ?", (guild_id,))
+            else:
+                cur = self.conn.execute(
+                    f"DELETE FROM {table} WHERE guild_id = ? AND user_id = ?",
+                    (guild_id, user_id))
+            gone += cur.rowcount
         self.conn.commit()
-        return cur.rowcount
+        return gone
 
     def clear_disabled(self, guild_id: int) -> int:
         cur = self.conn.execute(
@@ -2425,6 +2442,9 @@ class Database:
                 ("wishes",
                  "DELETE FROM wishes WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
+                ("starwishes",
+                 "DELETE FROM starwishes WHERE guild_id = ? AND user_id = ?",
+                 (guild_id, user_id)),
                 ("likes",
                  "DELETE FROM character_likes WHERE guild_id = ? AND user_id = ?",
                  (guild_id, user_id)),
@@ -2459,6 +2479,7 @@ class Database:
             for label, table in (
                 ("claims", "marriages"),
                 ("wishes", "wishes"),
+                ("starwishes", "starwishes"),
                 ("likes", "character_likes"),
                 ("shards", "shard_pulls"),
                 ("badges", "badges"),
@@ -3658,11 +3679,68 @@ class Database:
         ).fetchone()
 
     def wishers_of(self, guild_id: int, character_id: int) -> list:
+        """Everyone waiting on this character: wishes and starwishes."""
         rows = self.conn.execute(
-            "SELECT user_id FROM wishes WHERE guild_id = ? AND character_id = ?",
-            (guild_id, character_id),
+            "SELECT user_id FROM wishes WHERE guild_id = ? AND character_id = ?"
+            " UNION SELECT user_id FROM starwishes WHERE guild_id = ? AND character_id = ?",
+            (guild_id, character_id, guild_id, character_id),
         ).fetchall()
         return [r["user_id"] for r in rows]
+
+    # ---------- starwishes ----------
+
+    def starwishes_of(self, guild_id: int, user_id: int) -> list:
+        return self.conn.execute(
+            "SELECT c.* FROM starwishes s JOIN characters c ON c.id = s.character_id"
+            " WHERE s.guild_id = ? AND s.user_id = ? ORDER BY s.added_at",
+            (guild_id, user_id),
+        ).fetchall()
+
+    def starwish_count(self, guild_id: int, user_id: int) -> int:
+        return self.conn.execute(
+            "SELECT COUNT(*) AS c FROM starwishes WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        ).fetchone()["c"]
+
+    def add_starwish(self, guild_id: int, user_id: int, character_id: int) -> bool:
+        """Star a character. A plain wish for them is folded in."""
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO starwishes (guild_id, user_id, character_id, added_at)"
+                " VALUES (?, ?, ?, ?)", (guild_id, user_id, character_id, int(time.time())))
+            if cur.rowcount:
+                self.conn.execute(
+                    "DELETE FROM wishes WHERE guild_id = ? AND user_id = ? AND character_id = ?",
+                    (guild_id, user_id, character_id))
+        return cur.rowcount > 0
+
+    def remove_starwish(self, guild_id: int, user_id: int, character_id: int) -> bool:
+        cur = self.conn.execute(
+            "DELETE FROM starwishes WHERE guild_id = ? AND user_id = ? AND character_id = ?",
+            (guild_id, user_id, character_id))
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def wish_candidates(self, guild_id: int, user_id: int, gender: str = None,
+                        kind: str = None) -> list:
+        """This player's unclaimed wishes and starwishes that this roll could
+        turn up, as [(character, starred)]. Only unclaimed: a wish tilts rolls
+        towards someone you can still have."""
+        starred = {r["character_id"]: 1 for r in self.conn.execute(
+            "SELECT character_id FROM starwishes WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id))}
+        plain = {r["character_id"]: 0 for r in self.conn.execute(
+            "SELECT character_id FROM wishes WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id))}
+        wanted = {**plain, **starred}
+        if not wanted:
+            return []
+        source, where, args = self._roll_scope(guild_id, False, gender, kind)
+        marks = ",".join("?" * len(wanted))
+        rows = self.conn.execute(
+            f"SELECT c.* {source} {where} AND c.id IN ({marks})",
+            (*args, *wanted)).fetchall()
+        return [(row, wanted[row["id"]]) for row in rows]
 
     def wish_count(self, guild_id: int, user_id: int) -> int:
         return self.conn.execute(

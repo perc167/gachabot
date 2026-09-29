@@ -7,6 +7,7 @@ from discord.ext import commands
 
 import config
 import perks
+import wishes as wish_slots
 import utils
 from utils import fmt_duration
 
@@ -80,17 +81,13 @@ class Profile(commands.Cog):
 
         earned = perks.effective(db, gid, member.id)
         owned_badges = db.badges_of(gid, member.id)
-        wishes = db.wish_count(gid, member.id)
-        slots = (
-            db.get_setting(gid, "wish_limit")
-            + player["extra_wish_slots"]
-            + earned["wish_slots"]
-        )
+        wished = wish_slots.used(db, gid, member.id)
+        slots = wish_slots.capacity(db, gid, member.id)
         likes = len(db.likes_of(gid, member.id))
         shards = db.shards_of(gid, member.id)
         embed.add_field(
             name="Also",
-            value=f"{wishes}/{slots} wishes · {likes} likes ·"
+            value=f"{wished}/{slots} wish slots · {likes} likes ·"
                   f" {len(shards)}/{len(config.SHARD_TYPES)} shard types",
             inline=False,
         )

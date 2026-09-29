@@ -817,6 +817,54 @@ async def main():
     check("wish removed", db.remove_wish(GUILD, BOB, second["id"]))
     check("wishers empty after", db.wishers_of(GUILD, second["id"]) == [])
 
+    # 7b. Wish slots and starwishes, Mudae style.
+    import wishes
+    WG = GUILD + 90
+    pool = sorted(db.search_characters("", limit=100000),
+                  key=lambda r: r["like_rank"] or 99999)
+    check("everyone starts with 8 wish slots", wishes.capacity(db, WG, BOB) == 8)
+    check("starwishes cost 2, then 4, then 6",
+          [wishes.next_star_cost(n) for n in range(3)] == [2, 4, 6]
+          and [wishes.star_cost(n) for n in range(4)] == [0, 2, 6, 12])
+    for row in pool[10:13]:
+        db.add_wish(WG, BOB, row["id"])
+    check("a starwish folds a plain wish into it",
+          db.add_starwish(WG, BOB, pool[10]["id"]) and db.wish_count(WG, BOB) == 2
+          and db.starwish_count(WG, BOB) == 1)
+    check("a starwish needs no wish first", db.add_starwish(WG, BOB, pool[20]["id"]))
+    check("slots used: 2 wishes + starwishes costing 2 and 4",
+          wishes.used(db, WG, BOB) == 8 and wishes.room(db, WG, BOB) == 0)
+    check("starwishers are pinged like wishers", db.wishers_of(WG, pool[20]["id"]) == [BOB])
+    db.claim(WG, pool[11]["id"], ALICE)
+    got = {row["id"]: starred for row, starred in db.wish_candidates(WG, BOB)}
+    check("only unclaimed wishes tilt rolls, starwishes marked",
+          got == {pool[10]["id"]: 1, pool[12]["id"]: 0, pool[20]["id"]: 1}, str(got))
+    check("8 wishes land about 1 roll in 250, and never more than 1 in 4",
+          abs(wishes.chance(8) - 1 / 250) < 1e-9 and wishes.chance(10 ** 6) == wishes.MOST_OFTEN)
+
+    class _Rng:
+        def __init__(self, value):
+            self.value = value
+
+        def random(self):
+            return self.value
+
+        def choices(self, population, weights, k):
+            return [population[weights.index(max(weights))]]
+    check("a lucky roll lands on a wish, a starwish most of all",
+          wishes.boosted_roll(db, WG, BOB, rng=_Rng(0.0))["id"] in (pool[10]["id"], pool[20]["id"])
+          and wishes.boosted_roll(db, WG, BOB, rng=_Rng(0.99)) is None)
+    check("clearing wishes clears starwishes too",
+          db.clear_wishes(WG, BOB) >= 3 and wishes.used(db, WG, BOB) == 0)
+
+    # A server that switches sources off keeps the secret and $limroul rules.
+    real = db.excluded_sources
+    db.excluded_sources = lambda gid: ["Hentai"]
+    _src, where, _args = db._roll_scope(WG, True)
+    db.excluded_sources = real
+    check("switching sources off keeps secrets out of the pool",
+          "secret_odds = 0" in where and "NOT IN" in where)
+
     # 8. Trading / transfer.
     db.claim(GUILD, second["id"], BOB)
     db.transfer(GUILD, top["id"], BOB)

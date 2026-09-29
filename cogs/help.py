@@ -184,7 +184,7 @@ CATEGORIES = [
         ("renames", "every word you changed"),
     ]),
     ("🌟", "Wish settings", [
-        ("starwish", "your one favourite"),
+        ("starwish", "5x wish, costs slots"),
         ("wishdm", "pings by DM"),
         ("wishsort", "how it sorts"),
         ("wishprotect", "how long it holds"),

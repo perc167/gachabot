@@ -6,6 +6,7 @@ from discord.ext import commands
 import utils
 import config
 import perks
+import wishes
 from views import CharacterPicker, Paginator, choose_character
 
 
@@ -29,15 +30,13 @@ class Wishlist(commands.Cog):
         if not character:
             return
 
-        limit = (
-            db.get_setting(gid, "wish_limit")
-            + db.get_player(gid, ctx.author.id)["extra_wish_slots"]
-            + perks.effective(db, gid, ctx.author.id)["wish_slots"]
-        )
-        if db.wish_count(gid, ctx.author.id) >= limit:
+        if any(r["id"] == character["id"] for r in db.starwishes_of(gid, ctx.author.id)):
+            await ctx.send(f"**{character['name']}** is already one of your starwishes.")
+            return
+        if wishes.room(db, gid, ctx.author.id) <= 0:
             await ctx.send(
-                f"Your wishlist is full ({limit})."
-                f" Drop one with `{ctx.prefix}unwish <name>`."
+                f"Your wishlist is full ({wishes.capacity(db, gid, ctx.author.id)} slots,"
+                f" starwishes included). Drop one with `{ctx.prefix}unwish <name>`."
             )
             return
 
@@ -60,6 +59,7 @@ class Wishlist(commands.Cog):
     async def unwish(self, ctx, *, name: str = None):
         """`$unwish` — pick from your wishlist, or name someone directly."""
         db = self.bot.db
+        gid = ctx.guild.id
         if name:
             matches = db.find_characters_by_name(name, guild_id=gid)
             character = await choose_character(
@@ -96,22 +96,20 @@ class Wishlist(commands.Cog):
         member = member or ctx.author
         db = self.bot.db
         gid = ctx.guild.id
+        starred = db.starwishes_of(gid, member.id)
         rows = db.wishes_of(gid, member.id)
-        if not rows:
+        if not rows and not starred:
             await ctx.send(f"{member.display_name} has no wishes.")
             return
 
-        limit = (
-            db.get_setting(gid, "wish_limit")
-            + db.get_player(gid, member.id)["extra_wish_slots"]
-            + perks.effective(db, gid, member.id)["wish_slots"]
-        )
+        limit = wishes.capacity(db, gid, member.id)
         lines = []
-        for i, row in enumerate(rows, 1):
+        for i, row in enumerate([*starred, *rows], 1):
             owner_id = db.owner_of(gid, row["id"])
             state = f"owned by <@{owner_id}>" if owner_id else "free"
+            mark = "\u2b50 " if i <= len(starred) else ""
             lines.append(
-                f"`{i:>2}.` **{row['name']}** • {row['series']}"
+                f"`{i:>2}.` {mark}**{row['name']}** • {row['series']}"
                 f" • {row['likes']} ♥ • {state}"
             )
 
@@ -124,7 +122,8 @@ class Wishlist(commands.Cog):
                 colour=0x4EA8DE,
             )
             embed.set_footer(
-                text=f"Page {page_no}/{len(pages)} • {len(rows)}/{limit} wishes"
+                text=f"Page {page_no}/{len(pages)} • {wishes.used(db, gid, member.id)}/{limit}"
+                     f" slots used • \u2b50 starwishes use 2, then 4, then 6"
             )
             embeds.append(embed)
 

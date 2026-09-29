@@ -10,6 +10,7 @@ from discord.ext import commands
 import config
 import perks
 import utils
+import wishes
 from views import Confirm, Paginator, choose_character
 
 
@@ -142,14 +143,10 @@ class Bulk(commands.Cog):
         if not title:
             return
 
-        limit = (
-            db.get_setting(gid, "wish_limit")
-            + db.get_player(gid, ctx.author.id)["extra_wish_slots"]
-            + perks.effective(db, gid, ctx.author.id)["wish_slots"]
-        )
-        room = limit - db.wish_count(gid, ctx.author.id)
+        room = wishes.room(db, gid, ctx.author.id)
         if room <= 0:
-            await ctx.send(f"Your wishlist is full ({limit}).")
+            await ctx.send(f"Your wishlist is full"
+                           f" ({wishes.capacity(db, gid, ctx.author.id)} slots).")
             return
 
         cast = db.characters_in_series(title, guild_id=ctx.guild.id)
@@ -184,7 +181,10 @@ class Bulk(commands.Cog):
             return
         for row in rows:
             db.remove_wish(gid, ctx.author.id, row["id"])
-        await ctx.send(f"Cleared **{len(rows)}** wishes.")
+        kept = db.starwish_count(gid, ctx.author.id)
+        await ctx.send(f"Cleared **{len(rows)}** wishes."
+                       + (f" Your {kept} starwish{'es' if kept != 1 else ''} stayed;"
+                          f" `{ctx.prefix}starwish remove <name>` drops one." if kept else ""))
 
     @commands.command(name="series", aliases=["sr", "mudanime", "anime", "sl"])
     @commands.guild_only()

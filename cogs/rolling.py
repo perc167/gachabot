@@ -6,6 +6,7 @@ from discord.ext import commands
 
 import config
 import perks
+import wishes
 import utils
 from cogs.personalise import word
 from utils import fmt_duration, karuda_value
@@ -262,6 +263,10 @@ class Rolling(commands.Cog):
         wish_chance = perks.effective(db, gid, ctx.author.id)["wish_chance"]
         if wish_chance and random.random() * 100 < wish_chance:
             character = db.random_wish(gid, ctx.author.id, include_claimed)
+        if character is None:
+            # Wishes and starwishes tilt your own rolls towards them.
+            character = wishes.boosted_roll(db, gid, ctx.author.id,
+                                            gender=gender, kind=kind)
         if character is None:
             character = db.random_character(
                 gid, include_claimed, db.get_setting(gid, "roll_bias"),
