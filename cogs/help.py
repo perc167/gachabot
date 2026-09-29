@@ -1,9 +1,12 @@
-"""Help: every command on one page, sent by DM.
+"""Help: every command, sent by DM, grouped by what it's for.
 
 The old version put each section behind a dropdown, which meant knowing which
 section a command lived in before you could find it - exactly backwards for
-somebody who does not know the command yet. So it is one page now: every
-command visible at once, grouped, three columns, one short line each.
+somebody who does not know the command yet. So nothing is hidden: every
+command is there to scroll through, one short line each. But the gacha,
+moderation, voice and the rest each get their own message with their name at
+the top (AREAS), after a short contents page, so they don't run together.
+`$help gacha` shows one area on its own, in the channel.
 
 Each line is a command and what it does in two or three words. Anything
 longer belongs in `$help <command>`, which prints the full description, the
@@ -574,6 +577,53 @@ CATEGORIES = [
 
 TOTAL = sum(len(entries) for *_, entries in CATEGORIES)
 
+# (key, icon, title, what's in it, [section names], other names people might
+# type for it). Every section in CATEGORIES is in exactly one area.
+AREAS = [
+    ("gacha", "\U0001f3b2", "Gacha", "rolling, harems, karuda, wishes, trading and more", [
+        "Rolling", "Your harem", "Harem tools", "Clearing out", "Karuda", "Shop",
+        "Badges & tower", "Bonds", "Wishes", "Likes", "Trading", "You",
+        "Your own characters", "Leaderboards", "Your words", "Wish settings", "Tea",
+        "Nicknames", "Artwork", "Finding things", "Notes", "Resets \u2014 yours",
+    ], ("mudae", "roll", "rolls", "harem")),
+    ("gachasetup", "\u2699\ufe0f", "Gacha setup", "settings and switches for admins", [
+        "Server admin", "Switches \u2014 pool", "Switches \u2014 cards",
+        "Switches \u2014 karuda", "Resets \u2014 server",
+    ], ("gachasettings", "switches", "gachaadmin")),
+    ("mod", "\U0001f6e1\ufe0f", "Moderation", "jail, mutes, warnings, bans, automod and staff points", [
+        "Moderation", "Jail & mutes", "Warnings", "Kicks & bans", "Cleaning up",
+        "Records & names", "Mod setup", "Automod", "Staff points",
+    ], ("moderation", "mods", "staff")),
+    ("voice", "\U0001f50a", "Voice", "your own voice rooms and hours in voice", [
+        "Voice rooms", "Voice hours",
+    ], ("vc", "voicemaster")),
+    ("levels", "\U0001f4c8", "Levels", "XP, level cards, the leaderboard and level roles", [
+        "Levels", "Level setup",
+    ], ("level", "xp", "leveling", "levelling")),
+    ("server", "\U0001f44b", "Server", "autoroles, welcomes, snipes, AFK, reminders and info", [
+        "Utility", "Welcome & roles", "Auto replies & reaction roles",
+    ], ("utility", "welcome", "tools")),
+    ("premium", "\u2728", "Premium", "Premium extras and making Paper yours", [
+        "Premium", "Make Paper yours",
+    ], ("plus", "upgrade")),
+    ("fun", "\U0001f3ad", "Fun", "games and toys", [
+        "Games", "Toy box", "Word games",
+    ], ("games", "toys")),
+    ("about", "\U0001f4d6", "About", "the bot itself", [
+        "About", "Bot owner",
+    ], ("info", "bot")),
+]
+
+
+def area_for(word: str):
+    """The area someone means by `$help <word>`, or None."""
+    word = word.lower().strip()
+    for area in AREAS:
+        key, _icon, title, _what, _sections, others = area
+        if word in (key, title.lower(), title.lower().replace(" ", "")) or word in others:
+            return area
+    return None
+
 
 # Discord refuses an embed over 6000 characters and more than 25 fields, and
 # caps a whole message at 6000 across its embeds. Rather than thin the list
@@ -581,6 +631,7 @@ TOTAL = sum(len(entries) for *_, entries in CATEGORIES)
 # below the true limit so a long section can never straddle it.
 PAGE_BUDGET = 5200
 PAGE_FIELDS = 24
+MESSAGE_BUDGET = 5800       # all the embeds in one message together
 
 
 def _section(prefix: str, icon: str, name: str, entries) -> tuple:
@@ -592,46 +643,77 @@ def _section(prefix: str, icon: str, name: str, entries) -> tuple:
     )
 
 
-def help_pages(prefix: str) -> list:
-    """Every command, across as few messages as it fits in.
-
-    Sections are inline fields, so Discord lays them out three across rather
-    than as one long column. Sections are packed greedily and a new page
-    starts before the limit rather than after it, which means adding commands
-    never silently truncates the list - it just spills onto another message.
-    """
-    pages, fields, size = [], [], 0
-    for icon, name, entries in CATEGORIES:
-        field = _section(prefix, icon, name, entries)
+def _pack(fields) -> list:
+    """Fields into pages, packed greedily. A new page starts before a limit
+    rather than after it, so adding commands never silently truncates the
+    list - it just spills onto another message."""
+    pages, page, size = [], [], 0
+    for field in fields:
         cost = len(field[0]) + len(field[1])
-        if fields and (size + cost > PAGE_BUDGET or len(fields) >= PAGE_FIELDS):
-            pages.append(fields)
-            fields, size = [], 0
-        fields.append(field)
+        if page and (size + cost > PAGE_BUDGET or len(page) >= PAGE_FIELDS):
+            pages.append(page)
+            page, size = [], 0
+        page.append(field)
         size += cost
-    if fields:
-        pages.append(fields)
+    if page:
+        pages.append(page)
+    return pages
 
+
+def area_pages(prefix: str, area) -> list:
+    """One area's commands: its sections three across, over as few messages
+    as they fit in, each titled with the area."""
+    key, icon, title, _what, names, _others = area
+    by_name = {n: (i, n, entries) for i, n, entries in CATEGORIES}
+    fields = [_section(prefix, *by_name[name]) for name in names]
+    pages = _pack(fields)
     embeds = []
     for number, page in enumerate(pages, 1):
         embed = discord.Embed(
-            title="Every command" + (f"  ·  {number}/{len(pages)}"
-                                     if len(pages) > 1 else ""),
-            colour=config.CARD_COLOUR,
-        )
-        if number == 1:
-            embed.description = (
-                f"Type the command after `{prefix}` — so `{prefix}w` to roll.\n"
-                f"**New here?** `{prefix}w`, press **Claim**, then `{prefix}dk`"
-                f" for your daily.\n"
-                f"Want detail on one? `{prefix}help <command>`."
-            )
+            title=f"{icon}  {title}" + (f"  \u00b7  {number}/{len(pages)}"
+                                        if len(pages) > 1 else ""),
+            colour=config.CARD_COLOUR)
         for field_name, value in page:
             embed.add_field(name=field_name, value=value, inline=True)
         if number == len(pages):
-            embed.set_footer(text=f"{TOTAL} commands")
+            count = sum(len(by_name[name][2]) for name in names)
+            embed.set_footer(text=f"{count} commands \u00b7 {prefix}help {key} for just these")
         embeds.append(embed)
     return embeds
+
+
+def help_pages(prefix: str) -> list:
+    """Every command: a contents page, then each area in turn."""
+    contents = discord.Embed(title="Paper's commands", colour=config.CARD_COLOUR)
+    contents.description = (
+        f"Type the command after `{prefix}` \u2014 so `{prefix}w` to roll.\n"
+        f"**New here?** `{prefix}w`, press **Claim**, then `{prefix}dk` for your daily.\n\n"
+        + "\n".join(f"{icon} **{title}** \u2014 {what}  \u00b7  `{prefix}help {key}`"
+                     for key, icon, title, what, _names, _others in AREAS)
+        + f"\n\nDetail on one command: `{prefix}help <command>`."
+    )
+    contents.set_footer(text=f"{TOTAL} commands")
+    embeds = [contents]
+    for area in AREAS:
+        embeds += area_pages(prefix, area)
+    return embeds
+
+
+def batches(embeds) -> list:
+    """Embeds grouped into as few messages as Discord takes: up to ten a
+    message and 6,000 characters across them. Each area keeps its own box,
+    it's just fewer DMs."""
+    messages, current, size = [], [], 0
+    for embed in embeds:
+        cost = len(embed)
+        if current and (len(current) >= 10 or size + cost > MESSAGE_BUDGET):
+            messages.append(current)
+            current, size = [], 0
+        current.append(embed)
+        size += cost
+    if current:
+        messages.append(current)
+    return messages
 
 
 def help_embed(prefix: str) -> discord.Embed:
@@ -652,28 +734,37 @@ class Help(commands.Cog):
             await self._one_command(ctx, command.strip().lstrip(prefix), prefix)
             return
 
-        pages = help_pages(prefix)
+        messages = batches(help_pages(prefix))
         try:
-            for embed in pages:
-                await ctx.author.send(embed=embed)
+            for embeds in messages:
+                await ctx.author.send(embeds=embeds)
         except discord.Forbidden:
             # DMs closed. Post it here rather than failing silently, which
             # would look like the command is broken.
             await ctx.send(
                 content=f"{ctx.author.mention} your DMs are closed, so here it is.",
-                embed=pages[0],
+                embeds=messages[0],
             )
-            for embed in pages[1:]:
-                await ctx.send(embed=embed)
+            for embeds in messages[1:]:
+                await ctx.send(embeds=embeds)
             return
         if ctx.guild:
             note = "sent you a DM \U0001f4ec"
-            if len(pages) > 1:
-                note = f"sent you {len(pages)} DMs \U0001f4ec"
+            if len(messages) > 1:
+                note = f"sent you {len(messages)} DMs \U0001f4ec"
             await ctx.send(f"{ctx.author.mention} {note}")
 
     async def _one_command(self, ctx, name: str, prefix: str):
+        area = area_for(name)
         found = self.bot.get_command(name.lower())
+        # An area wins over a command of the same name only where the
+        # command is the area's own front door (`levels`, `vc`, `premium`);
+        # `$help info` still means the command.
+        if area and (not found or found.qualified_name in ("levels", "level", "vc", "upgrade")
+                     or name.lower() in (area[0], area[2].lower())):
+            for embed in area_pages(prefix, area):
+                await ctx.send(embed=embed)
+            return
         if not found:
             await ctx.send(
                 f"No command called `{name}`. Try `{prefix}help` for the list."

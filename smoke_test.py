@@ -1505,9 +1505,27 @@ async def main():
     check("help shows every section",
           sum(len(p.fields) for p in pages) == len(helpmod.CATEGORIES),
           str(sum(len(p.fields) for p in pages)))
-    check("help pages are numbered when there is more than one",
-          len(pages) == 1 or all("/" in p.title for p in pages))
+    in_areas = [n for *_x, names, _o in helpmod.AREAS for n in names]
+    check("every help section is in exactly one area",
+          sorted(in_areas) == sorted(n for _i, n, _e in helpmod.CATEGORIES),
+          str(set(in_areas) ^ {n for _i, n, _e in helpmod.CATEGORIES}))
+    check("help opens with its contents, then an area per message",
+          not pages[0].fields and all(any(title in p.title for p in pages)
+                                      for _k, _i, title, *_r in helpmod.AREAS))
+    for area in helpmod.AREAS:
+        mine = helpmod.area_pages("$", area)
+        if len(mine) > 1 and not all("/" in p.title for p in mine):
+            check(f"{area[2]} help pages are numbered", False)
+    check("$help gacha, mod and levels find their areas",
+          helpmod.area_for("gacha")[0] == "gacha" and helpmod.area_for("Moderation")[0] == "mod"
+          and helpmod.area_for("mod")[0] == "mod" and helpmod.area_for("levels")[0] == "levels"
+          and helpmod.area_for("jail") is None)
     check("help needs no clicking", not hasattr(helpmod, "HelpView"))
+    sent = helpmod.batches(pages)
+    check("help goes out in a few messages Discord will take",
+          len(sent) < len(pages) and all(len(m) <= 10 and sum(len(e) for e in m) <= 6000
+                                         for m in sent) and sum(map(len, sent)) == len(pages),
+          str([sum(len(e) for e in m) for m in sent]))
 
     listed = [command for _icon, _name, entries in helpmod.CATEGORIES
               for command, _gloss in entries]
