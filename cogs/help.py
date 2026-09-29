@@ -80,8 +80,11 @@ CATEGORIES = [
     ("\U0001f3c5", "Badges & tower", [
         ("badges", "seven materials, four levels each"),
         ("buybadge", "climb one a level"),
-        ("tower", "your tower"),
-        ("ktup", "climb a floor"),
+        ("kt", "the karuda tower"),
+        ("build", "build a floor"),
+        ("destroy", "refund your tower"),
+        ("towervalue", "what floors cost"),
+        ("haremcolor", "your harem colour"),
         ("perks", "everything you have earned"),
     ]),
     ("\U0001f496", "Bonds", [
@@ -500,7 +503,7 @@ CATEGORIES = [
         ("takach", "taka"),
         ("takawai", "too cute"),
         ("eater", "eat it"),
-        ("destroy", "destroy something"),
+        ("smash", "smash something"),
     ]),
     ("\u270d\ufe0f", "Word games", [
         ("noun", "a random noun"),
@@ -511,7 +514,7 @@ CATEGORIES = [
         ("poem", "four lines"),
         ("quote", "fake wisdom"),
         ("invent", "invent something"),
-        ("build", "build something"),
+        ("craft", "make something"),
         ("date", "how the date goes"),
         ("fate", "ask fate"),
         ("say", "repeat it back"),

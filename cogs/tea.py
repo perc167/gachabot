@@ -15,6 +15,7 @@ import discord
 from discord.ext import commands
 
 import config
+import perks
 import utils
 
 # key: (display name, icon, what it does, price in karuda)
@@ -99,8 +100,8 @@ class Tea(commands.Cog):
             outcome = (f"**+{amount:,}** {config.CURRENCY} —"
                        f" you have **{now:,}**.")
         else:  # yellowtea
-            held = db.add_keys(gid, user, 1)
-            outcome = f"**+1 key** — you hold **{held}**."
+            got, held = perks.earn_keys(db, gid, user, 1)
+            outcome = f"**+{got} key{'s' if got > 1 else ''}** — you hold **{held}**."
 
         note = ""
         if key == "mixtea":

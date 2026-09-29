@@ -207,7 +207,7 @@ class Fun(commands.Cog):
         """Eat it."""
         await self._react(ctx, "eater")
 
-    @commands.command(name="destroy")
+    @commands.command(name="smash")
     async def destroy(self, ctx, *, thing: str = None):
         """Destroy something."""
         if thing:
@@ -273,7 +273,7 @@ class Fun(commands.Cog):
             f"your {random.choice(NOUNS)} {random.choice(ADVERBS)}."
         )
 
-    @commands.command(name="build")
+    @commands.command(name="craft")
     async def build(self, ctx):
         """Build something out of nothing."""
         await ctx.send(

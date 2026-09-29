@@ -414,7 +414,9 @@ class Cooldowns:
 
     def start_karuda_cooldown(self, guild_id: int, user_id: int):
         minutes = self.db.get_setting(guild_id, "karuda_interval_minutes")
-        self.db.update_player(guild_id, user_id, karuda_ready_at=now() + minutes * 60)
+        sooner = perks.effective(self.db, guild_id, user_id)["grab_cooldown"]
+        self.db.update_player(guild_id, user_id,
+                              karuda_ready_at=now() + int(minutes * 60 * (100 - sooner) / 100))
 
 
 def character_embed(

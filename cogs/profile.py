@@ -100,8 +100,8 @@ class Profile(commands.Cog):
             )
             embed.add_field(
                 name="Progress",
-                value=f"Tower floor **{player['tower_floor']}**"
-                      f"/{perks.MAX_FLOOR}  {perks.bar(player['tower_floor'], perks.MAX_FLOOR)}"
+                value=f"Tower level **{player['tower_floor']}**  "
+                      f"{perks.bar(player['tower_floor'] % perks.MAX_FLOOR or (perks.MAX_FLOOR if player['tower_floor'] else 0), perks.MAX_FLOOR)}"
                       + (f"\n{marks}" if marks else "")
                       + f"\n_{perks.describe(earned)}_",
                 inline=False,

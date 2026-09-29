@@ -112,23 +112,78 @@ def requirement(badge) -> str:
     needed = " + ".join(f"{BADGES_BY_KEY[k].name} {tier}" for k in STARTERS)
     return f"{needed} or 2 badges {ROMAN[-1]}"
 
-# Tower floors, climbed in order. Each is (cost, what it adds).
-# Costs rise faster than income does, so the top floors are a long project
-# rather than a weekend.
-TOWER_FLOORS = [
-    (2500, {"rolls": 1}),
-    (4000, {"grab_percent": 2}),
-    (6500, {"claim_percent": 5}),
-    (10000, {"rolls": 1}),
-    (16000, {"grab_percent": 3}),
-    (25000, {"wish_slots": 3}),
-    (40000, {"claim_percent": 7}),
-    (65000, {"rolls": 2}),
-    (100000, {"grab_percent": 5}),
-    (160000, {"daily_percent": 25}),
-]
+# The karuda tower, as Mudae builds it ($kt): twelve floors, and each floor
+# is a perk you choose, a different one each time. Every floor costs
+# FLOOR_STEP more than the last, whichever tower it's in. Build all twelve
+# and a new tower starts on top, with every bonus halved again; the cost
+# keeps climbing. $destroy pulls the lot down and refunds every karuda.
+#
+# Mudae's perks are for Mudae's systems. Where Paper has the same thing
+# (wish slots, the starwish, rolls) the perk is the same; where it doesn't
+# (disable lists, kakera power, reactions) it's the nearest thing Paper has.
+#
+# number: (what it does at full strength, {perk: amount})
+TOWER_PERKS = {
+    1: ("+{wish_slots} wishlist slots", {"wish_slots": 2}),
+    2: ("Increased spawn chance for your $starwish: +{star_boost}%", {"star_boost": 50}),
+    3: ("Claim cooldown -{claim_percent}%", {"claim_percent": 10}),
+    4: ("{key_on_wish}% chance to earn a key when you claim one of your wishes",
+        {"key_on_wish": 30}),
+    5: ("{key_on_claim}% chance to earn a key when you claim anyone", {"key_on_claim": 20}),
+    6: ("{extra_key}% chance to earn a 2nd key whenever you earn one", {"extra_key": 10}),
+    7: ("Karuda from grabs and $dk increased to {karuda_power}%", {"karuda_percent": 10}),
+    8: ("Karuda grabs come back {grab_cooldown}% sooner", {"grab_cooldown": 20}),
+    9: ("$dk shards are worth +{daily_percent}%", {"daily_percent": 25}),
+    10: ("$dk shows +{daily_offers} extra shard to choose from", {"daily_offers": 1}),
+    11: ("+{rolls} roll per window", {"rolls": 1}),
+    12: ("$haremcolor unlocked: your own colour on $harem", {"harem_colour": 1}),
+}
+PER_TOWER = len(TOWER_PERKS)
+FLOOR_STEP = 5000
 
-MAX_FLOOR = len(TOWER_FLOORS)
+
+def floor_cost(built: int) -> int:
+    """What the next floor costs, with `built` floors up already."""
+    return FLOOR_STEP * (built + 1)
+
+
+def tower_scale(tower: int) -> float:
+    """Tower 1 gives the full bonus, tower 2 half, tower 3 a quarter..."""
+    return 0.5 ** (max(1, tower) - 1)
+
+
+def floor_perk(perk: int, tower: int = 1) -> dict:
+    """What one floor gives in a given tower. Never rounds a perk to
+    nothing: a halved +1 roll is still +1."""
+    scale = tower_scale(tower)
+    return {key: max(1, round(amount * scale))
+            for key, amount in TOWER_PERKS[perk][1].items()}
+
+
+def perk_text(perk: int, tower: int = 1) -> str:
+    template, _base = TOWER_PERKS[perk]
+    values = floor_perk(perk, tower)
+    values["karuda_power"] = 100 + values.get("karuda_percent", 0)
+    return template.format(**values)
+
+
+def tower_layout(rows) -> tuple:
+    """(the tower being built now, perks already in it, floors in total)
+    from a player's tower_floors rows."""
+    total = len(rows)
+    tower = total // PER_TOWER + 1
+    built = {r["perk"] for r in rows if r["tower"] == tower}
+    return tower, built, total
+
+
+def tower_perks(rows) -> dict:
+    """Everything every floor of every tower adds up to."""
+    return combine(*(floor_perk(r["perk"], r["tower"]) for r in rows))
+
+
+# Floors per tower, for progress bars.
+MAX_FLOOR = PER_TOWER
+
 
 # Naming one character your soulmate is free and reversible, so the perk is
 # small - it is a statement, not a build.
@@ -149,20 +204,15 @@ EMPTY = {
     # the price of every other badge. Both arrived with the levelled badges.
     "wish_chance": 0,
     "badge_discount": 0,
+    # From the tower's chosen floors.
+    "star_boost": 0,
+    "key_on_wish": 0,
+    "key_on_claim": 0,
+    "extra_key": 0,
+    "grab_cooldown": 0,
+    "daily_offers": 0,
+    "harem_colour": 0,
 }
-
-
-def floor_cost(floor: int):
-    """What it costs to climb to `floor`. None if there is no such floor."""
-    if 1 <= floor <= MAX_FLOOR:
-        return TOWER_FLOORS[floor - 1][0]
-    return None
-
-
-def floor_perk(floor: int) -> dict:
-    if 1 <= floor <= MAX_FLOOR:
-        return TOWER_FLOORS[floor - 1][1]
-    return {}
 
 
 def describe(perks: dict) -> str:
@@ -184,6 +234,18 @@ def describe(perks: dict) -> str:
         parts.append(f"+{perks['wish_chance']}% wish rolls")
     if perks.get("badge_discount"):
         parts.append(f"-{perks['badge_discount']}% badge prices")
+    if perks.get("star_boost"):
+        parts.append(f"+{perks['star_boost']}% starwish")
+    if perks.get("key_on_wish") or perks.get("key_on_claim"):
+        parts.append("keys from claims")
+    if perks.get("extra_key"):
+        parts.append(f"{perks['extra_key']}% double keys")
+    if perks.get("grab_cooldown"):
+        parts.append(f"-{perks['grab_cooldown']}% grab wait")
+    if perks.get("daily_offers"):
+        parts.append(f"+{perks['daily_offers']} $dk shard")
+    if perks.get("harem_colour"):
+        parts.append("harem colour")
     return " · ".join(parts) or "nothing yet"
 
 
@@ -196,11 +258,6 @@ def combine(*sources) -> dict:
     return total
 
 
-def tower_perks(floor: int) -> dict:
-    """Everything the climb so far has granted, cumulatively."""
-    return combine(*(floor_perk(n) for n in range(1, min(floor, MAX_FLOOR) + 1)))
-
-
 def effective(db, guild_id: int, user_id: int) -> dict:
     """Every perk a player currently has, from badges, their tower, and
     the server's Premium."""
@@ -208,7 +265,7 @@ def effective(db, guild_id: int, user_id: int) -> dict:
     badge_perks = [BADGES_BY_KEY[key].perk_at(level)
                    for key, level in owned.items() if key in BADGES_BY_KEY]
     player = db.get_player(guild_id, user_id)
-    sources = [*badge_perks, tower_perks(player["tower_floor"])]
+    sources = [*badge_perks, tower_perks(db.tower_floors_of(guild_id, user_id))]
     if player["soulmate_id"]:
         sources.append(SOULMATE_PERK)
     if db.is_premium(guild_id):
@@ -219,7 +276,20 @@ def effective(db, guild_id: int, user_id: int) -> dict:
     # Nor should every roll be a wish, or badges end up free.
     result["wish_chance"] = min(result["wish_chance"], 40)
     result["badge_discount"] = min(result["badge_discount"], 40)
+    result["grab_cooldown"] = min(result["grab_cooldown"], 60)
+    for key in ("key_on_wish", "key_on_claim", "extra_key"):
+        result[key] = min(result[key], 100)
+    result["daily_offers"] = min(result["daily_offers"], 3)
     return result
+
+
+def earn_keys(db, guild_id: int, user_id: int, amount: int = 1, rng=None) -> tuple:
+    """Give keys, with the tower's chance of a 2nd. Returns (given, held)."""
+    import random
+    rng = rng or random
+    if amount > 0 and rng.random() * 100 < effective(db, guild_id, user_id)["extra_key"]:
+        amount += 1
+    return amount, db.add_keys(guild_id, user_id, amount)
 
 
 def badge_price(db, guild_id: int, user_id: int, badge, level: int):

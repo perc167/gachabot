@@ -244,7 +244,8 @@ class Karuda(commands.Cog):
         # The cooldown starts now rather than on choosing, so walking away
         # from the decision costs you the day.
         drops = []
-        for _ in range(DAILY_OFFERS):
+        offers = DAILY_OFFERS + perks.effective(db, gid, ctx.author.id)["daily_offers"]
+        for _ in range(offers):
             key, name, _fallback, multiplier, _weight, colour = config.roll_shard(
                 random
             )

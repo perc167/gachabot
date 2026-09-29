@@ -2400,13 +2400,14 @@ async def main():
     check("a locked badge says what it needs",
           all(perksmod.requirement(b) for b in locked)
           and not perksmod.requirement(perksmod.BADGES[0]))
-    check("tower costs only go up",
-          [c for c, _ in perksmod.TOWER_FLOORS]
-          == sorted(c for c, _ in perksmod.TOWER_FLOORS))
+    check("each tower floor costs 5,000 more than the last",
+          [perksmod.floor_cost(n) for n in range(4)] == [5000, 10000, 15000, 20000])
+    check("the tower has Mudae's twelve perks",
+          sorted(perksmod.TOWER_PERKS) == list(range(1, 13)))
     check("no perk key is a typo",
           all(b.perk in perksmod.EMPTY for b in perksmod.BADGES)
           and all(set(p).issubset(perksmod.EMPTY)
-                  for _c, p in perksmod.TOWER_FLOORS))
+                  for _t, p in perksmod.TOWER_PERKS.values()))
 
     CLIMBER = 777
     base = perksmod.effective(db, GUILD, CLIMBER)
@@ -2447,11 +2448,22 @@ async def main():
                     "  AND user_id = ? AND badge = ?", (GUILD, CLIMBER, "iron"))
     db.conn.commit()
 
-    db.update_player(GUILD, CLIMBER, tower_floor=4)
+    db.add_karuda(GUILD, CLIMBER, 5000 + 10000 + 15000 + 20000)
+    for perk in (11, 3, 7, 1):
+        tower, _built, total = perksmod.tower_layout(db.tower_floors_of(GUILD, CLIMBER))
+        db.build_floor(GUILD, CLIMBER, tower, perk, perksmod.floor_cost(total))
     stacked = perksmod.effective(db, GUILD, CLIMBER)
-    check("tower perks accumulate up the floors",
-          stacked["rolls"] == 2 + 2 and stacked["grab_percent"] == 2
-          and stacked["claim_percent"] == 5, str(stacked))
+    check("the floors you choose are the perks you get",
+          stacked["rolls"] == 2 + 1 and stacked["claim_percent"] == 10
+          and stacked["karuda_percent"] == 10 and stacked["wish_slots"] >= 2
+          and db.get_player(GUILD, CLIMBER)["tower_floor"] == 4
+          and db.get_player(GUILD, CLIMBER)["karuda"] == 0, str(stacked))
+    db.add_karuda(GUILD, CLIMBER, 25000)
+    check("a perk can't be built twice in one tower",
+          not db.build_floor(GUILD, CLIMBER, 1, 11, 25000)
+          and db.get_player(GUILD, CLIMBER)["karuda"] == 25000)
+    check("a floor you can't afford isn't built",
+          not db.build_floor(GUILD, CLIMBER, 1, 2, 999999))
 
     # Extra rolls have to reach the actual roll budget, not just the display.
     db.update_player(GUILD, CLIMBER, rolls_reset_at=0)
@@ -2466,7 +2478,7 @@ async def main():
     # a shared boundary, so a perk only has room to help while that boundary
     # is still further away than the shortened wait - run this late in a
     # window and both times are the boundary, correctly and uninformatively.
-    db.update_player(GUILD, CLIMBER, tower_floor=0)
+    db.destroy_tower(GUILD, CLIMBER)
     real_now = utils.now
     window = cd.claim_window(GUILD)[1]
     utils.now = lambda: (real_now() // window) * window
@@ -2528,8 +2540,35 @@ async def main():
           perksmod.describe(perksmod.EMPTY) == "nothing yet")
     check("bar fills proportionally",
           perksmod.bar(5, 10).count("▰") == 5)
-    check("top floor has no next cost",
-          perksmod.floor_cost(perksmod.MAX_FLOOR + 1) is None)
+    check("the second tower gives half, never nothing",
+          perksmod.floor_perk(1, 2) == {"wish_slots": 1} and perksmod.floor_perk(11, 2) == {"rolls": 1}
+          and perksmod.floor_perk(4, 2) == {"key_on_wish": 15})
+    fake_rows = [{"tower": 1, "perk": n} for n in range(1, 13)] + [{"tower": 2, "perk": 5}]
+    check("after 12 floors a new tower starts",
+          perksmod.tower_layout(fake_rows) == (2, {5}, 13))
+    TW = GUILD + 95
+    db.add_karuda(TW, CLIMBER, 15000)
+    db.build_floor(TW, CLIMBER, 1, 2, 5000)
+    db.build_floor(TW, CLIMBER, 1, 6, 10000)
+    check("$destroy refunds every karuda and every perk",
+          db.destroy_tower(TW, CLIMBER) == (2, 15000)
+          and db.get_player(TW, CLIMBER)["karuda"] == 15000
+          and perksmod.effective(db, TW, CLIMBER)["star_boost"] == 0)
+    db.update_player(TW, CLIMBER + 1, tower_floor=3)
+    db._refund_old_towers()
+    check("an old climb-in-order tower is refunded once",
+          db.get_player(TW, CLIMBER + 1)["karuda"] == 2500 + 4000 + 6500
+          and db.get_player(TW, CLIMBER + 1)["tower_floor"] == 0)
+    db._refund_old_towers()
+    check("and not twice", db.get_player(TW, CLIMBER + 1)["karuda"] == 13000)
+    got = []
+    real_rand = perksmod.effective
+    perksmod.effective = lambda *a: {**perksmod.EMPTY, "extra_key": 100}
+    try:
+        got.append(perksmod.earn_keys(db, TW, CLIMBER, 1)[0])
+    finally:
+        perksmod.effective = real_rand
+    check("perk 6 can double a key", got == [2])
     check("tower leaderboard finds the climber",
           any(r["user_id"] == CLIMBER for r in db.top_towers(GUILD))
           or db.get_player(GUILD, CLIMBER)["tower_floor"] == 0)

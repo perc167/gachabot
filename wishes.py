@@ -64,7 +64,8 @@ def boosted_roll(db, guild_id: int, user_id: int, gender: str = None,
     candidates = db.wish_candidates(guild_id, user_id, gender=gender, kind=kind)
     if not candidates:
         return None
-    weights = [STAR_WEIGHT if starred else 1 for _row, starred in candidates]
+    star = STAR_WEIGHT * (100 + perks.effective(db, guild_id, user_id)["star_boost"]) / 100
+    weights = [star if starred else 1 for _row, starred in candidates]
     if rng.random() >= chance(sum(weights)):
         return None
     return rng.choices([row for row, _starred in candidates], weights=weights, k=1)[0]

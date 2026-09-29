@@ -3,12 +3,25 @@ import discord
 from discord.ext import commands
 
 import config
+import perks
 import utils
 from cogs.personalise import word
 from views import CharacterPicker, Paginator, choose_character
 
 ORDERS = ("likes", "name", "recent", "karuda")
 
+
+
+def harem_colour(db, guild_id: int, user_id: int):
+    """The colour someone chose for their harem with $haremcolor, if the
+    tower's perk 12 is theirs; otherwise None."""
+    colour = db.get_player_pref(guild_id, user_id, "harem_colour")
+    if colour and perks.effective(db, guild_id, user_id)["harem_colour"]:
+        try:
+            return int(colour)
+        except (TypeError, ValueError):
+            return None
+    return None
 
 class NoteModal(discord.ui.Modal, title="Note"):
     text = discord.ui.TextInput(
@@ -107,13 +120,57 @@ class Harem(commands.Cog):
             if note:
                 footer = f"“{note}” • {footer}"
             image = db.random_image(row["id"]) or row["image_url"]
-            embeds.append(
-                utils.character_embed(db, gid, row, image_url=image,
-                                      footer=footer[:2048])
-            )
+            card = utils.character_embed(db, gid, row, image_url=image,
+                                         footer=footer[:2048])
+            colour = harem_colour(db, gid, member.id)
+            if colour is not None:
+                card.colour = colour
+            embeds.append(card)
             art.append(image)
 
         await Paginator(embeds, ctx.author.id, art=art).start(ctx)
+
+    @commands.command(name="haremcolor", aliases=["haremcolour", "colormm", "colourmm"])
+    @commands.guild_only()
+    async def haremcolor(self, ctx, *, value: str = None):
+        """Tower perk 12: your own colour on $harem. A colour name, a hex
+        code, or `reset`."""
+        from cogs.moderation import COLOURS
+        db = self.bot.db
+        gid, uid = ctx.guild.id, ctx.author.id
+        if not perks.effective(db, gid, uid)["harem_colour"]:
+            await ctx.send(f"Your own harem colour is perk **12** of the tower."
+                           f" `{ctx.prefix}kt` to see it, `{ctx.prefix}build 12` to get it.")
+            return
+        if not value:
+            current = harem_colour(db, gid, uid)
+            await ctx.send(embed=discord.Embed(
+                title="Harem colour",
+                description=(f"Yours is `#{current:06X}`." if current is not None
+                             else "You're using the server's colour.")
+                + f"\n`{ctx.prefix}haremcolor pink` or `{ctx.prefix}haremcolor #FF77AA`,"
+                  f" or `{ctx.prefix}haremcolor reset`.\nNames: "
+                + ", ".join(f"`{name}`" for name in COLOURS),
+                colour=current if current is not None else config.CARD_COLOUR))
+            return
+        key = value.strip().lstrip("#").lower()
+        if key in ("reset", "default", "off"):
+            db.set_player_pref(gid, uid, "harem_colour", "")
+            await ctx.send("Your harem uses the server's colour again.")
+            return
+        if key in COLOURS:
+            colour = COLOURS[key]
+        else:
+            try:
+                colour = int(key, 16)
+            except ValueError:
+                colour = -1
+        if not 0 <= colour <= 0xFFFFFF:
+            await ctx.send("Give me a colour name or a hex code like `FF77AA`.")
+            return
+        db.set_player_pref(gid, uid, "harem_colour", str(colour))
+        await ctx.send(embed=discord.Embed(description=f"Your harem is `#{colour:06X}` now.",
+                                           colour=colour))
 
     @commands.command(name="haremlist", aliases=["mml", "mmt", "haremtext"])
     @commands.guild_only()
@@ -149,8 +206,8 @@ class Harem(commands.Cog):
                       f"{word(self.bot.db, ctx.guild.id, member.id, 'harem_name')}"
                       f" — {len(rows)} characters",
                 description="\n".join(page),
-                colour=self.bot.db.get_pref(ctx.guild.id, "cardcolour",
-                                            config.CARD_COLOUR),
+                colour=harem_colour(self.bot.db, ctx.guild.id, member.id)
+                or self.bot.db.get_pref(ctx.guild.id, "cardcolour", config.CARD_COLOUR),
             )
             # The first character on the page, so a list still has a face on
             # it rather than being a wall of text.

@@ -83,6 +83,16 @@ class ClaimView(discord.ui.View):
         cooldowns.start_claim_cooldown(self.guild_id, user.id)
         self.claimed_by = user.id
 
+        # The tower's key perks: a chance of a key for claiming one of your
+        # own wishes, or anyone at all.
+        earned = perks.effective(db, self.guild_id, user.id)
+        chance = max(earned["key_on_claim"],
+                     earned["key_on_wish"] if user.id in self.wishers else 0)
+        key_note = ""
+        if chance and random.random() * 100 < chance:
+            got, held = perks.earn_keys(db, self.guild_id, user.id, 1)
+            key_note = f" \U0001f511 +{got} key{'s' if got > 1 else ''} (you hold {held})"
+
         # Wishes are consumed once granted, for everyone who wanted them.
         for wisher in self.wishers:
             db.remove_wish(self.guild_id, wisher, self.character["id"])
@@ -98,7 +108,7 @@ class ClaimView(discord.ui.View):
         await interaction.followup.send(
             f"{user.mention} "
             f"{word(db, self.guild_id, user.id, 'claim_word')}"
-            f" **{self.character['name']}**!"
+            f" **{self.character['name']}**!{key_note}"
         )
         self.stop()
 

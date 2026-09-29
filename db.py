@@ -148,6 +148,18 @@ CREATE TABLE IF NOT EXISTS wishes (
 CREATE INDEX IF NOT EXISTS idx_wishes_character
     ON wishes (guild_id, character_id);
 
+-- The karuda tower (perks.py): one row per floor built, with the perk chosen
+-- for it and what it cost, so $destroy can refund exactly.
+CREATE TABLE IF NOT EXISTS tower_floors (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    tower    INTEGER NOT NULL,
+    perk     INTEGER NOT NULL,
+    cost     INTEGER NOT NULL,
+    built_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (guild_id, user_id, tower, perk)
+);
+
 -- Starwishes (wishes.py): a wish that costs more slots and tilts rolls
 -- harder. Not a flag on wishes, because a starwish needs no plain wish.
 CREATE TABLE IF NOT EXISTS starwishes (
@@ -636,8 +648,31 @@ class Database:
         self.conn.executescript(SCHEMA)
         self._migrate()
         self._convert_old_badges()
+        self._refund_old_towers()
         self.conn.executescript(INDEXES)
         self.conn.commit()
+
+    # What the floors of the old, climb-in-order tower cost, for refunding it.
+    OLD_TOWER_COSTS = (2500, 4000, 6500, 10000, 16000, 25000, 40000, 65000,
+                       100000, 160000)
+
+    def _refund_old_towers(self):
+        """The tower used to be climbed in a fixed order, a set perk per
+        floor. Now every floor is a perk you choose, so an old climb can't be
+        carried over: whoever climbed it gets back everything they paid and
+        builds again as they like. Runs once: a refunded tower is floor 0,
+        and a new one always has its floors written down."""
+        rows = self.conn.execute(
+            "SELECT p.guild_id, p.user_id, p.tower_floor FROM players p"
+            " WHERE p.tower_floor > 0 AND NOT EXISTS (SELECT 1 FROM tower_floors t"
+            "  WHERE t.guild_id = p.guild_id AND t.user_id = p.user_id)").fetchall()
+        with self.conn:
+            for row in rows:
+                paid = sum(self.OLD_TOWER_COSTS[:row["tower_floor"]])
+                self.conn.execute(
+                    "UPDATE players SET karuda = karuda + ?, tower_floor = 0"
+                    " WHERE guild_id = ? AND user_id = ?",
+                    (paid, row["guild_id"], row["user_id"]))
 
     def _migrate(self):
         """Add columns that landed after someone already had a database."""
@@ -3686,6 +3721,45 @@ class Database:
             (guild_id, character_id, guild_id, character_id),
         ).fetchall()
         return [r["user_id"] for r in rows]
+
+    # ---------- the karuda tower ----------
+
+    def tower_floors_of(self, guild_id: int, user_id: int) -> list:
+        return self.conn.execute(
+            "SELECT * FROM tower_floors WHERE guild_id = ? AND user_id = ?"
+            " ORDER BY tower, built_at, perk", (guild_id, user_id)).fetchall()
+
+    def build_floor(self, guild_id: int, user_id: int, tower: int, perk: int,
+                    cost: int) -> bool:
+        """Pay for and add one floor, in one go. False if they can't afford
+        it or already have that perk in this tower."""
+        with self.conn:
+            player = self.get_player(guild_id, user_id)
+            if player["karuda"] < cost:
+                return False
+            cur = self.conn.execute(
+                "INSERT OR IGNORE INTO tower_floors (guild_id, user_id, tower, perk, cost,"
+                " built_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (guild_id, user_id, tower, perk, cost, time.time_ns()))
+            if not cur.rowcount:
+                return False
+            self.conn.execute(
+                "UPDATE players SET karuda = karuda - ?, tower_floor = tower_floor + 1"
+                " WHERE guild_id = ? AND user_id = ?", (cost, guild_id, user_id))
+        return True
+
+    def destroy_tower(self, guild_id: int, user_id: int) -> tuple:
+        """Pull every floor down and refund what they cost: (floors, karuda)."""
+        with self.conn:
+            row = self.conn.execute(
+                "SELECT COUNT(*) AS n, COALESCE(SUM(cost), 0) AS paid FROM tower_floors"
+                " WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)).fetchone()
+            self.conn.execute("DELETE FROM tower_floors WHERE guild_id = ? AND user_id = ?",
+                              (guild_id, user_id))
+            self.conn.execute(
+                "UPDATE players SET karuda = karuda + ?, tower_floor = 0"
+                " WHERE guild_id = ? AND user_id = ?", (row["paid"], guild_id, user_id))
+        return row["n"], row["paid"]
 
     # ---------- starwishes ----------
 
