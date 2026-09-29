@@ -73,12 +73,32 @@ FRAMES_PER_EPISODE = 60
 PER_CHARACTER = 6
 
 # On the thumbnail, enough to be worth a closer look. On the full frame,
-# enough to keep. Two thresholds because the thumbnail is 250 pixels wide and
-# the model was trained on 448.
+# enough to keep - and high, because the model answers 0.96 to 1.00 when it
+# is genuinely right: at 0.72 a blond stranger got into Gojou's album and
+# somebody else into Hitagi's.
 SHORTLIST = 0.45
-CONFIRM = 0.72
+CONFIRM = 0.85
 # Somebody else in shot. The whole point is frames of them alone.
 INTRUDER = 0.40
+
+# The model counts people whether or not it can name them, which is what
+# catches the second person in a frame when that person is nobody it knows -
+# Tadano beside Komi, Ritsu beside Mio.
+CROWD = ("2girls", "3girls", "4girls", "5girls", "6+girls", "multiple_girls",
+         "2boys", "3boys", "4boys", "5boys", "6+boys", "multiple_boys")
+
+# There is no tag for "a boy and a girl": the model says 1girl and 1boy at
+# once, which is how Tadano stood beside Komi in a frame that passed every
+# other check. One of each is still two people.
+GIRLS = ("1girl", "2girls", "3girls", "4girls", "5girls", "6+girls")
+BOYS = ("1boy", "2boys", "3boys", "4boys", "5boys", "6+boys")
+BOTH = 0.50
+
+# Credits, title cards and subtitled frames: text, not a picture of anybody.
+LETTERING = ("credits", "subtitled", "text_focus", "english_text",
+             "japanese_text", "character_name", "copyright_name", "logo",
+             "watermark")
+BUSY = 0.35
 
 SAME_IMAGE_BITS = 8
 
@@ -135,6 +155,8 @@ class Tagger:
         self.characters = {row["name"] for row in rows if row["category"] == "4"}
         self.character_index = [n for n, row in enumerate(rows)
                                 if row["category"] == "4"]
+        self.general_index = [n for n, row in enumerate(rows)
+                              if row["category"] == "0"]
 
     def prepare(self, image):
         from PIL import Image
@@ -151,12 +173,36 @@ class Tagger:
         array = self.np.asarray(square, dtype=self.np.float32)[:, :, ::-1]
         return self.np.expand_dims(array, 0)
 
-    def characters_in(self, image) -> dict:
-        """{character tag: confidence} for everyone the model sees."""
+    def read(self, image) -> tuple:
+        """(characters, other tags) the model sees, each with a confidence."""
         probs = self.session.run(
             None, {self.input.name: self.prepare(image)})[0][0]
-        return {self.names[n]: float(probs[n]) for n in self.character_index
-                if probs[n] >= 0.25}
+        people = {self.names[n]: float(probs[n]) for n in self.character_index
+                  if probs[n] >= 0.25}
+        rest = {self.names[n]: float(probs[n])
+                for n in self.general_index if probs[n] >= 0.25}
+        return people, rest
+
+    def characters_in(self, image) -> dict:
+        """{character tag: confidence} for everyone the model sees."""
+        return self.read(image)[0]
+
+    def alone(self, image, tag: str) -> bool:
+        """Is this a frame of `tag`, by themselves, with no lettering on it?"""
+        people, rest = self.read(image)
+        if people.get(tag, 0.0) < CONFIRM:
+            return False
+        if any(other != tag and value >= INTRUDER
+               for other, value in people.items()):
+            return False
+        if any(rest.get(word, 0.0) >= BUSY for word in CROWD):
+            return False
+        if (any(rest.get(word, 0.0) >= BOTH for word in GIRLS)
+                and any(rest.get(word, 0.0) >= BOTH for word in BOYS)):
+            return False
+        if any(rest.get(word, 0.0) >= BUSY for word in LETTERING):
+            return False
+        return True
 
 
 def image_from(data: bytes):
@@ -307,6 +353,27 @@ def spread(items: list, count: int) -> list:
     return [items[int(n * step)] for n in range(count)]
 
 
+def prefetch(urls, ahead: int = 4):
+    """Yield images in order, with several downloads in flight.
+
+    Tagging a frame costs about as long as fetching one, and doing them in
+    turn wastes half the clock. Each image carries the url it came from, so
+    a caller can record it without keeping a parallel list.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    urls = list(urls)
+    if not urls:
+        return
+    with ThreadPoolExecutor(max_workers=ahead) as pool:
+        for url, data in zip(urls, pool.map(lambda one: fetch(one, tries=2),
+                                            urls)):
+            image = image_from(data)
+            if image is not None:
+                image.url = url
+            yield image
+
+
 def series_plan(top: int) -> tuple:
     """Which series to sweep, and which characters each one is being swept for."""
     sys.path.insert(0, ROOT)
@@ -372,11 +439,7 @@ def harvest(tagger, series: str, wanted: list, budget: int) -> dict:
             image = image_from(fetch(FULL.format(frame), tries=2))
             if image is None or dull(image):
                 continue
-            seen = tagger.characters_in(image)
-            if seen.get(tag, 0.0) < CONFIRM:
-                continue
-            if any(other != tag and value >= INTRUDER
-                   for other, value in seen.items()):
+            if not tagger.alone(image, tag):
                 continue
             mark = fingerprint(image)
             if any(alike(mark, other) for other in prints):
@@ -390,12 +453,52 @@ def harvest(tagger, series: str, wanted: list, budget: int) -> dict:
     return found
 
 
+def verify(out_path: str):
+    """Re-check saved frames against the current rules, dropping the failures."""
+    import json as _json
+
+    with io.open(out_path, encoding="utf-8") as handle:
+        frames = _json.load(handle)
+    tags = _json.load(io.open(TAGS, encoding="utf-8"))
+    tagger = Tagger()
+
+    checked = dropped = 0
+    for key, urls in list(frames.items()):
+        tag = tags.get(key, "")
+        if not tag:
+            continue
+        kept = []
+        for image in prefetch(urls):
+            checked += 1
+            if image is None or dull(image):
+                dropped += 1
+                continue
+            if tagger.alone(image, tag):
+                kept.append(image.url)
+            else:
+                dropped += 1
+        if kept:
+            frames[key] = kept
+        else:
+            del frames[key]
+        with io.open(out_path, "w", encoding="utf-8", newline="\n") as handle:
+            _json.dump(frames, handle, ensure_ascii=False)
+
+    print(f"checked {checked:,} frames, dropped {dropped:,};"
+          f" {len(frames):,} characters keep"
+          f" {sum(len(v) for v in frames.values()):,}")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument("--top", type=int, default=500)
     parser.add_argument("--out", default=OUT)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--verify", action="store_true",
+                        help="re-check the frames already saved against the"
+                             " current rules instead of sweeping again")
     parser.add_argument("--budget", type=int, default=EPISODES * FRAMES_PER_EPISODE,
                         help="most thumbnails to scan per series")
     args = parser.parse_args()
@@ -405,6 +508,9 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+
+    if args.verify:
+        return verify(args.out)
 
     plan, unknown = series_plan(args.top)
     tagger = Tagger()
