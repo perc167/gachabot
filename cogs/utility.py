@@ -18,6 +18,7 @@ import discord
 from discord.ext import commands, tasks
 
 import config
+from converters import FuzzyRole
 from cogs.modtools import parse_duration
 
 SNIPE_FOR = 2 * 3600          # seconds a deleted or edited message stays snipable
@@ -284,7 +285,7 @@ class Utility(commands.Cog):
         await ctx.send(embed=embed)
 
     @commands.command(name="roleinfo", aliases=["ri"])
-    async def roleinfo(self, ctx, *, role: discord.Role):
+    async def roleinfo(self, ctx, *, role: FuzzyRole):
         """About a role: who has it, its colour, and what it can do."""
         embed = discord.Embed(title=role.name, colour=role.colour if role.colour.value
                               else config.CARD_COLOUR)
@@ -467,7 +468,7 @@ class Utility(commands.Cog):
     @commands.command(name="role", aliases=["giverole", "r"])
     @commands.has_permissions(manage_roles=True)
     @commands.bot_has_permissions(manage_roles=True)
-    async def role(self, ctx, member: discord.Member, *, role: discord.Role):
+    async def role(self, ctx, member: discord.Member, *, role: FuzzyRole):
         """`$role @someone @role`: gives them the role, or takes it away if
         they have it."""
         me = ctx.guild.me

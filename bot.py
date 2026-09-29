@@ -12,6 +12,7 @@ from discord.ext import commands
 
 import backup
 import config
+from converters import NoSuchRole
 import views
 from db import Database
 import utils
@@ -409,6 +410,14 @@ class GachaBot(commands.Bot):
             return
         if isinstance(error, commands.NotOwner):
             await ctx.send("Owner-only command.")
+            return
+        if isinstance(error, NoSuchRole):
+            await ctx.send(str(error), allowed_mentions=discord.AllowedMentions.none())
+            return
+        if isinstance(error, commands.MemberNotFound):
+            await ctx.send(f"I couldn't find **{discord.utils.escape_markdown(error.argument[:50])}**"
+                           " in this server. Try a mention or their user ID.",
+                           allowed_mentions=discord.AllowedMentions.none())
             return
         if isinstance(error, (commands.BadArgument, commands.MissingRequiredArgument)):
             await ctx.send(f"Usage: `{config.PREFIX}{ctx.command.qualified_name} {ctx.command.signature}`")

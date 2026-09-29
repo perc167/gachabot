@@ -556,6 +556,40 @@ async def main():
           .guide("mod-commands.md") and "$" not in bd.Build(fake_bot, fake_guild, "!")
           .guide("mod-commands.md").split("\n", 3)[3])
 
+    # $role finds roles the way people say them.
+    import converters
+
+    class _R:
+        def __init__(self, name, position, managed=False, default=False):
+            self.name, self.position, self.managed, self._d = name, position, managed, default
+
+        def is_default(self):
+            return self._d
+
+        def __lt__(self, other):
+            return self.position < other.position
+
+    names = ["「 ✦ OWNER ✦ 」", "「 ✦ Co-owner ✦ 」",
+             "「 ✦ Admin ✦ 」", "「 ✦ Mod ✦ 」",
+             "「 ✦ Trial ✦ 」", "Jailed", "muted", "imuted",
+             "-ˏˋ ✶ ˊˎ- heiarchy -ˏˋ ✶ ˊˎ-"]
+    rs = [_R("@everyone", 0, default=True)] + [_R(n, 20 - i) for i, n in enumerate(names)]
+    rs.append(_R("Moderator Bot", 30, managed=True))
+    paper_top = _R("PAPER", 40)
+    fake = NS(roles=rs, me=NS(top_role=paper_top))
+
+    def found(query):
+        role = converters.closest_role(fake, query)
+        return converters.plain(role.name) if role else None
+    check("$role finds decorated roles from plain words",
+          found("mod") == "mod" and found("MOD") == "mod" and found("trial") == "trial"
+          and found("coowner") == "co owner" and found("co owner") == "co owner"
+          and found("own") == "owner", str([found(q) for q in ("mod", "trial", "coowner", "own")]))
+    check("$role forgives typos and picks the exact one first",
+          found("trail") == "trial" and found("admn") == "admin" and found("muted") == "muted"
+          and found("jail") == "jailed" and found("hierarchy") == "heiarchy"
+          and found("zzzz") is None)
+
     # Utility: snipes expire, reminders come due.
     from cogs import utility as ut
     tool = b.get_cog("Utility")

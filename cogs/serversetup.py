@@ -19,6 +19,7 @@ import discord
 from discord.ext import commands
 
 import config
+from converters import FuzzyRole
 
 KINDS = ("welcome", "goodbye")
 DEFAULTS = {
@@ -156,7 +157,7 @@ class ServerSetup(commands.Cog):
 
     @autorole.command(name="add")
     @commands.has_permissions(manage_roles=True)
-    async def autorole_add(self, ctx, *, role: discord.Role):
+    async def autorole_add(self, ctx, *, role: FuzzyRole):
         """Give new members this role too."""
         why = usable_role(ctx.guild, role)
         roles = self.db.autoroles_of(ctx.guild.id)
@@ -171,7 +172,7 @@ class ServerSetup(commands.Cog):
 
     @autorole.command(name="remove")
     @commands.has_permissions(manage_roles=True)
-    async def autorole_remove(self, ctx, *, role: discord.Role):
+    async def autorole_remove(self, ctx, *, role: FuzzyRole):
         """Stop giving new members this role."""
         roles = self.db.autoroles_of(ctx.guild.id)
         self.db.replace_autoroles(ctx.guild.id, [r for r in roles if r != role.id])
@@ -401,7 +402,7 @@ class ServerSetup(commands.Cog):
     @commands.has_permissions(manage_roles=True)
     @commands.bot_has_permissions(manage_roles=True, add_reactions=True)
     async def reactionrole_add(self, ctx, message: discord.Message, emoji: str, *,
-                               role: discord.Role):
+                               role: FuzzyRole):
         """`$rr add <message link> <emoji> @role`: reacting gives the role,
         un-reacting takes it away."""
         if message.guild != ctx.guild:
