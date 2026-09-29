@@ -19,6 +19,9 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ART = os.path.join(ROOT, "data", "character_art.json")
 FRAMES = os.path.join(ROOT, "data", "character_frames.json")
+# Which full-size frame each cropped file was cut from, written by
+# tools/crop_frames.py.
+SOURCES = os.path.join(ROOT, "data", "frame_sources.json")
 
 # What an album holds at most. Past this it is a chore to flip through.
 LIMIT = 8
@@ -41,23 +44,46 @@ def main():
 
     art = load(args.art)
     frames = load(args.frames)
+    # A cropped frame and the 1920x1080 it came from are the same picture, so
+    # an album that carries both shows it twice - which is exactly what
+    # happened the first time these were merged.
+    sources = set(load(SOURCES).values())
 
     merged = dict(art)
-    gained = replaced = 0
+    gained = replaced = superseded = 0
     for key, shots in frames.items():
         if not shots:
             continue
-        existing = [url for url in merged.get(key, []) if url not in shots]
+        existing = []
+        for url in merged.get(key, []):
+            if url in shots:
+                continue
+            if url in sources:
+                superseded += 1
+                continue
+            existing.append(url)
         if key not in merged or not merged[key]:
             gained += 1
         else:
             replaced += 1
         merged[key] = (list(shots) + existing)[:LIMIT]
 
+    # Anywhere else in the file that still points at a frame we have cropped.
+    for key, urls in merged.items():
+        if key in frames:
+            continue
+        kept = [url for url in urls if url not in sources]
+        if len(kept) != len(urls):
+            superseded += len(urls) - len(kept)
+            merged[key] = kept
+
     total = sum(len(v) for v in merged.values())
     with_album = sum(1 for v in merged.values() if v)
     print(f"{len(frames):,} characters have frames:"
           f" {gained:,} had nothing before, {replaced:,} now lead with them")
+    if superseded:
+        print(f"dropped {superseded:,} uncropped copies of frames already"
+              f" in the album")
     print(f"the art file holds {with_album:,} characters and {total:,} images")
 
     if args.dry_run:
