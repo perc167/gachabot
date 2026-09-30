@@ -92,12 +92,23 @@ def plan_label(plan: str) -> str:
     return price_label() if plan == "premium" else _labels.get(plan, "")
 
 
+# Prices are shown in US dollars, whatever Stripe charges in. The account is
+# Australian, so the prices are AUD; this is AUD -> USD (29 Sep 2026), and
+# a converted price is rounded to the nearest 50 cents so it reads cleanly.
+TO_USD = {"aud": 0.70045}
+# Said wherever the prices are, so a checkout page in AUD is no surprise.
+PRICE_NOTE = "Prices in US dollars. Stripe bills in AUD, so checkout may differ by a few cents."
+
+
 def describe_price(price: dict) -> str:
     """A Stripe price as words, e.g. "$2.99 a month"."""
     amount = price.get("unit_amount")
     currency = (price.get("currency") or "").lower()
     if not isinstance(amount, int):
         return ""
+    if currency in TO_USD:
+        amount = max(50, round(amount * TO_USD[currency] / 50) * 50)
+        currency = "usd"
     money = f"{amount / 100:.2f}"
     symbol = SYMBOLS.get(currency)
     money = f"{symbol}{money}" if symbol else f"{money} {currency.upper()}"

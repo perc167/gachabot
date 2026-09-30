@@ -222,7 +222,7 @@ class Dashboard(commands.Cog):
                     if tier == "lifetime" else
                     f"\u2728 **{ctx.guild.name}** has {name} until <t:{row['until']}:D>.")
             if plans:
-                text += "\n\nGo further:\n" + plans
+                text += "\n\nGo further:\n" + plans + f"\n-# {billing.PRICE_NOTE}"
             if link:
                 text += f"\nManage it on the dashboard: <{link}>"
         else:
@@ -230,7 +230,7 @@ class Dashboard(commands.Cog):
                     " stays free; Premium adds these for everyone here:\n\n"
                     + premium.perk_lines())
             if billing.configured():
-                text += (f"\n\n{plans}\n\nTry Premium free for {billing.TRIAL_DAYS} days."
+                text += (f"\n\n{plans}\n-# {billing.PRICE_NOTE}\n\nTry Premium free for {billing.TRIAL_DAYS} days."
                          + (f" An admin can pick a plan on the dashboard: <{link}>" if link else ""))
             else:
                 text += "\n\nIt isn't on sale just yet."
@@ -306,8 +306,8 @@ class Dashboard(commands.Cog):
                                             scopes=("bot",))))
         base = public_url()
         if base:
-            for plan, fallback in (("premium", "A$4.99/mo"), ("plus", "A$15/mo"),
-                                   ("lifetime", "A$50 once")):
+            for plan, fallback in (("premium", "$3.50/mo"), ("plus", "$10.50/mo"),
+                                   ("lifetime", "$35 once")):
                 price = (billing.plan_label(plan).replace(" a month", "/mo")
                          .replace(".00", "") or fallback)
                 name = {"premium": "Premium", "plus": "Plus", "lifetime": "Lifetime"}[plan]
@@ -484,6 +484,7 @@ class Dashboard(commands.Cog):
             "premium_sale": {"for_sale": billing.configured(),
                              "price": billing.price_label(),
                              "plans": self.plans(),
+                             "price_note": billing.PRICE_NOTE,
                              "trial_days": billing.TRIAL_DAYS,
                              "perks": premium.perk_groups()},
         }, headers=HEADERS)
@@ -765,6 +766,7 @@ class Dashboard(commands.Cog):
             "billing": bool(row and row["customer"]),
             "for_sale": billing.configured(),
             "price": billing.price_label(),
+            "price_note": billing.PRICE_NOTE,
             "trial": billing.configured() and self.bot.db.trial_available(guild.id),
             "trial_days": billing.TRIAL_DAYS,
             "trialing": bool(row and active and row["status"] == "trialing"),

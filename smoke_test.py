@@ -271,6 +271,10 @@ async def main():
           billing.describe_price({"unit_amount": 299, "currency": "usd",
                                   "recurring": {"interval": "month"}}) == "$2.99 a month"
           and billing.describe_price({"unit_amount": 500, "currency": "sek"}) == "5.00 SEK"
+          and billing.describe_price({"unit_amount": 499, "currency": "aud",
+                                      "recurring": {"interval": "month"}}) == "$3.50 a month"
+          and billing.describe_price({"unit_amount": 1500, "currency": "aud"}) == "$10.50"
+          and billing.describe_price({"unit_amount": 5000, "currency": "aud"}) == "$35.00"
           and billing.describe_price({}) == "")
 
     # XP boosts: the best role boost, times the channel's (or its
