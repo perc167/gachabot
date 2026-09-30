@@ -23,6 +23,7 @@ STRIPE_API_BASE exists only so tests can stand in for Stripe.
 
 Talks to Stripe's REST API directly, so there's no extra dependency.
 """
+import asyncio
 import hashlib
 import hmac
 import json
@@ -125,11 +126,26 @@ def describe_price(price: dict) -> str:
 
 async def load_price_label():
     """Ask Stripe what each plan costs, for plan_label()."""
+    # Each plan on its own, so one bad price ID can't blank all three. The
+    # USD amount needs an expand; if Stripe refuses it, the plain price
+    # still gives a converted label.
     for plan in PLANS:
-        if plan_on_sale(plan):
-            label = describe_price(await _call(
-                "GET", f"/v1/prices/{price_id(plan)}?expand[]=currency_options"))
-            _labels[plan] = label + (" once" if PLANS[plan][1] == "payment" else "")
+        if not plan_on_sale(plan):
+            continue
+        path = f"/v1/prices/{price_id(plan)}"
+        try:
+            try:
+                price = await _call("GET", path + "?expand[]=currency_options")
+            except BillingError as error:
+                logging.getLogger("billing").warning(
+                    "%s price without its currencies: %s", plan, error)
+                price = await _call("GET", path)
+        except (BillingError, OSError, asyncio.TimeoutError) as error:
+            logging.getLogger("billing").warning(
+                "couldn't read the %s price (%s): %s", plan, price_id(plan), error)
+            continue
+        label = describe_price(price)
+        _labels[plan] = label + (" once" if PLANS[plan][1] == "payment" else "")
 
 
 async def _call(method: str, path: str, form: dict = None) -> dict:
