@@ -1,0 +1,159 @@
+"""Checks the albums of everyone who gained episode frames.
+
+    python tools/audit_albums.py --dry-run
+    python tools/audit_albums.py
+
+Two questions, asked of every picture in those albums:
+
+  Is it still them, alone? The frames were checked before they were cropped,
+  and a crop can ruin that - the attention crop keeps what is visually
+  interesting, which is not always the character, so a frame that passed can
+  come out as scenery with an elbow in it.
+
+  Is it already in the album? Twice over: the same file twice, which the
+  merge now prevents, and two different files that are the same picture,
+  which nothing has looked for. Near-duplicates are compared by an 8x8
+  average hash, so a crop and its original, or two frames a second apart,
+  count as one.
+
+Anything failing either question is dropped. Nobody is left with an empty
+album: a character whose every frame fails keeps whatever art they had.
+"""
+import argparse
+import io
+import json
+import os
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ART = os.path.join(ROOT, "data", "character_art.json")
+FRAMES = os.path.join(ROOT, "data", "character_frames.json")
+TAGS = os.path.join(ROOT, "data", "character_art_tags.json")
+ART_DIR = os.path.join(ROOT, "assets", "characters")
+
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+sys.path.insert(0, ROOT)
+
+# Two pictures whose 8x8 thumbnails differ in fewer bits than this are the
+# same picture as far as a player flipping through them is concerned.
+SAME_BITS = 8
+
+
+def load(path: str) -> dict:
+    with io.open(path, encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def open_image(url: str, fetch):
+    """The picture behind an album entry, local file or link."""
+    from PIL import Image
+
+    if url.startswith("local:"):
+        path = os.path.join(ART_DIR, url[len("local:"):])
+        if not os.path.exists(path):
+            return None
+        try:
+            image = Image.open(path)
+            image.load()
+            return image
+        except Exception:  # noqa: BLE001 - a broken file is a dropped entry
+            return None
+    data = fetch(url, tries=2)
+    if not data:
+        return None
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+        return image
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
+    import fetch_episode_frames as frames_tool
+
+    art = load(ART)
+    frames = load(FRAMES)
+    tags = load(TAGS)
+    tagger = frames_tool.Tagger()
+
+    checked = not_alone = duplicate = broken = 0
+    emptied = []
+    for key in sorted(frames):
+        album = art.get(key) or []
+        if not album:
+            continue
+        tag = tags.get(key, "")
+        kept, marks = [], []
+
+        for url in album:
+            image = open_image(url, frames_tool.fetch)
+            checked += 1
+            if image is None:
+                broken += 1
+                continue
+
+            mark = frames_tool.fingerprint(image)
+            if any(frames_tool.alike(mark, seen) for seen in marks):
+                duplicate += 1
+                continue
+
+            # Only the frames are re-judged. The official art was chosen by
+            # its own rules and is not a frame of anything.
+            if url.startswith("local:frame-") and tag:
+                if not tagger.alone(image, tag):
+                    not_alone += 1
+                    continue
+
+            marks.append(mark)
+            kept.append(url)
+
+        if kept:
+            art[key] = kept
+        else:
+            emptied.append(key.split("\x1f")[0])
+            art.pop(key, None)
+
+    print(f"checked {checked:,} pictures across {len(frames):,} albums")
+    print(f"  dropped {not_alone:,} where the crop no longer shows them alone")
+    print(f"  dropped {duplicate:,} that repeat a picture already there")
+    print(f"  dropped {broken:,} that would not open")
+    if emptied:
+        print(f"  {len(emptied)} left with nothing: {', '.join(emptied[:6])}")
+
+    # And the frames file, so a later merge does not put them back.
+    kept_local = {url for urls in art.values() for url in urls}
+    trimmed = {}
+    for key, urls in frames.items():
+        alive = [url for url in urls if url in kept_local]
+        if alive:
+            trimmed[key] = alive
+
+    total = sum(len(v) for v in art.values())
+    print(f"\nthe art file holds {sum(1 for v in art.values() if v):,}"
+          f" characters and {total:,} pictures")
+
+    if args.dry_run:
+        print("\nDry run, nothing written.")
+        return 0
+
+    with io.open(ART, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(art, handle, ensure_ascii=False)
+    with io.open(FRAMES, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(trimmed, handle, ensure_ascii=False)
+    print(f"\nWrote {ART} and {FRAMES}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

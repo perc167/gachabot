@@ -274,9 +274,16 @@ def pick(posts, tag: str, want: int) -> list:
     return chosen
 
 
+# Set by --only-screenshots: frames from the episodes and nothing else, even
+# when that leaves a character with none.
+SCREENSHOTS_ONLY = False
+
+
 def images_for_tag(tag: str, want: int) -> list:
     """Screenshots first, then official art to fill the album up."""
     found = pick(screenshot_posts(tag), tag, want)
+    if SCREENSHOTS_ONLY:
+        return found[:want]
     if len(found) < want:
         for url in pick(official_posts(tag), tag, want - len(found)):
             if url not in found:
@@ -321,6 +328,9 @@ def main():
     parser.add_argument("--out", default=OUT)
     parser.add_argument("--tags", default=TAGS)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--only-screenshots", action="store_true",
+                        help="frames from the episodes and nothing else - no"
+                             " official art to fill the gaps")
     parser.add_argument("--refilter", action="store_true",
                         help="keep the tags already resolved and only fetch"
                              " and re-filter their images, which skips two"
@@ -333,6 +343,9 @@ def main():
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+
+    global SCREENSHOTS_ONLY
+    SCREENSHOTS_ONLY = args.only_screenshots
 
     sys.path.insert(0, ROOT)
     import utils
@@ -368,7 +381,9 @@ def main():
                 tags.update(json.load(handle))
         # Characters whose name matched no tag last time will not match one
         # now either; leave them empty rather than paying for the lookup.
-        art = {k: [] for k, tag in tags.items() if not tag}
+        wanted_keys = {key(r) for r in rows}
+        art = {k: [] for k, tag in tags.items()
+               if not tag and k in wanted_keys}
         todo = [r for r in rows if tags.get(key(r))]
         print(f"re-filtering {len(todo):,} characters with a known tag")
     else:

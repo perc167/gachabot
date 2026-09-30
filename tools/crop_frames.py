@@ -41,10 +41,23 @@ WIDTH, HEIGHT = 640, 854
 QUALITY = 82
 DELAY = 0.25
 
+# Cuts are tried in order and the first that still shows the character alone
+# is kept. Entropy leads because it wins: of 109 frames whose attention crop
+# had lost the character, entropy recovered 56 and attention 7. The busiest
+# part of an animation cel is the character; the most salient part is often
+# a light source or a bright sky.
+CUTS = (
+    ("entropy", WIDTH, HEIGHT, "&a=entropy"),
+    ("attention", WIDTH, HEIGHT, "&a=attention"),
+    ("centre", WIDTH, HEIGHT, ""),
+    ("wide", 680, 850, "&a=entropy"),
+)
 
-def cropped_url(source: str) -> str:
+
+def cropped_url(source: str, width: int = WIDTH, height: int = HEIGHT,
+                extra: str = "&a=entropy") -> str:
     return (PROXY + "?url=" + urllib.parse.quote(source, safe="")
-            + f"&w={WIDTH}&h={HEIGHT}&fit=cover&a=attention&q={QUALITY}")
+            + f"&w={width}&h={height}&fit=cover&q={QUALITY}" + extra)
 
 
 def local_name(source: str) -> str:
@@ -94,18 +107,45 @@ def main():
 
     from PIL import Image
 
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    sys.path.insert(0, ROOT)
+    import fetch_episode_frames as frames_tool
+
+    tags = {}
+    tag_path = os.path.join(ROOT, "data", "character_art_tags.json")
+    if os.path.exists(tag_path):
+        with io.open(tag_path, encoding="utf-8") as handle:
+            tags = json.load(handle)
+    owner = {url: key for key, urls in frames.items() for url in urls}
+    tagger = frames_tool.Tagger()
+
     done, failed, bytes_written = 0, 0, 0
+    by_cut = {}
     for number, source in enumerate(todo, 1):
         name = local_name(source)
         path = os.path.join(ART_DIR, name)
         if not os.path.exists(path):
-            data = fetch(cropped_url(source))
-            try:
-                image = Image.open(io.BytesIO(data))
-                image.load()
-            except Exception:  # noqa: BLE001 - a bad crop is a skipped frame
+            tag = tags.get(owner.get(source, ""), "")
+            won = None
+            for label, width, height, extra in CUTS:
+                data = fetch(cropped_url(source, width, height, extra))
+                try:
+                    image = Image.open(io.BytesIO(data))
+                    image.load()
+                except Exception:  # noqa: BLE001 - try the next cut
+                    continue
+                # A crop that cut the character out, or left somebody else
+                # in, is not worth keeping - and finding that out now saves
+                # an audit pass later.
+                if tag and not tagger.alone(image, tag):
+                    continue
+                won = (label, data)
+                break
+            if not won:
                 failed += 1
                 continue
+            label, data = won
+            by_cut[label] = by_cut.get(label, 0) + 1
             with open(path, "wb") as handle:
                 handle.write(data)
         sources[name] = source
@@ -137,6 +177,11 @@ def main():
 
     print(f"\n{done:,} frames cropped to {WIDTH}x{HEIGHT},"
           f" {bytes_written / 1e6:.0f} MB in assets/characters/")
+    if by_cut:
+        print("cuts that worked: "
+              + ", ".join(f"{label} {count}" for label, count in by_cut.items()))
+    if failed:
+        print(f"{failed:,} had no cut that keeps the character alone")
     print("Now run: python tools/merge_art.py")
     return 0
 

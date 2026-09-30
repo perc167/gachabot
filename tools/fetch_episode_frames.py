@@ -99,8 +99,21 @@ LETTERING = ("credits", "subtitled", "text_focus", "english_text",
              "japanese_text", "character_name", "copyright_name", "logo",
              "watermark")
 BUSY = 0.35
+# Lettering gets a lower bar than a second person: credits over a face read
+# as small, faint text and the model is less sure of them, but an album
+# picture with writing across it is wrong either way.
+LETTERED = 0.22
 
-SAME_IMAGE_BITS = 8
+# Two shots a second apart are the same picture to somebody flipping
+# through an album, so this is generous rather than exact.
+SAME_IMAGE_BITS = 12
+
+# What makes a frame worth keeping, beyond being the right person. A frame
+# of one eye in the dark passes every identity check and is still a bad
+# picture, which is what Emilia's album was full of.
+CLOSE_UP = ("close-up", "eye_focus", "extreme_closeup")
+GOOD_FRAMING = ("upper_body", "cowboy_shot", "portrait", "looking_at_viewer",
+                "full_body", "solo_focus")
 
 
 def fetch(url: str, tries: int = 3, timeout: int = 40):
@@ -187,9 +200,9 @@ class Tagger:
         """{character tag: confidence} for everyone the model sees."""
         return self.read(image)[0]
 
-    def alone(self, image, tag: str) -> bool:
+    def alone(self, image, tag: str, reading=None) -> bool:
         """Is this a frame of `tag`, by themselves, with no lettering on it?"""
-        people, rest = self.read(image)
+        people, rest = reading if reading else self.read(image)
         if people.get(tag, 0.0) < CONFIRM:
             return False
         if any(other != tag and value >= INTRUDER
@@ -200,7 +213,7 @@ class Tagger:
         if (any(rest.get(word, 0.0) >= BOTH for word in GIRLS)
                 and any(rest.get(word, 0.0) >= BOTH for word in BOYS)):
             return False
-        if any(rest.get(word, 0.0) >= BUSY for word in LETTERING):
+        if any(rest.get(word, 0.0) >= LETTERED for word in LETTERING):
             return False
         return True
 
@@ -226,6 +239,38 @@ def fingerprint(image):
 
 def alike(one: int, two: int) -> bool:
     return bin(one ^ two).count("1") <= SAME_IMAGE_BITS
+
+
+def quality(image, tags: dict) -> float:
+    """How good a picture this is, apart from who is in it.
+
+    Sharpness and contrast off the pixels, framing off the tagger. A frame
+    that is dark, blurred, or a single eye filling the screen scores low even
+    when the model is certain whose eye it is.
+    """
+    small = image.convert("L").resize((96, 96))
+    pixels = list(small.getdata())
+    mean = sum(pixels) / len(pixels)
+    spread = (sum((p - mean) ** 2 for p in pixels) / len(pixels)) ** 0.5
+
+    # Edge energy as a stand-in for focus: a blurred or foggy frame has
+    # little of it, a crisp one has plenty.
+    rows = [pixels[n * 96:(n + 1) * 96] for n in range(96)]
+    edges = 0
+    for row in rows[::4]:
+        edges += sum(abs(row[n + 1] - row[n]) for n in range(0, 95, 2))
+    sharpness = edges / (24 * 48)
+
+    score = 0.0
+    score += min(spread, 70) / 70                 # contrast, capped
+    score += min(sharpness, 30) / 30              # focus, capped
+    # Mid brightness is best: dusk scenes are fine, pitch black is not.
+    score += 1.0 - min(abs(mean - 130), 110) / 110
+    if any(tags.get(word, 0.0) >= 0.4 for word in GOOD_FRAMING):
+        score += 0.6
+    if any(tags.get(word, 0.0) >= 0.4 for word in CLOSE_UP):
+        score -= 0.8
+    return score
 
 
 def dull(image) -> bool:
@@ -313,6 +358,38 @@ def find_series(title: str, cache: dict) -> str:
     return cache[title]
 
 
+def matching_series(title: str, limit: int = 4) -> list:
+    """Every season of a series, the earliest first.
+
+    The catalogue lists seasons separately, and taking the best single match
+    picked Re:Zero season two - where Emilia is scarce and Rem is asleep -
+    over the season she is actually in. A character is in their whole show,
+    so the whole show is what gets swept.
+    """
+    index = catalogue()
+    wanted = simple(title)
+    if not wanted:
+        return []
+
+    found = []
+    for name, path in index.items():
+        if not name:
+            continue
+        if name == wanted or name.startswith(wanted + " "):
+            # "re zero starting life in another world s02" begins with the
+            # base title; an unrelated show sharing a first word does not.
+            found.append((len(name), name, path))
+        elif wanted.startswith(name + " ") and len(name) >= 12:
+            found.append((len(name), name, path))
+
+    if not found:
+        one = find_series(title, {})
+        return [one] if one else []
+
+    found.sort()
+    return [path for _length, _name, path in found[:limit]]
+
+
 def episodes(series_path: str) -> list:
     page = fetch(f"{SITE}/anime/showimages.php?{series_path}").decode(
         "utf-8", "replace")
@@ -394,21 +471,24 @@ def series_plan(top: int) -> tuple:
     return plan, unknown
 
 
-def harvest(tagger, series: str, wanted: list, budget: int) -> dict:
+def harvest(tagger, series: str, wanted: list, budget: int,
+            episodes_wanted: int = EPISODES) -> dict:
     """Frames for the characters of one series: {key: [urls]}."""
-    cache = {}
-    if os.path.exists(SERIES_CACHE):
-        cache = json.load(io.open(SERIES_CACHE, encoding="utf-8"))
-    path = find_series(series, cache)
-    with io.open(SERIES_CACHE, "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(cache, handle, ensure_ascii=False)
-    if not path:
+    paths = matching_series(series)
+    if not paths:
         return {}
 
     wanted_tags = {tag: key for key, tag, _row in wanted}
     shortlist = {tag: [] for tag in wanted_tags}
 
-    for episode in spread(episodes(path), EPISODES):
+    # Spread the sample across the seasons as well as the episodes, so a
+    # show with four of them is not represented by its first.
+    each = max(1, episodes_wanted // len(paths))
+    schedule = []
+    for path in paths:
+        schedule += spread(episodes(path), each)
+
+    for episode in schedule:
         for frame in spread(frame_ids(episode), FRAMES_PER_EPISODE):
             thumb = image_from(fetch(THUMB.format(frame), tries=1, timeout=20))
             if thumb is None or dull(thumb):
@@ -435,17 +515,24 @@ def harvest(tagger, series: str, wanted: list, budget: int) -> dict:
     for tag, key in wanted_tags.items():
         candidates = sorted(shortlist[tag], reverse=True)[:PER_CHARACTER * 4]
         kept, prints = [], []
+        scored = []
         for _score, frame in candidates:
             image = image_from(fetch(FULL.format(frame), tries=2))
             if image is None or dull(image):
                 continue
-            if not tagger.alone(image, tag):
+            reading = tagger.read(image)
+            rest = reading[1]
+            if not tagger.alone(image, tag, reading):
                 continue
-            mark = fingerprint(image)
+            scored.append((quality(image, rest), fingerprint(image),
+                           FULL.format(frame)))
+
+        # Best first, then drop anything that repeats a shot already taken.
+        for _rank, mark, url in sorted(scored, reverse=True):
             if any(alike(mark, other) for other in prints):
                 continue
             prints.append(mark)
-            kept.append(FULL.format(frame))
+            kept.append(url)
             if len(kept) >= PER_CHARACTER:
                 break
         if kept:
@@ -496,6 +583,13 @@ def main():
     parser.add_argument("--top", type=int, default=500)
     parser.add_argument("--out", default=OUT)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--need", type=int, default=0,
+                        help="only look for characters who have fewer than"
+                             " this many frames already")
+    parser.add_argument("--series", default="",
+                        help="only this series, matched loosely")
+    parser.add_argument("--episodes", type=int, default=EPISODES,
+                        help="how many episodes to spread the sample across")
     parser.add_argument("--verify", action="store_true",
                         help="re-check the frames already saved against the"
                              " current rules instead of sweeping again")
@@ -536,9 +630,30 @@ def main():
         frames = json.load(io.open(args.out, encoding="utf-8"))
         print(f"resuming with {len(frames):,} already found")
 
+    if args.need:
+        # A top-up: keep only the people still short, and the series they are
+        # in. A series where everybody is full is not worth opening again.
+        short = {}
+        for series, people in known.items():
+            wanting = [(key, tag, row) for key, tag, row in people
+                       if len(frames.get(key) or []) < args.need]
+            if wanting:
+                short[series] = wanting
+        known = short
+        print(f"topping up {sum(len(v) for v in known.values()):,} characters"
+              f" who have fewer than {args.need}, across {len(known):,} series")
+
+    if args.series:
+        wanted = args.series.lower()
+        known = {series: people for series, people in known.items()
+                 if wanted in series.lower()}
+        print(f"limited to {len(known)} series matching {args.series!r}")
+
     done = json.load(io.open(args.out + ".series", encoding="utf-8")) \
         if args.resume and os.path.exists(args.out + ".series") else []
-    done = set(done)
+    # A top-up is deliberately going back over swept series, so the record of
+    # what has been done is not a reason to skip.
+    done = set() if (args.need or args.series) else set(done)
 
     started, scanned = time.time(), 0
     order = sorted(known.items(),
@@ -548,14 +663,18 @@ def main():
         if series in done:
             continue
         try:
-            got = harvest(tagger, series, people, args.budget)
+            got = harvest(tagger, series, people, args.budget,
+                          args.episodes)
         except KeyboardInterrupt:
             break
         except Exception as error:  # noqa: BLE001 - one series must not end a sweep
             print(f"  {series}: {type(error).__name__}")
             got = {}
 
-        frames.update(got)
+        for key, urls in got.items():
+            existing = frames.get(key) or []
+            merged = existing + [url for url in urls if url not in existing]
+            frames[key] = merged[:PER_CHARACTER]
         done.add(series)
         scanned += 1
         with io.open(args.out, "w", encoding="utf-8", newline="\n") as handle:
