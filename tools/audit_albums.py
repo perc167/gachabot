@@ -3,7 +3,11 @@
     python tools/audit_albums.py --dry-run
     python tools/audit_albums.py
 
-Two questions, asked of every picture in those albums:
+Three questions, asked of every picture in those albums:
+
+  Is there a face in it? A frame can be the right character, alone, and
+  still be a shoulder against a curtain or a single eye filling the screen.
+  Nothing about identity catches that, so the face detector does.
 
   Is it still them, alone? The frames were checked before they were cropped,
   and a crop can ruin that - the attention crop keeps what is visually
@@ -87,7 +91,7 @@ def main():
     tags = load(TAGS)
     tagger = frames_tool.Tagger()
 
-    checked = not_alone = duplicate = broken = 0
+    checked = not_alone = duplicate = broken = faceless = 0
     emptied = []
     for key in sorted(frames):
         album = art.get(key) or []
@@ -100,7 +104,13 @@ def main():
             image = open_image(url, frames_tool.fetch)
             checked += 1
             if image is None:
-                broken += 1
+                # A bundled file that is not there is really gone. A link
+                # that would not load might be the network having a moment,
+                # and deleting somebody's art over that is not on.
+                if url.startswith("local:"):
+                    broken += 1
+                    continue
+                kept.append(url)
                 continue
 
             mark = frames_tool.fingerprint(image)
@@ -110,9 +120,15 @@ def main():
 
             # Only the frames are re-judged. The official art was chosen by
             # its own rules and is not a frame of anything.
-            if url.startswith("local:frame-") and tag:
-                if not tagger.alone(image, tag):
+            if url.startswith("local:frame-"):
+                if tag and not tagger.alone(image, tag):
                     not_alone += 1
+                    continue
+                # A frame with no face is a torso, a shoulder, or a speck in
+                # a landscape. It passes every identity check and is still
+                # not a picture of anybody.
+                if not frames_tool.shows_face(tagger.read(image)[1]):
+                    faceless += 1
                     continue
 
             marks.append(mark)
@@ -126,6 +142,7 @@ def main():
 
     print(f"checked {checked:,} pictures across {len(frames):,} albums")
     print(f"  dropped {not_alone:,} where the crop no longer shows them alone")
+    print(f"  dropped {faceless:,} with no face in them at all")
     print(f"  dropped {duplicate:,} that repeat a picture already there")
     print(f"  dropped {broken:,} that would not open")
     if emptied:

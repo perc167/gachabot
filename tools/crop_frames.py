@@ -29,6 +29,7 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRAMES = os.path.join(ROOT, "data", "character_frames.json")
+FACES = os.path.join(ROOT, "data", "frame_faces.json")
 SOURCES = os.path.join(ROOT, "data", "frame_sources.json")
 ART_DIR = os.path.join(ROOT, "assets", "characters")
 
@@ -52,6 +53,34 @@ CUTS = (
     ("centre", WIDTH, HEIGHT, ""),
     ("wide", 680, 850, "&a=entropy"),
 )
+
+
+def around_face(image, box):
+    """A 3:4 window holding the face, with room above and below it.
+
+    The face sits a third of the way down, which is where a portrait puts
+    it, and the window is four times the face's height - close enough to
+    read the expression, wide enough to see who they are. Everything is
+    clamped inside the frame, so a face at the edge slides the window rather
+    than padding it.
+    """
+    x, y, w, h, full_w, full_h = box
+    centre_x = x + w / 2
+    centre_y = y + h / 2
+
+    want_h = min(full_h, max(h * 4.0, full_h * 0.55))
+    want_w = want_h * WIDTH / HEIGHT
+    if want_w > full_w:
+        want_w = full_w
+        want_h = want_w * HEIGHT / WIDTH
+
+    left = centre_x - want_w / 2
+    top = centre_y - want_h / 3          # headroom, as a portrait has
+    left = max(0, min(left, full_w - want_w))
+    top = max(0, min(top, full_h - want_h))
+    return image.crop((round(left), round(top),
+                       round(left + want_w), round(top + want_h))) \
+        .resize((WIDTH, HEIGHT), Image.LANCZOS)
 
 
 def cropped_url(source: str, width: int = WIDTH, height: int = HEIGHT,
@@ -106,6 +135,12 @@ def main():
         return 0
 
     from PIL import Image
+    globals()["Image"] = Image
+
+    faces = {}
+    if os.path.exists(FACES):
+        with io.open(FACES, encoding="utf-8") as handle:
+            faces = json.load(handle)
 
     sys.path.insert(0, os.path.join(ROOT, "tools"))
     sys.path.insert(0, ROOT)
@@ -127,7 +162,29 @@ def main():
         if not os.path.exists(path):
             tag = tags.get(owner.get(source, ""), "")
             won = None
-            for label, width, height, extra in CUTS:
+
+            # The frame sweep already found the face; cutting around it beats
+            # any guess about which part of the picture matters, and needs no
+            # outside service.
+            box = faces.get(source)
+            if box:
+                data = fetch(source, tries=2)
+                try:
+                    full = Image.open(io.BytesIO(data))
+                    full.load()
+                    cut = around_face(full, box)
+                    buffer = io.BytesIO()
+                    cut.convert("RGB").save(buffer, format="JPEG",
+                                            quality=QUALITY, optimize=True)
+                    data = buffer.getvalue()
+                    reading = tagger.read(cut)
+                    if ((not tag or tagger.alone(cut, tag, reading))
+                            and frames_tool.shows_face(reading[1])):
+                        won = ("face", data)
+                except Exception:  # noqa: BLE001 - fall back to the proxy
+                    pass
+
+            for label, width, height, extra in ([] if won else CUTS):
                 data = fetch(cropped_url(source, width, height, extra))
                 try:
                     image = Image.open(io.BytesIO(data))
@@ -137,7 +194,12 @@ def main():
                 # A crop that cut the character out, or left somebody else
                 # in, is not worth keeping - and finding that out now saves
                 # an audit pass later.
-                if tag and not tagger.alone(image, tag):
+                reading = tagger.read(image)
+                if tag and not tagger.alone(image, tag, reading):
+                    continue
+                # Whatever cut produced it, a crop with no face left in it is
+                # the shoulder-and-a-curtain shot.
+                if not frames_tool.shows_face(reading[1]):
                     continue
                 won = (label, data)
                 break

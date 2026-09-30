@@ -77,6 +77,22 @@ def main():
             superseded += len(urls) - len(kept)
             merged[key] = kept
 
+    # A bundled picture that is no longer on disk is a broken album entry:
+    # the bot would try to attach a file that is not there.
+    art_dir = os.path.join(ROOT, "assets", "characters")
+    missing = 0
+    for key, urls in list(merged.items()):
+        kept = []
+        for url in urls:
+            if url.startswith("local:") and not os.path.exists(
+                    os.path.join(art_dir, url[len("local:"):])):
+                missing += 1
+                continue
+            kept.append(url)
+        merged[key] = kept
+    if missing:
+        print(f"dropped {missing:,} entries whose file is no longer there")
+
     total = sum(len(v) for v in merged.values())
     with_album = sum(1 for v in merged.values() if v)
     print(f"{len(frames):,} characters have frames:"

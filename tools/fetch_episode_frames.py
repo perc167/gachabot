@@ -241,6 +241,57 @@ def alike(one: int, two: int) -> bool:
     return bin(one ^ two).count("1") <= SAME_IMAGE_BITS
 
 
+def shows_face(tags: dict) -> bool:
+    """Is a face visible, by what the tagger can read off it?"""
+    return any(value >= FACE_SURE for name, value in tags.items()
+               if any(word in name for word in FACE_TAGS))
+
+
+_cascade = None
+
+
+def face_finder():
+    """The anime face detector, downloaded once."""
+    global _cascade
+    if _cascade is None:
+        import cv2
+
+        download(CASCADE_URL, CASCADE, "face detector")
+        _cascade = cv2.CascadeClassifier(CASCADE)
+    return _cascade
+
+
+def biggest_face(image):
+    """(x, y, w, h) of the largest face in the picture, or None."""
+    import cv2
+    import numpy as np
+
+    finder = face_finder()
+    if finder.empty():
+        return None
+    grey = cv2.cvtColor(np.array(image.convert("RGB")), cv2.COLOR_RGB2GRAY)
+    found = finder.detectMultiScale(cv2.equalizeHist(grey), 1.08, 4,
+                                    minSize=(32, 32))
+    if len(found) == 0:
+        return None
+    return max(found, key=lambda box: box[3])
+
+
+def face_score(box, image) -> float:
+    """How well the face sits in the frame. 0 means do not keep it."""
+    if box is None:
+        return 0.0
+    share = box[3] / image.height
+    if not FACE_FLOOR <= share <= FACE_CEILING:
+        return 0.0
+    low, high = FACE_IDEAL
+    if low <= share <= high:
+        return 1.0
+    if share < low:
+        return max(0.2, (share - FACE_FLOOR) / (low - FACE_FLOOR))
+    return max(0.2, (FACE_CEILING - share) / (FACE_CEILING - high))
+
+
 def quality(image, tags: dict) -> float:
     """How good a picture this is, apart from who is in it.
 
@@ -286,6 +337,28 @@ def dull(image) -> bool:
 # fancaps: search, episodes, frames
 # --------------------------------------------------------------------------
 CATALOGUE = os.path.join(ROOT, "data", "fancaps_catalogue.json")
+FACES = os.path.join(ROOT, "data", "frame_faces.json")
+CASCADE = os.path.join(CACHE_DIR, "lbpcascade_animeface.xml")
+CASCADE_URL = ("https://raw.githubusercontent.com/nagadomi/"
+               "lbpcascade_animeface/master/lbpcascade_animeface.xml")
+
+# A frame has to show the face. The obvious way to check - an anime face
+# cascade - finds one in only a fifth of frames that plainly have one, so it
+# cannot be a gate. The tagger can: it reports eye colour, an expression, a
+# mouth, only when there is a face to read them off. On frames known to be
+# good it agrees 20 times out of 21, and it rejected both of the shots that
+# were complained about.
+FACE_TAGS = ("_eyes", "eyelashes", "smile", "open_mouth", "closed_eyes",
+             "blush", "teeth", "tongue", "looking_at_viewer", "portrait",
+             "face", "mouth", "eyebrows")
+FACE_SURE = 0.40
+
+# An eye filling the screen is a face too, and still a poor picture.
+TOO_CLOSE = ("close-up", "eye_focus")
+
+# How many frames one episode may give. Six frames of one scene is not an
+# album, however good each of them is.
+PER_EPISODE = 2
 
 
 def simple(title: str) -> str:
@@ -480,6 +553,8 @@ def harvest(tagger, series: str, wanted: list, budget: int,
 
     wanted_tags = {tag: key for key, tag, _row in wanted}
     shortlist = {tag: [] for tag in wanted_tags}
+    faces = {}
+    episode_of = {}
 
     # Spread the sample across the seasons as well as the episodes, so a
     # show with four of them is not represented by its first.
@@ -490,6 +565,7 @@ def harvest(tagger, series: str, wanted: list, budget: int,
 
     for episode in schedule:
         for frame in spread(frame_ids(episode), FRAMES_PER_EPISODE):
+            episode_of[frame] = episode
             thumb = image_from(fetch(THUMB.format(frame), tries=1, timeout=20))
             if thumb is None or dull(thumb):
                 continue
@@ -524,19 +600,55 @@ def harvest(tagger, series: str, wanted: list, budget: int,
             rest = reading[1]
             if not tagger.alone(image, tag, reading):
                 continue
-            scored.append((quality(image, rest), fingerprint(image),
-                           FULL.format(frame)))
+            # No face, no picture: this rules out the shot of a shoulder
+            # against a curtain, and the one where she is a dot in a field.
+            if not shows_face(rest):
+                continue
+            if any(rest.get(word, 0.0) >= 0.5 for word in TOO_CLOSE):
+                continue
+            # The cascade is unreliable as a gate but useful as a hint: when
+            # it does find a face, the crop can be built around it.
+            box = biggest_face(image)
+            scored.append((
+                quality(image, rest),
+                fingerprint(image),
+                FULL.format(frame),
+                episode_of.get(frame, ""),
+                ([int(v) for v in box] + [image.width, image.height])
+                if box is not None else None,
+            ))
 
-        # Best first, then drop anything that repeats a shot already taken.
-        for _rank, mark, url in sorted(scored, reverse=True):
+        # Best first, then drop repeats, and stop one episode filling the
+        # album with a single scene.
+        from collections import Counter
+
+        per_episode = Counter()
+        for _rank, mark, url, episode, box in sorted(scored,
+                                                     key=lambda row: -row[0]):
             if any(alike(mark, other) for other in prints):
                 continue
+            if episode and per_episode[episode] >= PER_EPISODE:
+                continue
+            per_episode[episode] += 1
             prints.append(mark)
             kept.append(url)
+            if box:
+                faces[url] = box
             if len(kept) >= PER_CHARACTER:
                 break
         if kept:
             found[key] = kept
+
+    # Where each face sits, so the crop is built around it rather than
+    # guessed at.
+    if faces:
+        known = {}
+        if os.path.exists(FACES):
+            with io.open(FACES, encoding="utf-8") as handle:
+                known = json.load(handle)
+        known.update(faces)
+        with io.open(FACES, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(known, handle, ensure_ascii=False)
     return found
 
 
