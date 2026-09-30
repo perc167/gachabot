@@ -53,6 +53,7 @@ COGS = [
     "cogs.events",
     "cogs.champions",
     "cogs.automod",
+    "cogs.antinuke",
     "cogs.customizer",
     "cogs.utility",
     "cogs.serversetup",

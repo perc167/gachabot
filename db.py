@@ -148,6 +148,21 @@ CREATE TABLE IF NOT EXISTS wishes (
 CREATE INDEX IF NOT EXISTS idx_wishes_character
     ON wishes (guild_id, character_id);
 
+-- Antinuke (cogs/antinuke.py): its settings, and who it trusts and who may
+-- change it (kind 'trusted' or 'admin').
+CREATE TABLE IF NOT EXISTS antinuke_settings (
+    guild_id INTEGER NOT NULL,
+    key      TEXT NOT NULL,
+    value    INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, key)
+);
+CREATE TABLE IF NOT EXISTS antinuke_people (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    kind     TEXT NOT NULL,
+    PRIMARY KEY (guild_id, user_id, kind)
+);
+
 -- The karuda tower (perks.py): one row per floor built, with the perk chosen
 -- for it and what it cost, so $destroy can refund exactly.
 CREATE TABLE IF NOT EXISTS tower_floors (
@@ -3739,6 +3754,27 @@ class Database:
             (guild_id, character_id, guild_id, character_id),
         ).fetchall()
         return [r["user_id"] for r in rows]
+
+    # ---------- antinuke ----------
+
+    def antinuke_get(self, guild_id: int, key: str, default: int = 0) -> int:
+        rows = self._select("antinuke_settings", guild_id=guild_id, key=key)
+        return rows[0]["value"] if rows else default
+
+    def antinuke_set(self, guild_id: int, key: str, value: int):
+        self._upsert("antinuke_settings", {"guild_id": guild_id, "key": key,
+                                           "value": int(value)})
+
+    def antinuke_people(self, guild_id: int, kind: str) -> list:
+        return [r["user_id"] for r in self._select("antinuke_people", guild_id=guild_id,
+                                                   kind=kind)]
+
+    def antinuke_add_person(self, guild_id: int, user_id: int, kind: str):
+        self._upsert("antinuke_people", {"guild_id": guild_id, "user_id": user_id,
+                                         "kind": kind})
+
+    def antinuke_remove_person(self, guild_id: int, user_id: int, kind: str) -> int:
+        return self._delete("antinuke_people", guild_id=guild_id, user_id=user_id, kind=kind)
 
     # ---------- the karuda tower ----------
 

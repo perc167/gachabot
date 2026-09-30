@@ -36,6 +36,8 @@ INVITE_PERMISSIONS = discord.Permissions(
     manage_messages=True,
     manage_nicknames=True,
     view_audit_log=True,
+    # Antinuke: deleting webhooks a nuke made.
+    manage_webhooks=True,
     # Voice: Join To Create makes channels and moves people into them.
     connect=True,
     move_members=True,

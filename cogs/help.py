@@ -481,6 +481,18 @@ CATEGORIES = [
         ("autoreact add", "react to a word"),
         ("autoreact remove", "stop one"),
     ]),
+    ("\U0001f6e1\ufe0f", "Antinuke", [
+        ("antinuke", "what it watches"),
+        ("antinuke on", "switch it on"),
+        ("antinuke off", "switch it off"),
+        ("antinuke punishment", "strip, kick or ban"),
+        ("antinuke limit", "how many a minute"),
+        ("antinuke trust", "never punish them"),
+        ("antinuke untrust", "stop trusting"),
+        ("antinuke admin", "let them change it"),
+        ("antinuke unadmin", "take that away"),
+        ("antinuke log", "where alerts go"),
+    ]),
     ("\U0001f3c5", "Staff points", [
         ("point", "give a point"),
         ("points", "see someone's points"),
@@ -595,7 +607,7 @@ AREAS = [
     ], ("gachasettings", "switches", "gachaadmin")),
     ("mod", "\U0001f6e1\ufe0f", "Moderation", "jail, mutes, warnings, bans, automod and staff points", [
         "Moderation", "Jail & mutes", "Warnings", "Kicks & bans", "Cleaning up",
-        "Records & names", "Mod setup", "Automod", "Staff points",
+        "Records & names", "Mod setup", "Automod", "Antinuke", "Staff points",
     ], ("moderation", "mods", "staff")),
     ("voice", "\U0001f50a", "Voice", "your own voice rooms and hours in voice", [
         "Voice rooms", "Voice hours",

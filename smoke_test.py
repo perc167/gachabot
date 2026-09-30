@@ -590,6 +590,127 @@ async def main():
           and found("jail") == "jailed" and found("hierarchy") == "heiarchy"
           and found("zzzz") is None)
 
+    # Antinuke: counts per person per minute, punishes past the limit, undoes
+    # what it can, and never touches the owner or the trusted.
+    from cogs import antinuke as an
+    nuker = b.get_cog("AntiNuke")
+    calls = []
+
+    class _AR:
+        def __init__(self, rid, position, managed=False, default=False, perms=0):
+            self.id, self.position, self.managed, self._d = rid, position, managed, default
+            self.name, self.permissions = f"r{rid}", discord.Permissions(perms)
+
+        def is_default(self):
+            return self._d
+
+        def __lt__(self, other):
+            return self.position < other.position
+
+        def __ge__(self, other):
+            return self.position >= other.position
+
+    class _AM:
+        def __init__(self, uid, roles, bot=False):
+            self.id, self.roles, self.bot = uid, roles, bot
+            self.top_role = max(roles, key=lambda r: r.position)
+            self.display_name = self.name = f"m{uid}"
+
+        async def remove_roles(self, *roles, reason=None):
+            calls.append(("strip", self.id, len(roles)))
+
+        async def kick(self, reason=None):
+            calls.append(("kick", self.id))
+
+        def __str__(self):
+            return self.name
+
+    class _AChan:
+        async def send(self, *a, **k):
+            calls.append(("log",))
+
+    class _AOwner:
+        async def send(self, *a, **k):
+            calls.append(("dm",))
+
+    everyone, paper_role, mod_role, admin_role = (_AR(1, 0, default=True), _AR(2, 50),
+                                                  _AR(3, 10), _AR(4, 60))
+    NG = PAID + 120
+    rogue = _AM(501, [everyone, mod_role])
+    above = _AM(502, [everyone, admin_role])
+    members = {501: rogue, 502: above}
+
+    class _AGuild:
+        id, owner_id, owner, name = NG, 9, _AOwner(), "Nuke test"
+        me = _AM(b.user.id if b.user else 1, [everyone, paper_role])
+
+        def get_member(self, uid):
+            return members.get(uid)
+
+        def get_channel(self, cid):
+            return _AChan() if cid == 77 else None
+
+        async def ban(self, obj, reason=None, delete_message_seconds=0):
+            calls.append(("ban", obj.id))
+
+        async def unban(self, obj, reason=None):
+            calls.append(("unban", obj.id))
+
+    g = _AGuild()
+    b._connection.user = b.user or NS(id=1)
+
+    def entry(action, uid, target=None, before=None, after=None):
+        return NS(guild=g, user_id=uid, user=None, action=action, target=target,
+                  before=before or NS(), after=after or NS())
+
+    await nuker.on_audit_log_entry_create(entry(an.A.channel_delete, 501))
+    await nuker.on_audit_log_entry_create(entry(an.A.channel_delete, 501))
+    check("the antinuke does nothing until it's switched on", not calls)
+    db.antinuke_set(NG, "enabled", 1)
+    db.antinuke_set(NG, "log_channel", 77)
+    await nuker.on_audit_log_entry_create(entry(an.A.channel_delete, 501))
+    check("one channel deleted is under the limit", not calls)
+    await nuker.on_audit_log_entry_create(entry(an.A.channel_delete, 501))
+    check("two in a minute: stripped, logged and the owner told",
+          ("strip", 501, 1) in calls and ("log",) in calls and ("dm",) in calls, str(calls))
+    calls.clear()
+    for n in range(3):
+        await nuker.on_audit_log_entry_create(entry(an.A.channel_delete, 9))
+    check("the owner is never punished", not calls)
+    db.antinuke_set(NG, "punishment", an.PUNISHMENTS.index("ban"))
+    nuker.punished.clear()
+    for victim in (601, 602, 603):
+        await nuker.on_audit_log_entry_create(entry(an.A.ban, 501, target=NS(id=victim)))
+    check("a ban spree: banned, and every victim unbanned",
+          ("ban", 501) in calls and all(("unban", v) in calls for v in (601, 602, 603)), str(calls))
+    calls.clear()
+    nuker.punished.clear()
+    for n in range(2):
+        await nuker.on_audit_log_entry_create(entry(an.A.role_delete, 502))
+    check("someone above Paper can't be punished, and it says so",
+          not any(c[0] in ("ban", "strip", "kick") for c in calls) and ("dm",) in calls)
+    calls.clear()
+    db.antinuke_add_person(NG, 501, "trusted")
+    nuker.punished.clear()
+    for n in range(5):
+        await nuker.on_audit_log_entry_create(entry(an.A.role_delete, 501))
+    check("the trusted are never punished", not calls)
+    admin_perms = discord.Permissions(administrator=True)
+    check("dangerous permissions and vanity changes are recognised",
+          an.module_for(entry(an.A.role_update, 1, before=NS(permissions=discord.Permissions(0)),
+                              after=NS(permissions=admin_perms))) == "danger_perms"
+          and an.module_for(entry(an.A.role_update, 1, before=NS(permissions=admin_perms),
+                                  after=NS(permissions=admin_perms))) == ""
+          and an.module_for(entry(an.A.guild_update, 1, before=NS(vanity_url_code="a"),
+                                  after=NS(vanity_url_code="b"))) == "vanity"
+          and an.module_for(entry(an.A.guild_update, 1, before=NS(name="a"),
+                                  after=NS(name="b"))) == "")
+    ctx_like = lambda uid: NS(author=NS(id=uid), guild=NS(id=NG, owner_id=9))
+    db.antinuke_add_person(NG, 700, "admin")
+    check("only the owner and antinuke admins can change it",
+          nuker.can_configure(ctx_like(9)) and nuker.can_configure(ctx_like(700))
+          and not nuker.can_configure(ctx_like(501)))
+
     # Utility: snipes expire, reminders come due.
     from cogs import utility as ut
     tool = b.get_cog("Utility")
