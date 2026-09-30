@@ -132,7 +132,7 @@ CURRENCY_TITLE = "Karuda"
 CARD_COLOUR = 0x7C6BF0
 CLAIMED_COLOUR = 0x43B581
 
-# The eight kinds of shard a $daily can turn up.
+# The eight kinds of shard a $dk can turn up.
 #   key, display name, fallback icon, payout multiplier, weight, embed colour
 # Weights are relative out of 1000: Dust lands half the time, Lumen 1 in 500.
 #

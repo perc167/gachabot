@@ -269,11 +269,15 @@ class Aliases(commands.Cog):
             embed=embed, **art,
         )
 
-    @commands.command(name="changeimg", aliases=["setmainimg"])
+    @commands.command(name="changeimg", aliases=["setmainimg", "c"])
     @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     async def changeimg(self, ctx, *, args: str = None):
-        """`$changeimg <character> | <number>` — pick which picture leads."""
+        """`$changeimg <character> | <number>` — pick which picture leads.
+
+        Mudae's `$c Rem$2` works too."""
+        if args and "|" not in args and "$" in args:
+            args = "|".join(args.rsplit("$", 1))
         if not args or "|" not in args:
             await ctx.send(f"Use `{ctx.prefix}changeimg <character> | <number>`.")
             return

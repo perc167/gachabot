@@ -612,7 +612,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     document.querySelectorAll("#chans input").forEach(function(cb){ cb.checked = ignored.has(cb.value); });
     $("karuda-sub").textContent = "Paid once for every " + s.karuda_every +
       " levels someone reaches, and never twice for the same level. Kept small on purpose, up to " +
-      s.limits.karuda.max + ", so levels never outpace $daily. 0 turns it off.";
+      s.limits.karuda.max + ", so levels never outpace $dk. 0 turns it off.";
     var vars = $("vars"); vars.textContent = "";
     s.variables.forEach(function(v){
       var c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.textContent = v;

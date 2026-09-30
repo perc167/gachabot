@@ -179,6 +179,55 @@ class KarudaView(discord.ui.View):
         self.stop()
 
 
+def timer_lines(bot, guild_id: int, member, prefix: str, only=None) -> list:
+    """Mudae's $tu, a line per timer. `only` picks some of them, in order."""
+    db, cooldowns = bot.db, bot.cooldowns
+    uid = member.id
+    name = f"**{member.display_name}**"
+    parts = {}
+
+    ready, wait = cooldowns.claim_ready(guild_id, uid)
+    reset_at, _ = cooldowns.claim_window(guild_id)
+    next_reset = fmt_duration(reset_at - utils.now())
+    parts["claim"] = (
+        f"{name}, you __can__ claim right now! The next claim reset is in"
+        f" **{next_reset}**." if ready else
+        f"{name}, you can't claim for another **{fmt_duration(wait)}**.")
+
+    left, reset_in = cooldowns.rolls_left(guild_id, uid)
+    parts["rolls"] = (f"You have **{left}** roll{'s' if left != 1 else ''} left."
+                      f" Next rolls reset in **{fmt_duration(reset_in)}**.")
+
+    ready, wait = cooldowns.daily_ready(guild_id, uid)
+    parts["daily"] = (f"`{prefix}daily` is available!" if ready else
+                      f"Next `{prefix}daily` reset in **{fmt_duration(wait)}**.")
+
+    ready, wait = cooldowns.karuda_ready(guild_id, uid)
+    parts["grab"] = ("You __can__ grab karuda right now!" if ready else
+                     f"You can't grab karuda for another"
+                     f" **{fmt_duration(wait)}**.")
+
+    wait = db.get_player(guild_id, uid)["daily_ready_at"] - utils.now()
+    parts["dk"] = (f"`{prefix}dk` is ready!" if wait <= 0 else
+                   f"Next `{prefix}dk` in **{fmt_duration(wait)}**.")
+
+    if cooldowns.rt_unlocked(guild_id, uid):
+        ready, wait = cooldowns.rt_ready(guild_id, uid)
+        parts["rt"] = (f"`{prefix}rt` is available!" if ready else
+                       f"Time left before `{prefix}rt`: **{fmt_duration(wait)}**.")
+
+    player = db.get_player(guild_id, uid)
+    if player["roll_resets"]:
+        count = player["roll_resets"]
+        parts["stock"] = (f"You have **{count}** rolls reset{'s' if count != 1 else ''}"
+                          f" in stock (`{prefix}us`).")
+    parts["balance"] = f"Karuda: **{player['karuda']:,}**"
+
+    order = only or ("claim", "rolls", "daily", "grab", "dk", "rt", "stock",
+                     "balance")
+    return [parts[key] for key in order if key in parts]
+
+
 class Rolling(commands.Cog):
     """$w and friends."""
 
@@ -259,9 +308,15 @@ class Rolling(commands.Cog):
 
         left, reset_in = self.bot.cooldowns.rolls_left(gid, ctx.author.id)
         if left <= 0:
+            # Point at a reset they already have before making them wait.
+            hint = ""
+            if self.bot.cooldowns.daily_ready(gid, ctx.author.id)[0]:
+                hint = f" `{ctx.prefix}daily` is ready and resets them now."
+            elif db.get_player(gid, ctx.author.id)["roll_resets"]:
+                hint = f" You have a rolls reset in stock: `{ctx.prefix}us`."
             await ctx.send(
                 f"{ctx.author.mention} you are out of rolls."
-                f" More in {fmt_duration(reset_in)}."
+                f" More in {fmt_duration(reset_in)}.{hint}"
             )
             return
 
@@ -338,42 +393,96 @@ class Rolling(commands.Cog):
         message = await ctx.send(content=content, embed=embed, view=view, **art)
         view.message = message
 
-    @commands.command(name="rolls", aliases=["ru", "rollsleft", "cooldowns", "cd", "timers"])
-    @commands.guild_only()
-    async def rolls(self, ctx):
-        """Show your rolls left and every cooldown."""
-        gid = ctx.guild.id
-        uid = ctx.author.id
-        left, reset_in = self.bot.cooldowns.rolls_left(gid, uid)
-        claim_ready, claim_in = self.bot.cooldowns.claim_ready(gid, uid)
-        kak_ready, kak_in = self.bot.cooldowns.karuda_ready(gid, uid)
-        player = self.bot.db.get_player(gid, uid)
+    # ---- timers, the way Mudae's $tu words them --------------------
 
-        embed = discord.Embed(
-            title=f"{ctx.author.display_name}'s status", colour=0x4EA8DE
-        )
-        embed.add_field(
-            name="Rolls",
-            value=f"**{left}** left • resets in {fmt_duration(reset_in)}",
-            inline=False,
-        )
-        embed.add_field(
-            name="Claim",
-            value="ready now" if claim_ready else f"in {fmt_duration(claim_in)}",
-            inline=True,
-        )
-        embed.add_field(
-            name="Karuda",
-            value="ready now" if kak_ready else f"in {fmt_duration(kak_in)}",
-            inline=True,
-        )
-        embed.add_field(name="Balance", value=f"{player['karuda']} karuda", inline=True)
-        embed.add_field(
-            name="Harem",
-            value=f"{self.bot.db.harem_size(gid, uid)} characters",
-            inline=True,
-        )
-        await ctx.send(embed=embed)
+    @commands.command(name="tu", aliases=["rolls", "timers", "timersup",
+                                          "cooldowns", "cd"])
+    @commands.guild_only()
+    async def tu(self, ctx):
+        """Every timer you have: claim, rolls, $daily, $dk, $rt."""
+        await ctx.send("\n".join(timer_lines(self.bot, ctx.guild.id,
+                                              ctx.author, ctx.prefix)))
+
+    @commands.command(name="mu", aliases=["marryup", "claimup"])
+    @commands.guild_only()
+    async def mu(self, ctx):
+        """When you can claim next."""
+        await ctx.send(timer_lines(self.bot, ctx.guild.id, ctx.author,
+                                   ctx.prefix, only=("claim",))[0])
+
+    @commands.command(name="ru", aliases=["rollsleft"])
+    @commands.guild_only()
+    async def ru(self, ctx):
+        """How many rolls you have, and when they come back."""
+        await ctx.send("\n".join(timer_lines(
+            self.bot, ctx.guild.id, ctx.author, ctx.prefix,
+            only=("rolls", "stock"))))
+
+    @commands.command(name="daily", aliases=["dailyrolls", "dailyreset"])
+    @commands.guild_only()
+    async def daily(self, ctx):
+        """A free rolls reset, every 20 hours."""
+        cooldowns = self.bot.cooldowns
+        gid, uid = ctx.guild.id, ctx.author.id
+        result = cooldowns.take_daily(gid, uid)
+        if not result:
+            _ready, wait = cooldowns.daily_ready(gid, uid)
+            await ctx.send(f"**{ctx.author.display_name}**, next {ctx.prefix}daily"
+                           f" reset in **{fmt_duration(wait)}**.")
+            return
+        if result == "reset":
+            left, _ = cooldowns.rolls_left(gid, uid)
+            await ctx.send(f"✅ **{ctx.author.display_name}**, your rolls are"
+                           f" reset: **{left}** rolls to go.")
+            return
+        stock = self.bot.db.get_player(gid, uid)["roll_resets"]
+        await ctx.send(
+            f"✅ **{ctx.author.display_name}**, your rolls are already full,"
+            f" so the reset went in the bank ({stock} in stock)."
+            f" `{ctx.prefix}us` uses it once you've rolled.")
+
+    @commands.command(name="us", aliases=["userolls", "rollreset", "rollsreset"])
+    @commands.guild_only()
+    async def us(self, ctx):
+        """Use a banked rolls reset from $daily."""
+        gid, uid = ctx.guild.id, ctx.author.id
+        result = self.bot.cooldowns.use_reset(gid, uid)
+        if result == "none":
+            await ctx.send(f"You have no rolls resets in stock."
+                           f" `{ctx.prefix}daily` gives one every 20 hours.")
+        elif result == "full":
+            await ctx.send("Your rolls are already full. Roll first,"
+                           " then use the reset.")
+        else:
+            left, _ = self.bot.cooldowns.rolls_left(gid, uid)
+            stock = self.bot.db.get_player(gid, uid)["roll_resets"]
+            await ctx.send(f"✅ Rolls reset: **{left}** to go"
+                           f" ({stock} left in stock).")
+
+    @commands.command(name="rt", aliases=["resetclaimtimer", "freeclaim"])
+    @commands.guild_only()
+    async def rt(self, ctx):
+        """Reset your claim timer for free, every 20 hours (Opal IV or Premium)."""
+        cooldowns = self.bot.cooldowns
+        gid, uid = ctx.guild.id, ctx.author.id
+        if not cooldowns.rt_unlocked(gid, uid):
+            await ctx.send(
+                f"`{ctx.prefix}rt` comes with **Opal IV** (`{ctx.prefix}badges`)"
+                f" or a Premium server. Until then, `{ctx.prefix}resetclaim`"
+                f" buys a claim reset with karuda.")
+            return
+        ready, wait = cooldowns.rt_ready(gid, uid)
+        if not ready:
+            await ctx.send(f"Time left before `{ctx.prefix}rt`:"
+                           f" **{fmt_duration(wait)}**.")
+            return
+        if cooldowns.claim_ready(gid, uid)[0]:
+            await ctx.send("You can already claim. Save the reset for when"
+                           " you can't.")
+            return
+        cooldowns.use_rt(gid, uid)
+        await ctx.send(f"✅ **{ctx.author.display_name}**, your claim is"
+                       f" reset. Go get someone.")
 
     @commands.command(name="limroul", aliases=["limitroulette", "rollcap"])
     @commands.guild_only()

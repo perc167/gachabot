@@ -226,7 +226,7 @@ class Karuda(commands.Cog):
             embed.set_footer(text=f"{found}/{len(config.SHARD_TYPES)} shard types found")
         await ctx.send(embed=embed)
 
-    @commands.command(name="dk", aliases=["daily", "dailykaruda"])
+    @commands.command(name="dk", aliases=["dailykaruda", "dailyk"])
     @commands.guild_only()
     async def dk(self, ctx):
         """Two shards appear: you keep one, the other can be sniped."""
@@ -298,7 +298,7 @@ class Karuda(commands.Cog):
         art = (f"{custom}/{len(config.SHARD_TYPES)} crystal emoji found"
                if custom else "using fallback icons - upload assets/shards/")
         embed.set_footer(
-            text=f"One pull per {ctx.prefix}daily, every 20 hours • {art}"
+            text=f"One pull per {ctx.prefix}dk, every 20 hours • {art}"
         )
         await ctx.send(embed=embed)
 

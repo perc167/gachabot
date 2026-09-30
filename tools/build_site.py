@@ -1304,7 +1304,7 @@ $levels sync</code>"""),
 $levels ignore #bot-spam</code>
          <p class="note">Every 5 levels pays a little karuda, 100 by
          default, and only once per milestone, so it never outpaces
-         <code>$daily</code>. <code>$levels karuda 0</code> turns it
+         <code>$dk</code>. <code>$levels karuda 0</code> turns it
          off.</p>"""),
     ]
     server_steps = [

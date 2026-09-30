@@ -3196,6 +3196,59 @@ async def main():
     check("but a claim on them survives", sdb.owner_of(GUILD, sid) == ALICE)
     sdb.close()
 
+    # 22. Mudae's $daily, $us, $rt and $tu.
+    from types import SimpleNamespace
+    from cogs import rolling as rollmod
+    ddb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "daily.db"))
+    dcd = utils.Cooldowns(ddb)
+    full = config.GUILD_SETTINGS["roll_limit"][0]
+    check("$daily with full rolls banks the reset",
+          dcd.take_daily(GUILD, ALICE) == "banked"
+          and ddb.get_player(GUILD, ALICE)["roll_resets"] == 1)
+    check("and $daily waits 20 hours after", dcd.take_daily(GUILD, ALICE) == ""
+          and dcd.daily_ready(GUILD, ALICE)[1] > 19 * 3600)
+    check("$us won't spend a reset on full rolls",
+          dcd.use_reset(GUILD, ALICE) == "full")
+    for _ in range(3):
+        dcd.spend_roll(GUILD, ALICE)
+    check("$us gives the rolls back", dcd.use_reset(GUILD, ALICE) == "used"
+          and dcd.rolls_left(GUILD, ALICE)[0] == full
+          and ddb.get_player(GUILD, ALICE)["roll_resets"] == 0)
+    check("an empty bank says so", dcd.use_reset(GUILD, ALICE) == "none")
+    ddb.update_player(GUILD, ALICE, rolls_daily_at=0)
+    dcd.spend_roll(GUILD, ALICE)
+    check("$daily after rolling resets them at once",
+          dcd.take_daily(GUILD, ALICE) == "reset"
+          and dcd.rolls_left(GUILD, ALICE)[0] == full)
+
+    check("$rt is locked without Opal IV or Premium",
+          not dcd.rt_unlocked(GUILD, BOB))
+    ddb.conn.execute("INSERT OR REPLACE INTO badges (guild_id, user_id, badge,"
+                     " bought_at, level) VALUES (?, ?, 'opal', 0, 4)", (GUILD, BOB))
+    check("Opal IV unlocks it", dcd.rt_unlocked(GUILD, BOB))
+    dcd.start_claim_cooldown(GUILD, BOB)
+    was_ready = dcd.claim_ready(GUILD, BOB)[0]
+    dcd.use_rt(GUILD, BOB)
+    check("$rt clears the claim timer",
+          not was_ready and dcd.claim_ready(GUILD, BOB)[0]
+          and not dcd.rt_ready(GUILD, BOB)[0])
+
+    fake_bot = SimpleNamespace(db=ddb, cooldowns=dcd)
+    bob = SimpleNamespace(id=BOB, display_name="Bob")
+    tu = rollmod.timer_lines(fake_bot, GUILD, bob, "$")
+    check("$tu covers claim, rolls, daily, dk and rt",
+          any("claim" in line for line in tu) and any("rolls left" in line for line in tu)
+          and any("$daily" in line for line in tu) and any("$dk" in line for line in tu)
+          and any("$rt" in line for line in tu), "\n".join(tu))
+    alice = SimpleNamespace(id=ALICE, display_name="Alice")
+    check("$tu leaves $rt out for anyone without it",
+          not any("$rt" in line
+                  for line in rollmod.timer_lines(fake_bot, GUILD, alice, "$")))
+    check("$mu is the claim line alone",
+          rollmod.timer_lines(fake_bot, GUILD, bob, "$", only=("claim",))[0]
+          .startswith("**Bob**, you __can__ claim"))
+    ddb.close()
+
     await b.close()
 
 

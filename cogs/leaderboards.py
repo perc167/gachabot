@@ -169,7 +169,7 @@ class Leaderboards(commands.Cog):
         await ctx.send(embed=board(
             db, ctx.guild.id, f"\U0001f48e  Shard collectors", lines))
 
-    @commands.command(name="serveroverview", aliases=["serverstats", "tu", "tus"])
+    @commands.command(name="serveroverview", aliases=["serverstats", "tus"])
     @commands.guild_only()
     async def overview(self, ctx):
         """How far along this server is, in one card."""

@@ -171,7 +171,7 @@ class Admin(commands.Cog):
             f" Album is now {total}."
         )
 
-    @commands.command(name="album", aliases=["images", "mu"])
+    @commands.command(name="album", aliases=["images"])
     async def album(self, ctx, *, name: str):
         """Flip through every image a character has."""
         character = self.bot.db.find_character_by_name(name)

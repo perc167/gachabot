@@ -362,6 +362,60 @@ class Cooldowns:
         player = self.db.get_player(guild_id, user_id)
         self.db.update_player(guild_id, user_id, rolls_used=player["rolls_used"] + 1)
 
+    # Mudae's $daily: a free rolls reset every 20 hours. It's used there and
+    # then when you've rolled at all this window; with a full hand it goes in
+    # the bank instead, for `$us`, so claiming it early never wastes it.
+    DAILY_ROLLS = 20 * 60 * 60
+    # $rt: a free claim reset, on the same 20 hours, for Opal IV or Premium.
+    RT_COOLDOWN = 20 * 60 * 60
+
+    def daily_ready(self, guild_id: int, user_id: int) -> tuple:
+        """Returns (is_ready, seconds_remaining) for $daily."""
+        player = self.db.get_player(guild_id, user_id)
+        remaining = player["rolls_daily_at"] - now()
+        return remaining <= 0, max(0, remaining)
+
+    def take_daily(self, guild_id: int, user_id: int) -> str:
+        """$daily. Returns "reset", "banked", or "" when it isn't ready."""
+        if not self.daily_ready(guild_id, user_id)[0]:
+            return ""
+        self.rolls_left(guild_id, user_id)  # settle the window first
+        player = self.db.get_player(guild_id, user_id)
+        self.db.update_player(guild_id, user_id,
+                              rolls_daily_at=now() + self.DAILY_ROLLS)
+        if player["rolls_used"] > 0:
+            self.db.update_player(guild_id, user_id, rolls_used=0)
+            return "reset"
+        self.db.update_player(guild_id, user_id,
+                              roll_resets=player["roll_resets"] + 1)
+        return "banked"
+
+    def use_reset(self, guild_id: int, user_id: int) -> str:
+        """$us: spend a banked rolls reset. Returns "used", "full" or "none"."""
+        self.rolls_left(guild_id, user_id)
+        player = self.db.get_player(guild_id, user_id)
+        if player["roll_resets"] <= 0:
+            return "none"
+        if player["rolls_used"] <= 0:
+            return "full"
+        self.db.update_player(guild_id, user_id, rolls_used=0,
+                              roll_resets=player["roll_resets"] - 1)
+        return "used"
+
+    def rt_unlocked(self, guild_id: int, user_id: int) -> bool:
+        return (self.db.is_premium(guild_id)
+                or self.db.badge_levels(guild_id, user_id).get("opal", 0) >= 4)
+
+    def rt_ready(self, guild_id: int, user_id: int) -> tuple:
+        """Returns (is_ready, seconds_remaining) for $rt."""
+        player = self.db.get_player(guild_id, user_id)
+        remaining = player["rt_ready_at"] - now()
+        return remaining <= 0, max(0, remaining)
+
+    def use_rt(self, guild_id: int, user_id: int):
+        self.db.update_player(guild_id, user_id, claim_ready_at=0,
+                              rt_ready_at=now() + self.RT_COOLDOWN)
+
     def claim_window(self, guild_id: int) -> tuple:
         """The claim window everyone on this server shares: (ends_at, length).
 

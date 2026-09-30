@@ -33,7 +33,12 @@ CATEGORIES = [
         ("hg", "guy, games only"),
         ("ma", "anyone, anime only"),
         ("mg", "anyone, games only"),
-        ("rolls", "what you have left"),
+        ("tu", "every timer you have"),
+        ("mu", "when you can claim"),
+        ("ru", "rolls left"),
+        ("daily", "free rolls reset, every 20h"),
+        ("us", "use a banked rolls reset"),
+        ("rt", "free claim reset (Opal IV)"),
         ("limroul", "how deep the rolls go"),
     ]),
     ("\U0001f48d", "Your harem", [

@@ -98,7 +98,7 @@ class Trading(commands.Cog):
         await view.wait()
         return view.chosen
 
-    @commands.command(name="trade", aliases=["tr", "trad", "swap"])
+    @commands.command(name="trade", aliases=["tr", "trad", "swap", "exchange", "marryexchange"])
     @commands.guild_only()
     async def trade(self, ctx, member: discord.Member, *, args: str = None):
         """`$trade @user` — pick from a menu. Both of you choose in turn.

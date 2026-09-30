@@ -729,6 +729,11 @@ class Database:
             ("guild_premium", "tier", "TEXT NOT NULL DEFAULT 'premium'"),
             # Every message someone has sent, for the leaderboard.
             ("levels", "messages", "INTEGER NOT NULL DEFAULT 0"),
+            # Mudae's $daily: a free rolls reset every 20 hours, banked when
+            # your rolls are already full, and $rt's free claim reset.
+            ("players", "roll_resets", "INTEGER NOT NULL DEFAULT 0"),
+            ("players", "rolls_daily_at", "INTEGER NOT NULL DEFAULT 0"),
+            ("players", "rt_ready_at", "INTEGER NOT NULL DEFAULT 0"),
         ):
             existing = {
                 row["name"]
@@ -2610,6 +2615,9 @@ class Database:
             "showcase_id",
             "tuto_step",
             "tuto_silent",
+            "roll_resets",
+            "rolls_daily_at",
+            "rt_ready_at",
         }
         fields = {k: v for k, v in fields.items() if k in allowed}
         if not fields:
