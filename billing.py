@@ -92,18 +92,22 @@ def plan_label(plan: str) -> str:
     return price_label() if plan == "premium" else _labels.get(plan, "")
 
 
-# Prices are shown in US dollars, whatever Stripe charges in. The account is
-# Australian, so the prices are AUD; this is AUD -> USD (29 Sep 2026), and
-# a converted price is rounded to the nearest 50 cents so it reads cleanly.
+# Prices are shown in US dollars. The account is Australian, so each price
+# is AUD with a USD amount beside it (Stripe's currency_options), which US
+# buyers are charged exactly. A price without one is converted at the AUD ->
+# USD rate of 29 Sep 2026, rounded to the nearest 50 cents.
 TO_USD = {"aud": 0.70045}
 # Said wherever the prices are, so a checkout page in AUD is no surprise.
-PRICE_NOTE = "Prices in US dollars. Stripe bills in AUD, so checkout may differ by a few cents."
+PRICE_NOTE = "Prices in US dollars. Outside the US, checkout may show another currency."
 
 
 def describe_price(price: dict) -> str:
     """A Stripe price as words, e.g. "$2.99 a month"."""
     amount = price.get("unit_amount")
     currency = (price.get("currency") or "").lower()
+    usd = ((price.get("currency_options") or {}).get("usd") or {}).get("unit_amount")
+    if isinstance(usd, int):
+        amount, currency = usd, "usd"
     if not isinstance(amount, int):
         return ""
     if currency in TO_USD:
@@ -123,7 +127,8 @@ async def load_price_label():
     """Ask Stripe what each plan costs, for plan_label()."""
     for plan in PLANS:
         if plan_on_sale(plan):
-            label = describe_price(await _call("GET", f"/v1/prices/{price_id(plan)}"))
+            label = describe_price(await _call(
+                "GET", f"/v1/prices/{price_id(plan)}?expand[]=currency_options"))
             _labels[plan] = label + (" once" if PLANS[plan][1] == "payment" else "")
 
 
