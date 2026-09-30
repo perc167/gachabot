@@ -657,6 +657,7 @@ async def main():
             calls.append(("unban", obj.id))
 
     g = _AGuild()
+    real_user = b._connection.user
     b._connection.user = b.user or NS(id=1)
 
     def entry(action, uid, target=None, before=None, after=None):
@@ -710,6 +711,28 @@ async def main():
     check("only the owner and antinuke admins can change it",
           nuker.can_configure(ctx_like(9)) and nuker.can_configure(ctx_like(700))
           and not nuker.can_configure(ctx_like(501)))
+
+    b._connection.user = real_user
+
+    # $promo: a box about Paper, and a button per plan to the Premium page.
+    dash = b.get_cog("Dashboard")
+    promo = dash.promo_embed("$")
+    check("the promo box says what Paper does and how to add it",
+          len(promo) < 6000 and "How to add it" in promo.description
+          and "Moderation" in promo.description)
+    old_url = os.environ.get("PUBLIC_URL")
+    os.environ["PUBLIC_URL"] = "https://paper.example"
+    try:
+        links = [item.url for item in dash.promo_buttons().children]
+    finally:
+        if old_url is None:
+            os.environ.pop("PUBLIC_URL", None)
+        else:
+            os.environ["PUBLIC_URL"] = old_url
+    check("the promo buttons go to each plan",
+          [u.split("plan=")[-1] for u in links if "plan=" in u] == ["premium", "plus", "lifetime"]
+          and all(u.startswith("https://paper.example/dashboard?premium=1") for u in links
+                  if "plan=" in u), str(links))
 
     # Utility: snipes expire, reminders come due.
     from cogs import utility as ut

@@ -211,6 +211,7 @@ body{background:transparent}
   border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px}
 .plan.best{border-color:rgba(229,197,90,.6);box-shadow:0 0 0 1px rgba(229,197,90,.2) inset}
 .plan.owned{opacity:.7}
+.plan.picked{box-shadow:0 0 0 2px var(--gold);transform:translateY(-2px)}
 .plan h3{margin:0;font-family:var(--display);font-size:16px}
 .plan .price{font-family:var(--display);font-weight:600;color:var(--gold);font-size:18px}
 .plan p{margin:0 0 6px;font-size:13.5px;color:var(--dim);flex:1}
@@ -813,6 +814,14 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 
   // One card per plan on sale. Plans the server has (or has better) are marked
   // instead of sold again.
+  // A plan picked on a button elsewhere (the $promo panel links here with
+  // ?plan=), kept through logging in so its card is the one lit up.
+  var wantedPlan = (location.search.match(/[?&]plan=(premium|plus|lifetime)/) || [])[1];
+  try {
+    if (wantedPlan) sessionStorage.setItem("paper-plan", wantedPlan);
+    else wantedPlan = sessionStorage.getItem("paper-plan") || "";
+  } catch (e) {}
+
   function planCards(p, forGuild){
     var wrap = el("div", {cls: "plans"});
     (p.plans || []).forEach(function(pl){
@@ -825,7 +834,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         action = button(label, "btn " + (pl.key === "lifetime" ? "gold" : "gold soft"),
                         "/api/premium/checkout", forGuild, {plan: pl.key});
       }
-      wrap.appendChild(el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "") + (pl.owned ? " owned" : "")}, [
+      wrap.appendChild(el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "") + (pl.owned ? " owned" : "")
+                                   + (pl.key === wantedPlan && !pl.owned ? " picked" : "")}, [
         pl.key === "lifetime" ? el("span", {cls: "tag", text: "Pay once"}) : null,
         el("h3", {text: pl.name}),
         el("div", {cls: "price", text: pl.price || ""}),
@@ -1372,7 +1382,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     // The plans, to read here; each server's own page has the buttons.
     var onSale = (sale.plans || []).filter(function(pl){ return pl.on_sale; });
     if (onSale.length) list.appendChild(el("div", {cls: "plans"}, onSale.map(function(pl){
-      return el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "")}, [
+      return el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "")
+                           + (pl.key === wantedPlan ? " picked" : "")}, [
         pl.key === "lifetime" ? el("span", {cls: "tag", text: "Pay once"}) : null,
         el("h3", {text: pl.name}), el("div", {cls: "price", text: pl.price || ""}),
         el("p", {text: pl.line})]);

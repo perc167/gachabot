@@ -260,6 +260,78 @@ class Dashboard(commands.Cog):
                        f" {billing.PLANS[plan][3]}"
                        + (" for good." if lifetime else f" until <t:{until}:D>."))
 
+    # ------------------------------------------------------------- promo
+
+    def promo_embed(self, prefix: str) -> discord.Embed:
+        """The advert: what Paper does and how to add it, in one box."""
+        me = self.bot.user
+        name = me.display_name if me else "Paper"
+        total = self.bot.db.character_count()
+        embed = discord.Embed(
+            colour=0xF47FFF,
+            description=(
+                f"**Add {name} to your server** \u2014 a gacha, moderation, voice"
+                f" rooms and levels, in one bot.\n\n"
+                f"\U0001f3b2 **Gacha:** roll and claim from {total:,} characters,"
+                " Mudae style, with wishes, trades, badges and a karuda tower\n"
+                "\U0001f6e1\ufe0f **Moderation:** jail, mutes, warnings, bans, automod,"
+                " an antinuke and staff points\n"
+                "\U0001f50a **Voice:** Join To Create rooms people run themselves,"
+                " and voice hours\n"
+                "\U0001f4c8 **Levels:** XP for chat and voice, level roles, and"
+                " stats cards\n"
+                "\U0001f44b **Server tools:** autoroles, welcomes, reaction roles,"
+                " snipes, reminders\n\n"
+                "**How to add it**\n"
+                "1. Press **Free** below and pick your server\n"
+                f"2. Type `{prefix}help` there to see everything\n"
+                f"3. Set it up on the web with `{prefix}dashboard`\n\n"
+                "Everything above is free. Premium adds extras for your whole server,"
+                " and Lifetime is paid once, never again."))
+        if me:
+            embed.set_author(name=name, icon_url=me.display_avatar.url)
+            embed.set_thumbnail(url=me.display_avatar.with_size(256).url)
+        embed.set_footer(text=f"{name} \u00b7 {SITE_URL.split('//')[-1]}",
+                         icon_url=me.display_avatar.url if me else None)
+        return embed
+
+    def promo_buttons(self) -> discord.ui.View:
+        """Link buttons: Free is the invite, the rest open the Premium page."""
+        from cogs.profile import INVITE_PERMISSIONS
+        view = discord.ui.View(timeout=None)
+        if self.bot.user:
+            view.add_item(discord.ui.Button(
+                label="Free", emoji="\u2728", style=discord.ButtonStyle.link,
+                url=discord.utils.oauth_url(self.bot.user.id, permissions=INVITE_PERMISSIONS,
+                                            scopes=("bot",))))
+        base = public_url()
+        if base:
+            for plan, fallback in (("premium", "A$4.99/mo"), ("plus", "A$15/mo"),
+                                   ("lifetime", "A$50 once")):
+                price = (billing.plan_label(plan).replace(" a month", "/mo")
+                         .replace(".00", "") or fallback)
+                name = {"premium": "Premium", "plus": "Plus", "lifetime": "Lifetime"}[plan]
+                view.add_item(discord.ui.Button(
+                    label=f"{name} \u00b7 {price}", style=discord.ButtonStyle.link,
+                    url=f"{base}/dashboard?premium=1&plan={plan}"))
+        return view
+
+    @commands.command(name="promo", aliases=["addpanel", "invitepanel", "advert"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    async def promo(self, ctx, channel: discord.TextChannel = None):
+        """Post a panel about Paper with buttons to add it or buy Premium,
+        here or in the channel you name."""
+        channel = channel or ctx.channel
+        try:
+            await channel.send(embed=self.promo_embed(ctx.prefix), view=self.promo_buttons())
+        except discord.HTTPException:
+            await ctx.send(f"I can't post in {channel.mention}. Give me Send Messages and"
+                           " Embed Links there.")
+            return
+        if channel != ctx.channel:
+            await ctx.send(f"Posted in {channel.mention}.")
+
     # ---------------------------------------------------------- showcase
 
     def shown(self, guild) -> bool:
