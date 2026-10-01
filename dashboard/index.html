@@ -768,6 +768,16 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     return n;
   }
 
+  // A server's icon, or its first letter: when there's no icon, and when the
+  // icon link has gone dead (Discord drops the old one when it changes).
+  function serverPic(s){
+    var letter = function(){ return el("span", {cls: "ph", text: s.name.charAt(0).toUpperCase()}); };
+    if (!s.icon) return letter();
+    var img = el("img", {src: s.icon, alt: ""});
+    img.addEventListener("error", function(){ img.replaceWith(letter()); });
+    return img;
+  }
+
   function openOverview(){
     only("loading");
     api("GET", "/api/overview").then(function(r){
@@ -1395,9 +1405,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     $("pp-note").textContent = "Coming soon: Premium isn't on sale just yet. Check back soon.";
     var box = $("pp-servers"); box.textContent = "";
     me.servers.forEach(function(s, i){
-      var pic;
-      if (s.icon) pic = el("img", {src: s.icon, alt: ""});
-      else pic = el("span", {cls: "ph", text: s.name.charAt(0).toUpperCase()});
+      var pic = serverPic(s);
       var status = s.premium ? el("span", {cls: "st gold", text: "✨ Premium"})
         : s.has_bot ? el("span", {cls: "st dim", text: "Free"})
         : el("span", {cls: "st dim", text: "Paper isn't here yet"});
@@ -1434,9 +1442,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       var card = document.createElement(s.has_bot ? "button" : "a");
       card.className = "srv" + (s.has_bot ? "" : " add");
       card.style.animationDelay = Math.min(i * 0.03, 0.3) + "s";
-      var pic;
-      if (s.icon) { pic = document.createElement("img"); pic.src = s.icon; pic.alt = ""; }
-      else { pic = document.createElement("span"); pic.className = "ph"; pic.textContent = s.name.charAt(0).toUpperCase(); }
+      var pic = serverPic(s);
       var text = document.createElement("span");
       var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = s.name;
       var st = document.createElement("span"); st.className = "st";

@@ -467,9 +467,17 @@ class Dashboard(commands.Cog):
         servers = []
         for g in json.loads(session["guilds"]):
             guild = self.bot.get_guild(int(g["id"]))
-            icon = (f"https://cdn.discordapp.com/icons/{g['id']}/{g['icon']}.png?size=96"
-                    if g.get("icon") else None)
-            servers.append({"id": g["id"], "name": g["name"], "icon": icon,
+            # What Discord said at login goes stale when a server changes its
+            # icon (the old link stops working), so where Paper is in the
+            # server, its own up-to-date copy wins.
+            if guild is not None:
+                name = guild.name
+                icon = guild.icon.replace(size=128).url if guild.icon else None
+            else:
+                name = g["name"]
+                icon = (f"https://cdn.discordapp.com/icons/{g['id']}/{g['icon']}.png?size=96"
+                        if g.get("icon") else None)
+            servers.append({"id": g["id"], "name": name, "icon": icon,
                             "has_bot": guild is not None,
                             "premium": bool(guild) and self.bot.db.is_premium(guild.id),
                             "trial": bool(guild) and self.bot.db.trial_available(guild.id)})
