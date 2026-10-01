@@ -470,6 +470,10 @@ async def main():
         async def create_thread(self, name, content):
             self.threads.append((name, content))
 
+        async def move(self, end=False, reason=None):
+            self.guild.channels.remove(self)
+            self.guild.channels.append(self)
+
     class _Guild:
         def __init__(self, gid):
             self.id, self.features, self.me = gid, ["ROLE_ICONS"], _Me()
@@ -537,8 +541,16 @@ async def main():
     by_name = {c.name: c for c in fake_guild.channels}
     check("the builder makes the staff area, logs, forum and community channels",
           {"jail", "moderator-only", "jail vc", "mod vc", "logs", "mod-logs", "how-to-mod",
-           "welcome", "rules", "general", "gacha", "level-ups", "Join To Create",
+           bd.TOP_MARK + "welcome", bd.TOP_MARK + "rules", bd.TOP_MARK + "general",
+           bd.MISC_MARK + "paper", bd.MISC_MARK + "levelup", bd.MEDIA_MARK + "edits",
+           bd.VC_MARK + " III", "vc-info", "Join To Create",
            "MUST READ", bd.category_name("mod")} <= set(by_name), str(sorted(by_name)))
+    check("the categories go in Paper's order, staff at the bottom",
+          [c.name for c in fake_guild.categories]
+          == [bd.IMPORTANT, bd.TEXT, bd.MISC, bd.VOICE, bd.PRIVATE_VC, bd.MEDIA,
+              bd.MUST_READ, bd.MOD_CAT, bd.LOGS_CAT], str([c.name for c in fake_guild.categories]))
+    check("no booster channel without a booster role",
+          bd.TOP_MARK + "booster-general" not in by_name)
     check("the forum gets the mod guide and the commands",
           [t for t, _c in by_name["how-to-mod"].threads]
           == ["MOD GUIDE: HOW TO MOD", "MOD GUIDE: COMMANDS"]
@@ -550,16 +562,17 @@ async def main():
           db.get_mod_config(BG, "jail_channel") == by_name["jail"].id
           and db.get_mod_config(BG, "log_channel") == by_name["mod-logs"].id
           and owner.id in db.staff_roles_of(BG)
-          and db.greeting(BG, "welcome")["channel_id"] == by_name["welcome"].id
-          and lv.setting(BG, "channel") == by_name["level-ups"].id
+          and db.greeting(BG, "welcome")["channel_id"] == by_name[bd.TOP_MARK + "welcome"].id
+          and lv.setting(BG, "channel") == by_name[bd.MISC_MARK + "levelup"].id
           and db.get_vc_setting(BG, "create_channel") == by_name["Join To Create"].id
-          and db.allowed_channels(BG) == {by_name["gacha"].id}
+          and db.allowed_channels(BG) == {by_name[bd.MISC_MARK + "paper"].id}
           and len(db.level_roles_of(BG)) == 5 and len(db.autoroles_of(BG)) == 1)
     check("and switched on: automod, antinuke, anti-alt",
           db.automod_all(BG).get("invites_on") == "1" and db.automod_all(BG).get("spam_on") == "1"
           and db.antinuke_get(BG, "enabled") == 1 and db.antinuke_get(BG, "alt:enabled") == 1)
-    check("the info category has #welcome first",
-          [c.name for c in by_name[bd.category_name("info")].channels][:2] == ["welcome", "rules"])
+    check("IMPORTANT has welcome first, then announcements, giveaways, rules",
+          [c.name for c in by_name[bd.IMPORTANT].channels]
+          == [bd.TOP_MARK + n for n in ("welcome", "announcements", "giveaways", "rules")])
 
     # Only the owner may switch the antinuke on; anyone else is told to ask.
     other_guild = _Guild(BG + 1)
@@ -569,7 +582,13 @@ async def main():
     check("an admin who isn't the owner can't switch the antinuke on",
           db.antinuke_get(BG + 1, "enabled") == 0
           and any("antinuke on" in p for p in someone.problems)
-          and {c.name for c in other_guild.channels} == {bd.category_name("chat"), "gacha"})
+          and {c.name for c in other_guild.channels} == {bd.MISC, bd.MISC_MARK + "paper"})
+    other_guild.premium_subscriber_role = _Role(77, "Server Booster")
+    await bd.Build(fake_bot, other_guild, "$").run({"channels"})
+    boost = discord.utils.get(other_guild.channels, name=bd.TOP_MARK + "booster-general")
+    check("boosters get their own channel, hidden from everyone else",
+          boost is not None and boost.overwrites[other_guild.default_role].view_channel is False
+          and boost.overwrites[other_guild.premium_subscriber_role].view_channel)
 
     # The wizard: one question a step, back, yes to the rest, then a summary.
     wiz = bd.SetupWizard(NS(), NS(author=NS(id=1), guild=other_guild, prefix="$"))

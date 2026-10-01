@@ -12,11 +12,16 @@ Build it, and then only the yeses are built, in order:
     forum      a MUST READ category with a how-to-mod forum: the mod guide
                and the command list as posts (data/guides/)
     welcome    #welcome, with Paper's welcomes and goodbyes in it
-    channels   rules, announcements, general, media, bot-cmds
+    channels   announcements, giveaways, rules; general and booster-general;
+               bot-commands; artwork, media, face-reveal, hall-of-shame, edits
     member     a Member role new people get
-    gacha      #gacha, with rolling kept to it
-    levels     #level-ups and level roles
-    voice      voice channels with Join To Create
+    gacha      #paper, with rolling kept to it
+    levels     #levelup and level roles
+    voice      vc I, II and III, then vc-info and Join To Create
+
+The layout follows Paper's own server: IMPORTANT, Text Channels, Misc
+Category, Voice Channels, Private Vcs and Media, then the staff categories
+(MUST READ, mod, logs) moved to the very bottom.
     automod    invite, mass mention and spam filters on
     antinuke   on, if the owner (or an antinuke admin) is the one asking
     antialt    new accounts jailed, hardban look-alikes flagged
@@ -50,6 +55,25 @@ def divider(name: str) -> str:
 
 def category_name(name: str) -> str:
     return f"----୨୧----{name}----୨୧----"
+
+
+# The layout, top to bottom, as on Paper's own server. Each category's
+# channels share a little decoration in front of their names.
+IMPORTANT, TEXT, MISC = category_name("IMPORTANT"), category_name("Text Channels"), \
+    category_name("Misc Category")
+VOICE, PRIVATE_VC, MEDIA = category_name("Voice Channels"), category_name("Private Vcs"), \
+    category_name("Media")
+MUST_READ, MOD_CAT, LOGS_CAT = "MUST READ", category_name("mod"), category_name("logs")
+LAYOUT = (IMPORTANT, TEXT, MISC, VOICE, PRIVATE_VC, MEDIA)
+# Which steps put channels in which of those.
+NEEDS = {"welcome": (IMPORTANT,), "channels": (IMPORTANT, TEXT, MISC, MEDIA),
+         "gacha": (MISC,), "levels": (MISC,), "voice": (VOICE, PRIVATE_VC)}
+# Staff categories always end up at the very bottom, in this order.
+STAFF_CATEGORIES = (MUST_READ, MOD_CAT, LOGS_CAT)
+TOP_MARK = "ᶻ-z-𐰁-"       # IMPORTANT and Text Channels
+MISC_MARK = "❀⸝⸝-"         # Misc Category
+MEDIA_MARK = "ঌ⁀➷⋆˚-"      # Media
+VC_MARK = "ᰔ vc"            # the open voice channels: ᰔ vc I, II, III
 
 
 P = discord.Permissions
@@ -103,19 +127,22 @@ STEPS = {
     "forum": ("\U0001f4d6", "How-to-mod forum", "Make a how-to-mod forum for your staff?",
               "A MUST READ category with the mod guide and the command list as posts."),
     "welcome": ("\U0001f44b", "Welcomes", "Greet people who join and leave?",
-                "A #welcome channel, with Paper's welcome and goodbye messages in it."),
+                "A #welcome channel at the top, with Paper's welcome and goodbye messages."),
     "channels": ("\U0001f4ac", "Chat channels", "Make the usual chat channels?",
-                 "#rules and #announcements (read-only), then #general, #media and #bot-cmds."),
+                 "IMPORTANT: announcements, giveaways and rules (read-only). Text Channels:"
+                 " general, and booster-general for your boosters. Misc: bot-commands."
+                 " Media: artwork, media, face-reveal, hall-of-shame and edits."),
     "member": ("\U0001f9d1", "Member role", "Give everyone who joins a Member role?",
                "A Member role, handed out automatically to new members."),
     "gacha": ("\U0001f3b2", "Gacha", "Use Paper's gacha game?",
-              "A #gacha channel, with rolling and claiming kept to it so chat stays clear."),
+              "A #paper channel in Misc, with rolling and claiming kept to it so chat"
+              " stays clear."),
     "levels": ("\U0001f4c8", "Levels", "Use levels and level roles?",
-               "A #level-ups channel for level-up messages, and roles at levels"
+               "A #levelup channel in Misc for level-up messages, and roles at levels"
                " 5, 10, 20, 30 and 50."),
     "voice": ("\U0001f50a", "Voice rooms", "Make voice channels with Join To Create?",
-              "A voice category with Join To Create (everyone gets their own room),"
-              " general vc and music."),
+              "Voice Channels: vc I, II and III. Private Vcs: vc-info and Join To Create,"
+              " where everyone gets their own room."),
     "automod": ("\U0001f916", "Automod", "Switch on automod?",
                 "Deletes invite links, mass mentions and spam, and warns or jails the sender."),
     "antinuke": ("\U0001f6a8", "Antinuke", "Switch on the antinuke?",
@@ -251,14 +278,14 @@ class Build:
     async def build_staff(self):
         await self.punishment_roles()
         jailed = self.punishment("jail_role")
-        mod = await self.category(category_name("mod"), self.staff_only())
+        mod = await self.category(MOD_CAT, self.staff_only())
         jail = await self.text("jail", mod, self.staff_only([jailed]),
                                topic="Jailed members talk to staff here.")
         self.db.set_mod_config(self.guild.id, "jail_channel", jail.id)
         await self.text("moderator-only", mod, topic="Staff chat.")
         await self.voice("jail vc", mod, self.staff_only([jailed]))
         await self.voice("mod vc", mod)
-        logs = await self.category(category_name("logs"), self.staff_only())
+        logs = await self.category(LOGS_CAT, self.staff_only())
         await self.text("logs", logs, topic="For other bots' logs.")
         mod_logs = await self.text("mod-logs", logs, topic="Every mod action, from Paper.")
         self.db.set_mod_config(self.guild.id, "log_channel", mod_logs.id)
@@ -283,7 +310,7 @@ class Build:
         return re.sub(r"\$(?=[a-z])", lambda _m: self.prefix, text) if self.prefix != "$" else text
 
     async def build_forum(self):
-        must = await self.category("MUST READ", self.staff_only())
+        must = await self.category(MUST_READ, self.staff_only())
         posts = [("MOD GUIDE: HOW TO MOD", "how-to-mod.md"),
                  ("MOD GUIDE: COMMANDS", "mod-commands.md")]
         existing = self.find_channel("how-to-mod", must)
@@ -304,19 +331,36 @@ class Build:
                 await channel.send(f"# {title}\n" + self.guide(filename)[:1900])
 
     async def build_welcome(self):
-        info = await self.category(category_name("info"))
-        welcome = await self.text("welcome", info, self.read_only())
+        top = await self.category(IMPORTANT)
+        welcome = await self.text(f"{TOP_MARK}welcome", top, self.read_only())
         for kind in ("welcome", "goodbye"):
             if not self.guild.get_channel(self.db.greeting(self.guild.id, kind)["channel_id"]):
                 self.db.set_greeting(self.guild.id, kind, channel_id=welcome.id)
 
+    def boosters_only(self):
+        booster = getattr(self.guild, "premium_subscriber_role", None)
+        if booster is None:
+            return None
+        can = discord.PermissionOverwrite(view_channel=True, send_messages=True)
+        return {self.guild.default_role: discord.PermissionOverwrite(view_channel=False),
+                self.guild.me: can, booster: can}
+
     async def build_channels(self):
-        info = await self.category(category_name("info"))
-        await self.text("rules", info, self.read_only(), topic="Read these first.")
-        await self.text("announcements", info, self.read_only())
-        chat = await self.category(category_name("chat"))
-        for name in ("general", "media", "bot-cmds"):
-            await self.text(name, chat)
+        top = await self.category(IMPORTANT)
+        for name in ("announcements", "giveaways"):
+            await self.text(f"{TOP_MARK}{name}", top, self.read_only())
+        await self.text(f"{TOP_MARK}rules", top, self.read_only(), topic="Read these first.")
+        text = await self.category(TEXT)
+        await self.text(f"{TOP_MARK}general", text)
+        boosters = self.boosters_only()
+        if boosters:
+            await self.text(f"{TOP_MARK}booster-general", text, boosters,
+                            topic="Thank you for boosting.")
+        misc = await self.category(MISC)
+        await self.text(f"{MISC_MARK}bot-commands", misc)
+        media = await self.category(MEDIA)
+        for name in ("artwork", "media", "face-reveal", "hall-of-shame", "edits"):
+            await self.text(f"{MEDIA_MARK}{name}", media)
 
     async def build_member(self):
         gid = self.guild.id
@@ -324,9 +368,10 @@ class Build:
         self.db.replace_autoroles(gid, [*self.db.autoroles_of(gid), member.id])
 
     async def build_gacha(self):
-        chat = await self.category(category_name("chat"))
-        gacha = await self.text("gacha", chat, topic=f"Roll with {self.prefix}w, {self.prefix}h"
-                                                     f" and {self.prefix}m.")
+        misc = await self.category(MISC)
+        gacha = await self.text(f"{MISC_MARK}paper", misc,
+                                topic=f"Roll with {self.prefix}w, {self.prefix}h"
+                                      f" and {self.prefix}m.")
         if not self.db.allowed_channels(self.guild.id):
             self.db.allow_channel(self.guild.id, gacha.id)
 
@@ -340,19 +385,35 @@ class Build:
                     ((r["level"], r["role_id"]) for r in self.db.level_roles_of(gid))}
         existing.update(dict(pairs))
         self.db.replace_level_roles(gid, sorted(existing.items()))
-        chat = await self.category(category_name("chat"))
-        level_ups = await self.text("level-ups", chat, self.read_only())
+        misc = await self.category(MISC)
+        level_ups = await self.text(f"{MISC_MARK}levelup", misc, self.read_only())
         levels = self.bot.get_cog("Levels")
         if levels:
             levels.save_settings(gid, {"channel": level_ups.id})
 
     async def build_voice(self):
-        voice = await self.category(category_name("voice"))
-        join = await self.voice("Join To Create", voice)
-        await self.voice("general vc", voice)
-        await self.voice("music", voice)
+        voice = await self.category(VOICE)
+        for number in ("I", "II", "III"):
+            await self.voice(f"{VC_MARK} {number}", voice)
+        private = await self.category(PRIVATE_VC)
+        info = await self.text("vc-info", private, self.read_only(),
+                               topic="How your own voice room works.")
+        join = await self.voice("Join To Create", private)
         if not self.guild.get_channel(self.db.get_vc_setting(self.guild.id, "create_channel")):
             self.db.set_vc_setting(self.guild.id, "create_channel", join.id)
+        if "#vc-info" in self.made and hasattr(info, "send"):
+            p = self.prefix
+            try:
+                await info.send(
+                    "**Your own voice room**\n"
+                    f"Join **Join To Create** and Paper makes you a room. It's yours:\n"
+                    f"`{p}vc lock` / `{p}vc unlock` · `{p}vc hide` / `{p}vc unhide`\n"
+                    f"`{p}vc rename <name>` · `{p}vc limit <number>`\n"
+                    f"`{p}vc permit @someone` · `{p}vc ban @someone`\n"
+                    f"`{p}vc claim` takes over a room its owner left."
+                    " The room goes away when everyone leaves.")
+            except discord.HTTPException:
+                pass
 
     def switch_on(self, label: str, is_on: bool, turn_on):
         """A setting rather than a channel: counted as kept if it was already on."""
@@ -398,9 +459,27 @@ class Build:
                                  f"`{self.prefix}setupmod`.")
 
     async def run(self, parts):
+        # The categories go in first, in the layout's order, so they line up
+        # however the steps fill them; the staff ones are moved down after.
+        for category in LAYOUT:
+            if any(category in NEEDS.get(part, ()) for part in parts):
+                await self.category(category)
         for part in STEPS:
             if part in parts:
                 await getattr(self, f"build_{part}")()
+        await self.staff_to_the_bottom()
+
+    async def staff_to_the_bottom(self):
+        """MUST READ, mod and logs below everything else, in that order."""
+        for name in STAFF_CATEGORIES:
+            category = discord.utils.get(self.guild.categories, name=name)
+            if category is None:
+                continue
+            try:
+                await category.move(end=True, reason="$serversetup")
+            except discord.HTTPException:
+                self.problems.append(f"I couldn't move **{name}** to the bottom;"
+                                     " drag it down yourself.")
 
 
 class SetupWizard(discord.ui.View):
