@@ -46,6 +46,12 @@ class CamieTagger:
 
         self.np = np
         self.keep_above = keep_above
+        # Overwritten by the sweep, which owns the numbers; these are only
+        # so the class works on its own.
+        self.label = "Camie"
+        self.shortlist_at = 0.25
+        self.confirm_at = 0.60
+        self.margin = 0.15
         self.session = ort.InferenceSession(
             MODEL, providers=["CPUExecutionProvider"])
         self.input = self.session.get_inputs()[0]
@@ -110,10 +116,14 @@ class CamieTagger:
         import fetch_episode_frames as sweep
 
         people, rest = reading if reading else self.read(image)
-        if people.get(tag, 0.0) < sweep.CONFIRM:
+        mine = people.get(tag, 0.0)
+        if mine < self.confirm_at:
             return False
-        if any(other != tag and value >= sweep.INTRUDER
-               for other, value in people.items()):
+        others = [value for other, value in people.items()
+                  if not sweep.same_person(other, tag)]
+        if any(value >= sweep.INTRUDER for value in others):
+            return False
+        if self.margin and mine - max(others, default=0.0) < self.margin:
             return False
         if any(rest.get(word, 0.0) >= sweep.BUSY for word in sweep.CROWD):
             return False

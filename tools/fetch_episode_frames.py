@@ -81,6 +81,16 @@ CONFIRM = 0.85
 # Somebody else in shot. The whole point is frames of them alone.
 INTRUDER = 0.40
 
+# Camie's tagger knows ten times as many characters and is sure of none of
+# them the way WD is: on 60 frames WD confirmed at 0.85 or better, Camie's
+# median was 0.39, and it names the wrong person often enough to matter. So
+# it is believed only when it is well above its own median and clearly ahead
+# of its own second guess. That keeps about one frame in three, which is
+# plenty when a sweep looks at four hundred.
+CAMIE_SHORTLIST = 0.25
+CAMIE_CONFIRM = 0.60
+CAMIE_MARGIN = 0.15
+
 # The model counts people whether or not it can name them, which is what
 # catches the second person in a frame when that person is nobody it knows -
 # Tadano beside Komi, Ritsu beside Mio.
@@ -141,6 +151,27 @@ ALIASES = {
 }
 
 
+def bare_name(tag: str) -> str:
+    """A character tag with its bracketed note and its long vowels removed."""
+    name = re.sub(r"_\([^)]*\)$", "", tag).replace("-", "_").lower()
+    for long, short in (("ou", "o"), ("oo", "o"), ("uu", "u"), ("ei", "e"),
+                        ("oh", "o")):
+        name = name.replace(long, short)
+    return re.sub(r"[^a-z0-9]", "", name)
+
+
+def same_person(one: str, other: str) -> bool:
+    """Two tags for the same character.
+
+    Danbooru files a character's other forms under their own tags -
+    akemi_homura and akemi_homura_(magical_girl) are one girl - and counting
+    the second as somebody else in shot would throw the frame away. Only an
+    exact match once the brackets are gone, deliberately: uchiha_itachi and
+    uchiha_sasuke share a surname and are two different people.
+    """
+    return one == other or bare_name(one) == bare_name(other)
+
+
 def fetch(url: str, tries: int = 3, timeout: int = 40):
     for attempt in range(tries):
         try:
@@ -188,6 +219,14 @@ class Tagger:
         self.input = self.session.get_inputs()[0]
         self.size = self.input.shape[1]
 
+        # What this particular model has to say before it is believed. WD
+        # answers 0.96 to 1.00 when it is right, so it is held to 0.85 and
+        # needs no margin over its second guess.
+        self.label = "WD"
+        self.shortlist_at = SHORTLIST
+        self.confirm_at = CONFIRM
+        self.margin = 0.0
+
         rows = list(csv.DictReader(io.open(LABELS, encoding="utf-8")))
         self.names = [row["name"] for row in rows]
         self.characters = {row["name"] for row in rows if row["category"] == "4"}
@@ -228,10 +267,16 @@ class Tagger:
     def alone(self, image, tag: str, reading=None) -> bool:
         """Is this a frame of `tag`, by themselves, with no lettering on it?"""
         people, rest = reading if reading else self.read(image)
-        if people.get(tag, 0.0) < CONFIRM:
+        mine = people.get(tag, 0.0)
+        if mine < self.confirm_at:
             return False
-        if any(other != tag and value >= INTRUDER
-               for other, value in people.items()):
+        others = [value for other, value in people.items()
+                  if not same_person(other, tag)]
+        if any(value >= INTRUDER for value in others):
+            return False
+        # A model that is only somewhat sure has to be surer of this person
+        # than of anybody else it half-recognises.
+        if self.margin and mine - max(others, default=0.0) < self.margin:
             return False
         if any(rest.get(word, 0.0) >= BUSY for word in CROWD):
             return False
@@ -593,14 +638,33 @@ def series_plan(top: int) -> tuple:
     return plan, unknown
 
 
-def harvest(tagger, series: str, wanted: list, budget: int,
-            episodes_wanted: int = EPISODES) -> dict:
-    """Frames for the characters of one series: {key: [urls]}."""
+def harvest(groups, series: str, budget: int,
+            episodes_wanted: int = EPISODES, scene_reader=None) -> dict:
+    """Frames for the characters of one series: {key: [urls]}.
+
+    `groups` pairs a model with the people it is being asked about, because
+    no one model knows everybody. A frame is downloaded once and shown to
+    whichever models are waiting on it.
+
+    `scene_reader` is the model whose ordinary tags are trusted - whether
+    anybody else is in shot, whether there is writing over it, whether a
+    face is visible. Every threshold here was measured against WD, so WD
+    reads the scene even for a character only Camie can name.
+    """
     paths = matching_series(series)
     if not paths:
         return {}
 
-    wanted_tags = {tag: key for key, tag, _row in wanted}
+    groups = [(tagger, people) for tagger, people in groups if people]
+    if not groups:
+        return {}
+
+    owner = {}                       # tag -> the model that knows them
+    wanted_tags = {}                 # tag -> roster key
+    for tagger, people in groups:
+        for key, tag, _row in people:
+            wanted_tags[tag] = key
+            owner[tag] = tagger
     shortlist = {tag: [] for tag in wanted_tags}
     faces = {}
     episode_of = {}
@@ -618,17 +682,18 @@ def harvest(tagger, series: str, wanted: list, budget: int,
             thumb = image_from(fetch(THUMB.format(frame), tries=1, timeout=20))
             if thumb is None or dull(thumb):
                 continue
-            seen = tagger.characters_in(thumb)
-            for tag in wanted_tags:
-                score = seen.get(tag, 0.0)
-                if score < SHORTLIST:
-                    continue
-                # Somebody else in shot rules it out before it costs a
-                # full-size download.
-                if any(other != tag and value >= INTRUDER
-                       for other, value in seen.items()):
-                    continue
-                shortlist[tag].append((score, frame))
+            for tagger, people in groups:
+                seen = tagger.characters_in(thumb)
+                for _key, tag, _row in people:
+                    score = seen.get(tag, 0.0)
+                    if score < tagger.shortlist_at:
+                        continue
+                    # Somebody else in shot rules it out before it costs a
+                    # full-size download.
+                    if any(value >= INTRUDER for other, value in seen.items()
+                           if not same_person(other, tag)):
+                        continue
+                    shortlist[tag].append((score, frame))
             budget -= 1
             if budget <= 0:
                 break
@@ -638,6 +703,7 @@ def harvest(tagger, series: str, wanted: list, budget: int,
     # Confirm the best of them at full size, where the model can be trusted.
     found = {}
     for tag, key in wanted_tags.items():
+        tagger = owner[tag]
         candidates = sorted(shortlist[tag], reverse=True)[:PER_CHARACTER * 4]
         kept, prints = [], []
         scored = []
@@ -646,6 +712,10 @@ def harvest(tagger, series: str, wanted: list, budget: int,
             if image is None or dull(image):
                 continue
             reading = tagger.read(image)
+            # Who it is, from the model that knows them; what kind of shot
+            # it is, from the model the bars were set against.
+            if scene_reader is not None and tagger is not scene_reader:
+                reading = (reading[0], scene_reader.read(image)[1])
             rest = reading[1]
             if not tagger.alone(image, tag, reading):
                 continue
@@ -746,6 +816,8 @@ def main():
     parser.add_argument("--top", type=int, default=500)
     parser.add_argument("--out", default=OUT)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--one-model", action="store_true",
+                        help="WD only, skipping the characters it cannot name")
     parser.add_argument("--need", type=int, default=0,
                         help="only look for characters who have fewer than"
                              " this many frames already")
@@ -772,38 +844,66 @@ def main():
     plan, unknown = series_plan(args.top)
     tagger = Tagger()
 
-    # Anyone the model has never heard of cannot be found this way. Said
-    # once, up front, rather than discovered halfway through.
+    # Whoever WD knows is WD's: it is quicker and it is sure of itself. The
+    # rest go to Camie, which knows ten times as many characters and is less
+    # certain of each, so it is held to a higher bar in return. Camie is only
+    # loaded if somebody actually needs it - it is 856MB.
+    second = None
+    if not args.one_model:
+        try:
+            from camie import CamieTagger
+            second = CamieTagger(keep_above=0.20)
+            second.label = "Camie"
+            second.shortlist_at = CAMIE_SHORTLIST
+            second.confirm_at = CAMIE_CONFIRM
+            second.margin = CAMIE_MARGIN
+        except Exception as error:  # noqa: BLE001 - WD alone still works
+            print(f"  (second tagger unavailable: {type(error).__name__})")
+
     known = {}
-    strangers = 0
+    strangers = extra = 0
     for series, people in plan.items():
-        keep = [(key, ALIASES.get(tag, tag), row) for key, tag, row in people
-                if ALIASES.get(tag, tag) in tagger.characters]
-        strangers += len(people) - len(keep)
-        if keep:
-            known[series] = keep
-    total_people = sum(len(v) for v in known.values())
+        mine, theirs = [], []
+        for key, tag, row in people:
+            tag = ALIASES.get(tag, tag)
+            if tag in tagger.characters:
+                mine.append((key, tag, row))
+            elif second is not None and tag in second.characters:
+                theirs.append((key, tag, row))
+            else:
+                strangers += 1
+        extra += len(theirs)
+        if mine or theirs:
+            known[series] = [(tagger, mine), (second, theirs)]
+    total_people = sum(len(p) for groups in known.values()
+                       for _t, p in groups)
     print(f"{total_people:,} of the top {args.top:,} can be recognised,"
           f" across {len(known):,} series")
-    print(f"  {strangers:,} are not in the tagger's vocabulary,"
+    print(f"  {total_people - extra:,} by WD, {extra:,} only by Camie")
+    print(f"  {strangers:,} are in neither vocabulary,"
           f" {unknown:,} have no tag at all\n")
 
+    # Always built on top of what is already there. A sweep of one series
+    # used to write a file holding that one series, which quietly threw away
+    # every frame found before it - and the file is the only record of them.
     frames = {}
-    if args.resume and os.path.exists(args.out):
+    if os.path.exists(args.out):
         frames = json.load(io.open(args.out, encoding="utf-8"))
-        print(f"resuming with {len(frames):,} already found")
+        print(f"building on {len(frames):,} characters already found")
 
     if args.need:
         # A top-up: keep only the people still short, and the series they are
         # in. A series where everybody is full is not worth opening again.
         short = {}
-        for series, people in known.items():
-            wanting = [(key, tag, row) for key, tag, row in people
-                       if len(frames.get(key) or []) < args.need]
-            if wanting:
+        for series, groups in known.items():
+            wanting = [(tagger, [(key, tag, row) for key, tag, row in people
+                                 if len(frames.get(key) or []) < args.need])
+                       for tagger, people in groups]
+            if any(people for _tagger, people in wanting):
                 short[series] = wanting
         known = short
-        print(f"topping up {sum(len(v) for v in known.values()):,} characters"
+        waiting = sum(len(p) for groups in known.values() for _t, p in groups)
+        print(f"topping up {waiting:,} characters"
               f" who have fewer than {args.need}, across {len(known):,} series")
 
     if args.series:
@@ -820,14 +920,16 @@ def main():
 
     started, scanned = time.time(), 0
     order = sorted(known.items(),
-                   key=lambda item: min(r.get("claim_rank") or 10 ** 9
-                                        for _k, _t, r in item[1]))
+                   key=lambda item: min([r.get("claim_rank") or 10 ** 9
+                                         for _tagger, people in item[1]
+                                         for _k, _t, r in people]
+                                        or [10 ** 9]))
     for number, (series, people) in enumerate(order, 1):
         if series in done:
             continue
         try:
-            got = harvest(tagger, series, people, args.budget,
-                          args.episodes)
+            got = harvest(people, series, args.budget,
+                          args.episodes, scene_reader=tagger)
         except KeyboardInterrupt:
             break
         except Exception as error:  # noqa: BLE001 - one series must not end a sweep
