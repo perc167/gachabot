@@ -130,6 +130,8 @@ class Dashboard(commands.Cog):
         app.router.add_get("/api/overview", self.api_overview)
         app.router.add_post("/api/premium/checkout", self.api_checkout)
         app.router.add_post("/api/premium/portal", self.api_portal)
+        app.router.add_post("/api/player/checkout", self.api_player_checkout)
+        app.router.add_post("/api/player/portal", self.api_player_portal)
         app.router.add_get("/api/cases.csv", self.api_cases)
         app.router.add_post("/api/events", self.api_event_add)
         app.router.add_post("/api/events/{event}/stop", self.api_event_stop)
@@ -241,7 +243,63 @@ class Dashboard(commands.Cog):
                          + (f" An admin can pick a plan on the dashboard: <{link}>" if link else ""))
             else:
                 text += "\n\nIt isn't on sale just yet."
+        if billing.player_on_sale():
+            label = billing.player_label()
+            text += (f"\n\n{premium.PLAYER_BADGE} Just for you, on every server:"
+                     f" **{billing.PLAYER[1]}**" + (f" ({label})" if label else "")
+                     + f". `{ctx.prefix}playerpremium`")
         await ctx.send(text[:2000], allowed_mentions=discord.AllowedMentions.none())
+
+    @commands.command(name="playerpremium", aliases=["myplan", "playerplan", "supporter"])
+    async def playerpremium(self, ctx):
+        """Paper Player Premium: your own extra rolls, wishes and karuda, everywhere."""
+        db = self.bot.db
+        row = db.player_premium_of(ctx.author.id)
+        base = public_url()
+        link = f"{base}/dashboard?premium=1" if base else ""
+        name, label = billing.PLAYER[1], billing.player_label()
+        if db.is_player_premium(ctx.author.id):
+            ending = row["status"] not in ("active", "trialing")
+            head = (f"{premium.PLAYER_BADGE} You have **{name}**"
+                    + (f" until <t:{row['until']}:D>, and it won't renew." if ending
+                       else f". It renews by <t:{row['until']}:D>.")
+                    + " Thank you!")
+        else:
+            head = (f"{premium.PLAYER_BADGE} **{name}**" + (f" ({label})" if label else "")
+                    + ": yours, on every server with Paper, on top of anything the"
+                    " server has.")
+        lines = [head, ""] + [f"• {perk}" for perk in premium.PLAYER_PERKS]
+        boosts_off = not db.get_setting(ctx.guild.id, "player_boosts") if ctx.guild else False
+        if boosts_off:
+            lines.append("-# This server keeps rolls equal for everyone, so here"
+                         " it's the badge only.")
+        if not billing.player_on_sale():
+            lines.append("\nIt isn't on sale just yet.")
+        elif link:
+            lines.append(f"\n{'Manage it' if row and row['customer'] else 'Get it'}"
+                         f" on the dashboard: <{link}>\n-# {billing.PRICE_NOTE}")
+        await ctx.send("\n".join(lines)[:2000],
+                       allowed_mentions=discord.AllowedMentions.none())
+
+    @commands.command(name="giveplayer", aliases=["grantplayer"])
+    @is_bot_owner()
+    async def giveplayer(self, ctx, user: discord.User, days: str = "30"):
+        """Owner only: give someone Player Premium for some days, or `off`."""
+        db = self.bot.db
+        if days.lower() == "off":
+            db.set_player_premium(user.id, status="canceled", until=int(time.time()))
+            await ctx.send(f"**{user}** has no Player Premium now.",
+                           allowed_mentions=discord.AllowedMentions.none())
+            return
+        try:
+            count = max(1, int(days))
+        except ValueError:
+            await ctx.send("Give a number of days, or `off`.")
+            return
+        until = int(time.time()) + count * 86400
+        db.set_player_premium(user.id, status="active", until=until)
+        await ctx.send(f"**{user}** has {billing.PLAYER[1]} until <t:{until}:D>.",
+                       allowed_mentions=discord.AllowedMentions.none())
 
     @commands.command(name="giveplan", aliases=["grantpremium"])
     @is_bot_owner()
@@ -502,7 +560,60 @@ class Dashboard(commands.Cog):
                              "price_note": billing.PRICE_NOTE,
                              "trial_days": billing.TRIAL_DAYS,
                              "perks": premium.perk_groups()},
+            "player": self.player_state(session["user_id"]),
         }, headers=HEADERS)
+
+    # -------------------------------------------------------- Player Premium
+
+    def player_state(self, user_id: int) -> dict:
+        row = self.bot.db.player_premium_of(user_id)
+        active = self.bot.db.is_player_premium(user_id)
+        return {"name": billing.PLAYER[1], "line": billing.PLAYER[2],
+                "price": billing.player_label(), "on_sale": billing.player_on_sale(),
+                "perks": premium.PLAYER_PERKS, "active": active,
+                "until": row["until"] if row and active else 0,
+                "ending": bool(row and active and row["status"] not in ("active", "trialing")),
+                "billing": bool(row and row["customer"])}
+
+    def player_who(self, request):
+        """The logged-in person, for buying or managing their own plan."""
+        session = self.session_of(request)
+        if not session:
+            return None, problem(401, "You're logged out. Log in again.")
+        if request.headers.get("X-Paper") != "1":
+            return None, problem(403, "Use the dashboard page.")
+        return session["user_id"], None
+
+    async def api_player_checkout(self, request):
+        user_id, error = self.player_who(request)
+        if error:
+            return error
+        if not billing.player_on_sale():
+            return problem(503, f"{billing.PLAYER[1]} isn't on sale yet.")
+        if self.bot.db.is_player_premium(user_id):
+            return problem(409, f"You have {billing.PLAYER[1]} already.")
+        back = f"{public_url()}/dashboard?premium=1"
+        row = self.bot.db.player_premium_of(user_id)
+        try:
+            url = await billing.player_checkout(
+                user_id, success_url=back + "&player=thanks", cancel_url=back,
+                customer=row["customer"] if row else "")
+        except (billing.BillingError, OSError) as e:
+            return problem(502, f"Couldn't start the payment: {e}")
+        return web.json_response({"url": url}, headers=HEADERS)
+
+    async def api_player_portal(self, request):
+        user_id, error = self.player_who(request)
+        if error:
+            return error
+        row = self.bot.db.player_premium_of(user_id)
+        if not row or not row["customer"]:
+            return problem(404, "You have no billing to manage.")
+        try:
+            url = await billing.portal(row["customer"], f"{public_url()}/dashboard?premium=1")
+        except (billing.BillingError, OSError) as e:
+            return problem(502, f"Couldn't open billing: {e}")
+        return web.json_response({"url": url}, headers=HEADERS)
 
     def invite_permissions(self):
         try:

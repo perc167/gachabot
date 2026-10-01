@@ -404,6 +404,7 @@ class Cooldowns:
 
     def rt_unlocked(self, guild_id: int, user_id: int) -> bool:
         return (self.db.is_premium(guild_id)
+                or perks.player_boosts(self.db, guild_id, user_id)
                 or self.db.badge_levels(guild_id, user_id).get("opal", 0) >= 4)
 
     def rt_ready(self, guild_id: int, user_id: int) -> tuple:

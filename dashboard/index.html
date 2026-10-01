@@ -219,6 +219,13 @@ body{background:transparent}
 .plan .tag{position:absolute;top:-9px;right:12px;background:var(--gold);color:#1a1405;
   font-size:11px;font-weight:700;border-radius:99px;padding:2px 9px}
 .plan .have{font-size:13.5px;color:var(--gold);font-weight:600}
+.prem.player{border-color:rgba(156,143,245,.55);
+  background:linear-gradient(120deg,rgba(124,107,240,.2),rgba(238,127,168,.12) 60%,rgba(229,197,90,.08))}
+.prem.player .kicker{font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--accent-soft);margin:0 0 6px}
+.prem.player .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.prem.player .have{color:var(--accent-soft);font-weight:600;font-size:14px}
+.prem.player .thanks-note{color:#9fe0c1;margin:10px 0 0}
 .plan.clickable{cursor:pointer;transition:transform .15s,border-color .15s}
 .plan.clickable:hover{transform:translateY(-2px);border-color:rgba(229,197,90,.45)}
 .plan .more{align-self:flex-start;background:none;border:0;padding:0;cursor:pointer;
@@ -357,6 +364,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     <div id="pp-perks"></div>
     <p class="pp-note" id="pp-note" hidden></p>
   </div>
+  <div id="pp-player"></div>
   <div class="servers-head"><h1>Pick a server</h1>
     <p>Premium belongs to one server. Admins of that server get it for everyone there.</p></div>
   <div class="servers" id="pp-servers"></div>
@@ -961,6 +969,37 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     }
     box.appendChild(panel);
   }
+  // Player Premium: bought by one person for themselves, on every server, so
+  // it sits apart from the server plans and needs no server picked.
+  function showPlayer(p, note){
+    var box = $("pp-player"); box.textContent = "";
+    if (!p || (!p.on_sale && !p.active)) return;
+    var date = function(t){
+      return new Date(t * 1000).toLocaleDateString(undefined, {year: "numeric", month: "long", day: "numeric"});
+    };
+    var row = el("div", {cls: "row"});
+    if (p.active) {
+      row.appendChild(el("span", {cls: "have", text: "✓ You have it, " +
+        (p.ending ? "until " : "renewing ") + date(p.until)}));
+      if (p.billing) row.appendChild(button("Manage billing", "btn ghost small", "/api/player/portal"));
+    } else {
+      row.appendChild(button("Get " + p.name, "btn gold", "/api/player/checkout"));
+    }
+    var thanks = /[?&]player=thanks/.test(location.search) && !p.active;
+    var panel = el("div", {cls: "prem player"});
+    [el("p", {cls: "kicker", text: "Just for you"}),
+     el("h2", {text: "💎 " + p.name}),
+     p.price ? el("div", {cls: "price", text: p.price}) : null,
+     el("p", {text: p.line + ". Bought by you, for you."}),
+     el("ul", {}, (p.perks || []).map(function(t){ return el("li", {text: t}); })),
+     row,
+     thanks ? el("p", {cls: "thanks-note", text: "Thank you! It switches on as soon as"
+       + " Stripe confirms, usually within a minute. Refresh to see it."}) : null,
+     note && !p.active ? el("p", {cls: "price-note", text: note}) : null
+    ].forEach(function(n){ if (n) panel.appendChild(n); });
+    box.appendChild(panel);
+  }
+
   function button(label, cls, path, forGuild, body){
     var b = el("button", {type: "button", cls: cls, text: label});
     b.addEventListener("click", function(){
@@ -1480,6 +1519,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     })));
     if (onSale.length && sale.price_note)
       list.appendChild(el("p", {cls: "price-note", text: sale.price_note}));
+    showPlayer(me.player, sale.price_note);
     $("pp-note").hidden = !!sale.for_sale;
     $("pp-note").textContent = "Coming soon: Premium isn't on sale just yet. Check back soon.";
     var box = $("pp-servers"); box.textContent = "";

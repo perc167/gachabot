@@ -4,6 +4,7 @@ from discord.ext import commands
 
 import config
 import perks
+import premium
 import utils
 from cogs.personalise import word
 from views import CharacterPicker, Paginator, choose_character
@@ -112,10 +113,11 @@ class Harem(commands.Cog):
         # picture, and $haremlist is one command away for anyone who
         # disagrees.
         embeds, art = [], []
+        mark = premium.badge(db, member.id)
         for position, row in enumerate(rows, 1):
             note = row["note"] if "note" in row.keys() else None
             called = word(db, gid, member.id, "harem_name")
-            footer = (f"{position}/{len(rows)} in {member.display_name}'s {called}"
+            footer = (f"{position}/{len(rows)} in {mark}{member.display_name}'s {called}"
                       f" • {total_karuda:,} karuda total • by {order}")
             if note:
                 footer = f"“{note}” • {footer}"
@@ -202,7 +204,7 @@ class Harem(commands.Cog):
         pages = utils.paginate(lines, 8)
         for page_no, page in enumerate(pages, 1):
             embed = discord.Embed(
-                title=f"{member.display_name}'s "
+                title=f"{premium.badge(self.bot.db, member.id)}{member.display_name}'s "
                       f"{word(self.bot.db, ctx.guild.id, member.id, 'harem_name')}"
                       f" — {len(rows)} characters",
                 description="\n".join(page),

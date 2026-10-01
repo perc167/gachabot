@@ -14,6 +14,26 @@ once rather than per player.
 # tower floors (perks.effective adds them in).
 GACHA_PERK = {"rolls": 5, "wish_slots": 10, "karuda_percent": 10}
 
+# Player Premium: one person's own plan, on every server Paper is in. It
+# stacks with a server's Premium. Servers that want everyone on equal terms
+# can switch the boosts off (the player_boosts setting); the badge stays.
+PLAYER_PERK = {"rolls": 5, "wish_slots": 4, "karuda_percent": 10}
+PLAYER_BADGE = "\U0001f48e"
+PLAYER_PERKS = [
+    f"+{PLAYER_PERK['rolls']} rolls every reset",
+    f"+{PLAYER_PERK['wish_slots']} wishlist slots",
+    f"+{PLAYER_PERK['karuda_percent']}% karuda from every grab and $dk",
+    "$rt: a free claim reset every 20 hours",
+    f"A {PLAYER_BADGE} by your name on your profile and harem",
+    "Yours on every server with Paper, on top of the server's own Premium",
+]
+
+def badge(db, user_id: int) -> str:
+    """The Player Premium badge and a space, for in front of a name, or ''.
+    Shown on every server, even where the boosts are switched off."""
+    return f"{PLAYER_BADGE} " if db.is_player_premium(user_id) else ""
+
+
 # $dk comes round this often on a Premium server, instead of every 20 hours.
 DAILY_COOLDOWN = 10 * 60 * 60
 

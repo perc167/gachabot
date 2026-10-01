@@ -38,7 +38,7 @@ CATEGORIES = [
         ("ru", "rolls left"),
         ("daily", "free rolls reset, every 20h"),
         ("us", "use a banked rolls reset"),
-        ("rt", "free claim reset (Opal IV)"),
+        ("rt", "free claim reset (Opal IV / Premium)"),
         ("limroul", "how deep the rolls go"),
     ]),
     ("\U0001f48d", "Your harem", [
@@ -402,6 +402,7 @@ CATEGORIES = [
     ]),
     ("\u2728", "Premium", [
         ("upgrade", "Paper Premium"),
+        ("playerpremium", "your own Premium, every server"),
         ("promo", "a panel to add Paper"),
         ("serversetup", "step-by-step server setup (Plus)"),
         ("event", "server events"),
@@ -600,6 +601,7 @@ CATEGORIES = [
         ("missingart", "who has no picture"),
         ("genkey", "mint premium keys"),
         ("giveplan", "give a server a plan"),
+        ("giveplayer", "give someone Player Premium"),
         ("backup", "DM the owners a backup"),
         ("restore", "restore a backup (DM)"),
         ("keystats", "keys made and spent"),

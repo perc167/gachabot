@@ -258,9 +258,15 @@ def combine(*sources) -> dict:
     return total
 
 
+def player_boosts(db, guild_id: int, user_id: int) -> bool:
+    """Does this player's own Player Premium count on this server?"""
+    return (db.is_player_premium(user_id)
+            and bool(db.get_setting(guild_id, "player_boosts")))
+
+
 def effective(db, guild_id: int, user_id: int) -> dict:
-    """Every perk a player currently has, from badges, their tower, and
-    the server's Premium."""
+    """Every perk a player currently has, from badges, their tower, the
+    server's Premium and their own Player Premium."""
     owned = db.badge_levels(guild_id, user_id)
     badge_perks = [BADGES_BY_KEY[key].perk_at(level)
                    for key, level in owned.items() if key in BADGES_BY_KEY]
@@ -270,6 +276,8 @@ def effective(db, guild_id: int, user_id: int) -> dict:
         sources.append(SOULMATE_PERK)
     if db.is_premium(guild_id):
         sources.append(premium.GACHA_PERK)
+    if player_boosts(db, guild_id, user_id):
+        sources.append(premium.PLAYER_PERK)
     result = combine(*sources)
     # A claim that costs nothing to wait for would break the claim economy.
     result["claim_percent"] = min(result["claim_percent"], 60)

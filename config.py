@@ -68,6 +68,10 @@ GUILD_SETTINGS = {
         "Head start a wisher gets before others may claim (0 = snipe at once)",
     ),
     "show_claimed": (1, 0, 1, "Roll characters that are already claimed (0/1)"),
+    "player_boosts": (
+        1, 0, 1,
+        "Player Premium's rolls, wishes, karuda and $rt count here (0 = everyone equal)",
+    ),
     "roll_rank_limit": (
         0, 0, 200000,
         "Deepest claim rank a roll can reach; 0 rolls the whole roster",

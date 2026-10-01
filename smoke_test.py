@@ -280,6 +280,52 @@ async def main():
           == "$34.99"
           and billing.describe_price({}) == "")
 
+    # Player Premium: one person, every server, apart from the server plans.
+    import db as player_dbmod
+    import utils as player_utils
+    pdb = player_dbmod.Database(os.path.join(tempfile.mkdtemp(), "player.db"))
+    P1, P2 = 500, 600
+    later = int(time.time()) + 30 * 86400
+    pmeta = {"kind": "player", "user_id": str(P1)}
+    real_subscription = billing.subscription
+
+    async def fake_subscription(sub_id):
+        return {"id": sub_id, "status": "active", "customer": "cus_pl",
+                "current_period_end": later, "metadata": pmeta}
+    billing.subscription = fake_subscription
+    try:
+        await billing.handle(pdb, {"type": "checkout.session.completed", "data": {"object": {
+            "mode": "subscription", "subscription": "sub_pl", "client_reference_id": f"user-{P1}",
+            "metadata": pmeta}}})
+    finally:
+        billing.subscription = real_subscription
+    check("a Player Premium checkout gives that person Player Premium",
+          pdb.is_player_premium(P1) and pdb.player_premium_of(P1)["customer"] == "cus_pl"
+          and not pdb.is_player_premium(P2))
+    check("and gives no server any plan", pdb.premium_of(P1) is None)
+    free_rolls = perks.effective(pdb, GUILD, P2)["rolls"]
+    check("their boosts count on every server",
+          all(perks.effective(pdb, g, P1)[k] - perks.effective(pdb, g, P2)[k] == v
+              for g in (GUILD, GUILD + 1) for k, v in premium.PLAYER_PERK.items()))
+    check("Player Premium unlocks $rt", player_utils.Cooldowns(pdb).rt_unlocked(GUILD, P1)
+          and not player_utils.Cooldowns(pdb).rt_unlocked(GUILD, P2))
+    pdb.set_setting(GUILD + 1, "player_boosts", 0)
+    check("a server can keep everyone equal",
+          perks.effective(pdb, GUILD + 1, P1)["rolls"] == free_rolls
+          and not player_utils.Cooldowns(pdb).rt_unlocked(GUILD + 1, P1))
+    check("but the badge shows everywhere", premium.badge(pdb, P1).startswith(premium.PLAYER_BADGE)
+          and premium.badge(pdb, P2) == "")
+    await billing.handle(pdb, {"type": "customer.subscription.updated", "data": {"object": {
+        "id": "sub_old", "status": "canceled", "metadata": pmeta}}})
+    check("an old subscription ending doesn't end the new one", pdb.is_player_premium(P1))
+    await billing.handle(pdb, {"type": "customer.subscription.deleted", "data": {"object": {
+        "id": "sub_pl", "status": "canceled", "metadata": pmeta}}})
+    check("cancelling it ends it", not pdb.is_player_premium(P1)
+          and pdb.player_premium_of(P1)["customer"] == "cus_pl")
+    check("the player perks fit a Discord message",
+          len("\n".join(premium.PLAYER_PERKS)) < 1000)
+    pdb.close()
+
     # XP boosts: the best role boost, times the channel's (or its
     # category's, or a thread's channel's), and only on Premium.
     lv = b.get_cog("Levels")

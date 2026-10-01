@@ -365,6 +365,17 @@ CREATE TABLE IF NOT EXISTS guild_premium (
     tier         TEXT NOT NULL DEFAULT 'premium'
 );
 
+-- Player Premium: one person's own plan, on every server (billing.py).
+-- Like guild_premium, it lasts while `until` is in the future.
+CREATE TABLE IF NOT EXISTS player_premium (
+    user_id      INTEGER PRIMARY KEY,
+    status       TEXT NOT NULL DEFAULT '',
+    until        INTEGER NOT NULL DEFAULT 0,
+    customer     TEXT NOT NULL DEFAULT '',
+    subscription TEXT NOT NULL DEFAULT '',
+    updated_at   INTEGER NOT NULL DEFAULT 0
+);
+
 -- Premium: events an admin schedules. strength is a percent for xp and
 -- karuda (200 = double) and a number of extra rolls for rolls.
 CREATE TABLE IF NOT EXISTS server_events (
@@ -1097,6 +1108,24 @@ class Database:
     def is_plus(self, guild_id: int) -> bool:
         """Premium Plus or Lifetime: the server builder."""
         return self.premium_tier(guild_id) in ("plus", "lifetime")
+
+    def set_player_premium(self, user_id: int, status: str, until: int,
+                           customer: str = "", subscription: str = ""):
+        row = self.player_premium_of(user_id)
+        self._upsert("player_premium", {
+            "user_id": user_id, "status": status, "until": int(until),
+            # A later event may not carry these; don't forget them.
+            "customer": customer or (row["customer"] if row else ""),
+            "subscription": subscription or (row["subscription"] if row else ""),
+            "updated_at": int(time.time())})
+
+    def player_premium_of(self, user_id: int):
+        rows = self._select("player_premium", user_id=user_id)
+        return rows[0] if rows else None
+
+    def is_player_premium(self, user_id: int) -> bool:
+        row = self.player_premium_of(user_id)
+        return bool(row and row["until"] > time.time())
 
     def add_event(self, guild_id: int, kind: str, strength: int, starts_at: int,
                   ends_at: int, channel_id: int, created_by: int) -> int:

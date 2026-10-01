@@ -1,9 +1,13 @@
-"""Paper Premium: Stripe payments, one plan per server.
+"""Paper Premium: Stripe payments, per server, and per player.
 
-Three plans (PLANS):
+Three plans for a server (PLANS):
     premium   monthly, with a free trial: the Premium perks
     plus      monthly: Premium and the server builder ($serversetup)
     lifetime  paid once: Plus for that server forever, never charged again
+and one for a person (PLAYER): Player Premium, monthly, their own gacha
+boosts on every server. Its Stripe objects carry metadata kind=player and a
+user_id instead of a guild_id, and it has its own table, so the two never
+mix.
 
 Card details never reach the bot. The dashboard asks Stripe for a Checkout
 page and sends the admin there; Stripe tells the bot what happened through
@@ -18,6 +22,7 @@ Needs, from the Stripe dashboard:
     STRIPE_WEBHOOK_SECRET  Developers > Webhooks > the endpoint (whsec_...)
     STRIPE_PLUS_PRICE_ID      the Plus monthly price (optional)
     STRIPE_LIFETIME_PRICE_ID  the Lifetime one-time price (optional)
+    STRIPE_PLAYER_PRICE_ID    the Player Premium monthly price (optional)
 and, optionally, PREMIUM_PRICE_LABEL (e.g. "$4.99 a month") for the button.
 STRIPE_API_BASE exists only so tests can stand in for Stripe.
 
@@ -51,6 +56,10 @@ PLANS = {
 }
 # Higher outranks lower: a lower plan's events never replace a higher one.
 RANK = {"premium": 1, "plus": 2, "lifetime": 3}
+
+# Player Premium: (price env var, name, one line on it).
+PLAYER = ("STRIPE_PLAYER_PRICE_ID", "Paper Player Premium",
+          "Your own extra rolls, wishes and karuda, on every server")
 
 
 class BillingError(Exception):
@@ -93,6 +102,18 @@ def plan_label(plan: str) -> str:
     return price_label() if plan == "premium" else _labels.get(plan, "")
 
 
+def player_price_id() -> str:
+    return os.getenv(PLAYER[0], "").strip()
+
+
+def player_on_sale() -> bool:
+    return configured() and bool(player_price_id())
+
+
+def player_label() -> str:
+    return _labels.get("player", "")
+
+
 # Prices are shown in US dollars. The account is Australian, so each price
 # is AUD with a USD amount beside it (Stripe's currency_options), which US
 # buyers are charged exactly. A price without one is converted at the AUD ->
@@ -129,10 +150,12 @@ async def load_price_label():
     # Each plan on its own, so one bad price ID can't blank all three. The
     # USD amount needs an expand; if Stripe refuses it, the plain price
     # still gives a converted label.
-    for plan in PLANS:
-        if not plan_on_sale(plan):
-            continue
-        path = f"/v1/prices/{price_id(plan)}"
+    wanted = [(plan, price_id(plan), PLANS[plan][1] == "payment")
+              for plan in PLANS if plan_on_sale(plan)]
+    if player_on_sale():
+        wanted.append(("player", player_price_id(), False))
+    for plan, price, once in wanted:
+        path = f"/v1/prices/{price}"
         try:
             try:
                 price = await _call("GET", path + "?expand[]=currency_options")
@@ -142,10 +165,10 @@ async def load_price_label():
                 price = await _call("GET", path)
         except (BillingError, OSError, asyncio.TimeoutError) as error:
             logging.getLogger("billing").warning(
-                "couldn't read the %s price (%s): %s", plan, price_id(plan), error)
+                "couldn't read the %s price (%s): %s", plan, path.rsplit("/", 1)[1], error)
             continue
         label = describe_price(price)
-        _labels[plan] = label + (" once" if PLANS[plan][1] == "payment" else "")
+        _labels[plan] = label + (" once" if once else "")
 
 
 async def _call(method: str, path: str, form: dict = None) -> dict:
@@ -202,6 +225,30 @@ async def checkout(guild_id: int, guild_name: str, buyer_id: int,
         # Stripe takes a card now and charges after the trial, unless
         # they cancel first.
         form["subscription_data[trial_period_days]"] = str(TRIAL_DAYS)
+    if customer:
+        form["customer"] = customer
+    session = await _call("POST", "/v1/checkout/sessions", form)
+    return session["url"]
+
+
+async def player_checkout(user_id: int, success_url: str, cancel_url: str,
+                          customer: str = "") -> str:
+    """A Stripe Checkout page for one person's Player Premium."""
+    meta = {"kind": "player", "user_id": str(user_id)}
+    form = {
+        "mode": "subscription",
+        "line_items[0][price]": player_price_id(),
+        "line_items[0][quantity]": "1",
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+        "client_reference_id": f"user-{user_id}",
+        "allow_promotion_codes": "true",
+        "subscription_data[description]": PLAYER[1],
+    }
+    for key, value in meta.items():
+        form[f"metadata[{key}]"] = value
+        # On the subscription too, so every later event says whose it is.
+        form[f"subscription_data[metadata][{key}]"] = value
     if customer:
         form["customer"] = customer
     session = await _call("POST", "/v1/checkout/sessions", form)
@@ -304,6 +351,24 @@ def apply_subscription(db, sub: dict, guild_id: int = None):
     return replaced if live else None
 
 
+def apply_player(db, sub: dict):
+    """Record what a Player Premium subscription means for its person."""
+    meta = sub.get("metadata") or {}
+    user_id = _number(meta.get("user_id"))
+    if not user_id:
+        return
+    status = sub.get("status", "")
+    sub_id = str(sub.get("id") or "")
+    live = status in ("active", "trialing", "past_due")
+    row = db.player_premium_of(user_id)
+    if (not live and row and row["subscription"] and row["subscription"] != sub_id
+            and row["until"] > time.time()):
+        return                          # an old subscription ending; a newer one runs
+    until = period_end(sub) + GRACE if live else int(time.time())
+    db.set_player_premium(user_id, status=status, until=until,
+                          customer=str(sub.get("customer") or ""), subscription=sub_id)
+
+
 def apply_lifetime(db, session: dict, guild_id: int):
     """A paid Lifetime purchase: Plus, for good. Returns the subscription it
     replaces, if one was running, so it can be stopped from renewing."""
@@ -321,6 +386,13 @@ async def handle(db, event: dict):
     """Act on one webhook event. Safe to run twice for the same event."""
     kind = event.get("type", "")
     obj = (event.get("data") or {}).get("object") or {}
+    if (obj.get("metadata") or {}).get("kind") == "player":
+        if kind == "checkout.session.completed" and obj.get("subscription"):
+            apply_player(db, await subscription(obj["subscription"]))
+        elif kind in ("customer.subscription.created", "customer.subscription.updated",
+                      "customer.subscription.deleted"):
+            apply_player(db, obj)
+        return
     replaced = None
     guild_id = _number(obj.get("client_reference_id")
                        or (obj.get("metadata") or {}).get("guild_id"))

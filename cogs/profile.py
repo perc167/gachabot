@@ -7,6 +7,7 @@ from discord.ext import commands
 
 import config
 import perks
+import premium
 import wishes as wish_slots
 import utils
 from utils import fmt_duration
@@ -61,7 +62,8 @@ class Profile(commands.Cog):
         icon = utils.shard_icon(config.SHARD_TYPES[0][0])
         worth = sum(utils.karuda_value(r, rate) for r in harem)
 
-        embed = discord.Embed(title=member.display_name, colour=config.CARD_COLOUR)
+        embed = discord.Embed(title=premium.badge(db, member.id) + member.display_name,
+                              colour=config.CARD_COLOUR)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(
             name="Balance", value=f"{icon} **{player['karuda']:,}**", inline=True

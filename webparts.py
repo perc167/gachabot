@@ -26,7 +26,7 @@ from cogs.toggles import GROUPS, TOGGLES
 GACHA_SECTIONS = (
     ("Rolls and claims", ("roll_limit", "roll_reset_minutes", "claim_interval_minutes",
                           "claim_window_seconds", "show_claimed", "roll_bias",
-                          "max_marriages")),
+                          "max_marriages", "player_boosts")),
     ("Wishes", ("wish_limit", "wish_protect_seconds")),
     ("Karuda and the daily", ("karuda_interval_minutes", "karuda_rate",
                               "karuda_grab_percent", "divorce_refund_percent",
