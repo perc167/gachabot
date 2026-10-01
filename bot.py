@@ -54,6 +54,7 @@ COGS = [
     "cogs.champions",
     "cogs.automod",
     "cogs.antinuke",
+    "cogs.antialt",
     "cogs.customizer",
     "cogs.utility",
     "cogs.serversetup",

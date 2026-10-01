@@ -499,6 +499,16 @@ CATEGORIES = [
         ("antinuke unadmin", "take that away"),
         ("antinuke log", "where alerts go"),
     ]),
+    ("\U0001f575️", "Anti-alt", [
+        ("antialt", "how it's set"),
+        ("antialt on", "switch it on"),
+        ("antialt off", "switch it off"),
+        ("antialt age", "how new is too new"),
+        ("antialt punish", "alert, jail, kick or ban"),
+        ("antialt lookalike", "flag hardban look-alikes"),
+        ("antialt allow", "let someone in"),
+        ("antialt unallow", "check them again"),
+    ]),
     ("\U0001f3c5", "Staff points", [
         ("point", "give a point"),
         ("points", "see someone's points"),
@@ -613,7 +623,8 @@ AREAS = [
     ], ("gachasettings", "switches", "gachaadmin")),
     ("mod", "\U0001f6e1\ufe0f", "Moderation", "jail, mutes, warnings, bans, automod and staff points", [
         "Moderation", "Jail & mutes", "Warnings", "Kicks & bans", "Cleaning up",
-        "Records & names", "Mod setup", "Automod", "Antinuke", "Staff points",
+        "Records & names", "Mod setup", "Automod", "Antinuke", "Anti-alt",
+        "Staff points",
     ], ("moderation", "mods", "staff")),
     ("voice", "\U0001f50a", "Voice", "your own voice rooms and hours in voice", [
         "Voice rooms", "Voice hours",

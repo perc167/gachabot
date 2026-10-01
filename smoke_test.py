@@ -3256,6 +3256,45 @@ async def main():
           .startswith("**Bob**, you __can__ claim"))
     ddb.close()
 
+    # 23. Anti-alt: new accounts and look-alikes of hardbanned users.
+    import datetime as dt
+    from cogs import antialt as altmod
+    check("ages read as days", altmod.parse_days("7") == 7
+          and altmod.parse_days("2w") == 14 and altmod.parse_days("48h") == 2
+          and altmod.parse_days("1h") == 1 and altmod.parse_days("0") is None
+          and altmod.parse_days("soon") is None and altmod.parse_days("400d") is None)
+    made = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=2)
+    check("a two-day-old account is under a week",
+          altmod.account_age(made) < 7 * altmod.DAY)
+    check("the same picture is a look-alike",
+          altmod.looks_alike(["a"], "abc", ["b"], "abc") == "the same profile picture")
+    check("names match through punctuation and case",
+          altmod.looks_alike(["X_Evader."], "", ["xevader"], "") == "the same name")
+    check("one letter off still matches a long name",
+          altmod.looks_alike(["troublemaker"], "", ["troublemakr"], "") == "a very similar name")
+    check("short names must match exactly",
+          altmod.looks_alike(["sam"], "", ["sim"], "") == "")
+    check("no picture is never a match",
+          altmod.looks_alike(["alice"], "", ["bob"], "") == "")
+    check("every punishment word is understood",
+          all(altmod.SAYS[w] == want for w, want in
+              (("jail", "jail"), ("jailed", "jail"), ("banned", "ban"),
+               ("kicked", "kick"), ("alert", "alert"), ("flag", "alert"))))
+
+    adb = dbmod.Database(os.path.join(tempfile.mkdtemp(), "alt.db"))
+    alt = altmod.AntiAlt(SimpleNamespace(db=adb))
+    check("anti-alt starts off, at 7 days and jail",
+          not alt.enabled(GUILD) and alt.days(GUILD) == 7 and alt.punishment(GUILD) == "jail")
+    alt.put(GUILD, "enabled", 1)
+    alt.put(GUILD, "punishment", altmod.PUNISHMENTS.index("ban"))
+    check("its settings don't touch antinuke's",
+          alt.enabled(GUILD) and adb.antinuke_get(GUILD, "enabled") == 0
+          and alt.punishment(GUILD) == "ban")
+    adb.antinuke_add_person(GUILD, BOB, "alt_allow")
+    check("an allowed user is remembered", alt.allowed(GUILD) == [BOB]
+          and adb.antinuke_people(GUILD, "trusted") == [])
+    adb.close()
+
     await b.close()
 
 
