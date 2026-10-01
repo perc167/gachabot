@@ -20,8 +20,13 @@ Three questions, asked of every picture in those albums:
   average hash, so a crop and its original, or two frames a second apart,
   count as one.
 
-Anything failing either question is dropped. Nobody is left with an empty
-album: a character whose every frame fails keeps whatever art they had.
+  Can you see them? A frame can be the right character, alone, face in
+  shot, and still be a silhouette in an unlit room or one eye filling the
+  card. That is what Emilia's album was complained about for, twice.
+
+Anything failing a question is dropped. A character whose every picture
+fails loses their album and falls back to the portrait on the roster, which
+is the same place everyone who was never swept gets theirs.
 """
 import argparse
 import io
@@ -91,7 +96,7 @@ def main():
     tags = load(TAGS)
     tagger = frames_tool.Tagger()
 
-    checked = not_alone = duplicate = broken = faceless = 0
+    checked = not_alone = duplicate = broken = faceless = unlit = 0
     emptied = []
     for key in sorted(frames):
         album = art.get(key) or []
@@ -127,8 +132,14 @@ def main():
                 # A frame with no face is a torso, a shoulder, or a speck in
                 # a landscape. It passes every identity check and is still
                 # not a picture of anybody.
-                if not frames_tool.shows_face(tagger.read(image)[1]):
+                reading = tagger.read(image)
+                if not frames_tool.shows_face(reading[1]):
                     faceless += 1
+                    continue
+                # The one the album was complained about twice: her, alone,
+                # face in shot, and too dark or too close to make out.
+                if not frames_tool.visible(image, reading[1]):
+                    unlit += 1
                     continue
 
             marks.append(mark)
@@ -143,6 +154,7 @@ def main():
     print(f"checked {checked:,} pictures across {len(frames):,} albums")
     print(f"  dropped {not_alone:,} where the crop no longer shows them alone")
     print(f"  dropped {faceless:,} with no face in them at all")
+    print(f"  dropped {unlit:,} too dark, or too close, to see who it is")
     print(f"  dropped {duplicate:,} that repeat a picture already there")
     print(f"  dropped {broken:,} that would not open")
     if emptied:

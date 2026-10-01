@@ -179,7 +179,8 @@ def main():
                     data = buffer.getvalue()
                     reading = tagger.read(cut)
                     if ((not tag or tagger.alone(cut, tag, reading))
-                            and frames_tool.shows_face(reading[1])):
+                            and frames_tool.shows_face(reading[1])
+                            and frames_tool.visible(cut, reading[1])):
                         won = ("face", data)
                 except Exception:  # noqa: BLE001 - fall back to the proxy
                     pass
@@ -200,6 +201,10 @@ def main():
                 # Whatever cut produced it, a crop with no face left in it is
                 # the shoulder-and-a-curtain shot.
                 if not frames_tool.shows_face(reading[1]):
+                    continue
+                # A crop can darken a frame by keeping the shadowed half of
+                # it, so the cut is judged on its own, not on the original.
+                if not frames_tool.visible(image, reading[1]):
                     continue
                 won = (label, data)
                 break
@@ -228,7 +233,9 @@ def main():
             if url.startswith("http") and not os.path.exists(
                     os.path.join(ART_DIR, name)):
                 continue
-            kept.append("local:" + name if url.startswith("http") else url)
+            entry = "local:" + name if url.startswith("http") else url
+            if entry not in kept:
+                kept.append(entry)
         if kept:
             swapped[key] = kept
 

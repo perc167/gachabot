@@ -66,7 +66,11 @@ def main():
             gained += 1
         else:
             replaced += 1
-        merged[key] = (list(shots) + existing)[:LIMIT]
+        album = []
+        for url in list(shots) + existing:
+            if url not in album:
+                album.append(url)
+        merged[key] = album[:LIMIT]
 
     # Anywhere else in the file that still points at a frame we have cropped.
     for key, urls in merged.items():

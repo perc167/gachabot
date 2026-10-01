@@ -116,6 +116,31 @@ GOOD_FRAMING = ("upper_body", "cowboy_shot", "portrait", "looking_at_viewer",
                 "full_body", "solo_focus")
 
 
+# The roster spells a character's danbooru tag the way their name is written
+# in English; danbooru does not always agree. A long vowel can be ou, oo, oh
+# or nothing - Rin Toosaka is tohsaka_rin there, Joutarou Kuujou is
+# kujo_jotaro - and the model only answers to its own spelling, so these nine
+# were silently unfindable.
+#
+# Written out rather than guessed at. Matching names loosely offered three
+# more, and all three were wrong: there is a Hanako in Toilet-bound
+# Hanako-kun and another in Blue Archive, a Yuno in Black Clover and another
+# in Hidamari Sketch, and the Josuke of Diamond is Unbreakable is not the
+# Josuke of JoJolion. A table of nine can be read and checked; a rule that
+# binds a character to a stranger cannot.
+ALIASES = {
+    "kuujou_joutarou": "kujo_jotaro",
+    "kuujou_jolyne": "kujo_jolyne",
+    "kakyouin_noriaki": "kakyoin_noriaki",
+    "toosaka_rin": "tohsaka_rin",
+    "gotou_hitori_(tsuchinoko)": "gotoh_hitori",
+    "yamada_ryou": "yamada_ryo",
+    "getou_suguru_(kenjaku)": "getou_suguru",
+    "hoshino_ai": "hoshino_ai_(oshi_no_ko)",
+    "kirigiri_kyouko": "kirigiri_kyoko",
+}
+
+
 def fetch(url: str, tries: int = 3, timeout: int = 40):
     for attempt in range(tries):
         try:
@@ -290,6 +315,30 @@ def face_score(box, image) -> float:
     if share < low:
         return max(0.2, (share - FACE_FLOOR) / (low - FACE_FLOOR))
     return max(0.2, (FACE_CEILING - share) / (FACE_CEILING - high))
+
+
+# Dark enough that she is a shape rather than a person. Measured off the
+# frames that were complained about: the hooded shot averages 67 of 255 and
+# the silhouette 104 with a quarter of it near black, while every frame worth
+# keeping sat above 85 with less than a quarter dark. The sky at dusk is
+# fine; an unlit room is not.
+DIM = 85.0
+MOSTLY_DARK = 0.24
+NEAR_BLACK = 40
+
+
+def visible(image, tags: dict) -> bool:
+    """Can you see who this is, or only that somebody is there?"""
+    # An eye filling the card is a bright, sharp, certain picture of nobody.
+    if any(tags.get(word, 0.0) >= 0.5 for word in TOO_CLOSE):
+        return False
+    grey = image.convert("L").resize((96, 96))
+    pixels = list(grey.getdata())
+    mean = sum(pixels) / len(pixels)
+    if mean < DIM:
+        return False
+    dark = sum(1 for p in pixels if p < NEAR_BLACK) / len(pixels)
+    return dark <= MOSTLY_DARK
 
 
 def quality(image, tags: dict) -> float:
@@ -604,7 +653,9 @@ def harvest(tagger, series: str, wanted: list, budget: int,
             # against a curtain, and the one where she is a dot in a field.
             if not shows_face(rest):
                 continue
-            if any(rest.get(word, 0.0) >= 0.5 for word in TOO_CLOSE):
+            # Right person, on her own, face in shot - and still unusable if
+            # the room is unlit or the shot is one eye.
+            if not visible(image, rest):
                 continue
             # The cascade is unreliable as a gate but useful as a hint: when
             # it does find a face, the crop can be built around it.
@@ -726,8 +777,8 @@ def main():
     known = {}
     strangers = 0
     for series, people in plan.items():
-        keep = [(key, tag, row) for key, tag, row in people
-                if tag in tagger.characters]
+        keep = [(key, ALIASES.get(tag, tag), row) for key, tag, row in people
+                if ALIASES.get(tag, tag) in tagger.characters]
         strangers += len(people) - len(keep)
         if keep:
             known[series] = keep
