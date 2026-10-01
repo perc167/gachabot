@@ -54,9 +54,15 @@ PERK_GROUPS = [
 ]
 
 
+# The cheapest plan each group comes with; a group not named here comes with
+# Premium. Each plan has everything from the plans below it.
+GROUP_TIER = {"With Plus or Lifetime": "plus"}
+
+
 def perk_groups() -> list:
     """The perks as plain data, for the dashboard."""
-    return [{"icon": icon, "title": title, "perks": list(lines)}
+    return [{"icon": icon, "title": title, "perks": list(lines),
+             "tier": GROUP_TIER.get(title, "premium")}
             for icon, title, lines in PERK_GROUPS]
 
 

@@ -219,6 +219,27 @@ body{background:transparent}
 .plan .tag{position:absolute;top:-9px;right:12px;background:var(--gold);color:#1a1405;
   font-size:11px;font-weight:700;border-radius:99px;padding:2px 9px}
 .plan .have{font-size:13.5px;color:var(--gold);font-weight:600}
+.plan.clickable{cursor:pointer;transition:transform .15s,border-color .15s}
+.plan.clickable:hover{transform:translateY(-2px);border-color:rgba(229,197,90,.45)}
+.plan .more{align-self:flex-start;background:none;border:0;padding:0;cursor:pointer;
+  font:12.5px var(--mono);color:var(--accent-soft)}
+.plan .more:hover{color:var(--gold)}
+dialog.plan-info{width:min(92vw,560px);max-height:86vh;overflow:auto;border-radius:18px;
+  padding:24px 24px 18px;color:var(--text);border:1px solid rgba(229,197,90,.45);
+  background:linear-gradient(160deg,#1d1733,#120f1f 70%)}
+dialog.plan-info::backdrop{background:rgba(5,4,10,.7);backdrop-filter:blur(3px)}
+.plan-info h2{font-family:var(--display);font-size:22px;margin:0}
+.plan-info .price{font-family:var(--display);font-weight:600;color:var(--gold);font-size:20px;margin:2px 0 6px}
+.plan-info .lead{color:var(--dim);margin:0 0 14px}
+.plan-info .x{position:absolute;top:10px;right:14px;background:none;border:0;color:var(--dim);
+  font-size:26px;line-height:1;cursor:pointer}
+.plan-info .x:hover{color:var(--text)}
+.plan-info .pgroups{grid-template-columns:1fr;margin:0 0 12px}
+.plan-info .pgroup ul{margin:0 0 6px;padding-left:17px;font-size:13.5px}
+.plan-info .pgroup.new{border-color:rgba(229,197,90,.55);background:rgba(229,197,90,.07)}
+.plan-info .newtag{margin-left:auto;font:600 11px var(--body);color:#1a1405;background:var(--gold);
+  border-radius:99px;padding:2px 8px}
+.plan-info .foot{font-size:13px;color:var(--dim);margin:0}
 .btn.gold.soft{background:rgba(229,197,90,.16);color:var(--gold);border:1px solid rgba(229,197,90,.5)}
 .btn.gold.soft:hover{background:rgba(229,197,90,.26)}
 .plans-head{margin:18px 0 4px;font-family:var(--display);font-size:15px}
@@ -456,6 +477,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
   <button class="btn ghost" id="discard" type="button" disabled>Discard</button>
   <button class="btn" id="save" type="button" disabled>Save changes</button>
 </div></div>
+
+<!-- What one plan includes, opened from any plan card. -->
+<dialog class="plan-info" id="plan-info" aria-labelledby="plan-info-name"></dialog>
 
 <script>
 (function(){
@@ -823,6 +847,59 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     }));
   }
 
+  // What one plan includes. Every plan card opens it, bought or not, so all
+  // three can be read before choosing. Each plan has everything from the
+  // plans below it; the groups a plan adds are marked as new.
+  var PLAN_RANK = {premium: 1, plus: 2, lifetime: 3};
+  var GROUP_RANK = {premium: 1, plus: 2};
+  function showPlan(pl, groups){
+    var box = $("plan-info"); box.textContent = "";
+    var rank = PLAN_RANK[pl.key] || 1;
+    var tier = function(g){ return GROUP_RANK[g.tier] || 1; };
+    // What the plan adds over Premium goes first, so it's what you see.
+    var mine = (groups || []).filter(function(g){ return tier(g) <= rank; })
+      .sort(function(a, b){ return tier(b) - tier(a); });
+    var shown = perks(mine);
+    mine.forEach(function(g, i){
+      if (tier(g) > 1) {
+        var card = shown.children[i];
+        card.classList.add("new");
+        card.firstChild.appendChild(el("span", {cls: "newtag",
+          text: pl.key === "plus" ? "New in Plus" : "Plus"}));
+      }
+    });
+    var close = el("button", {type: "button", cls: "x", text: "×"});
+    close.setAttribute("aria-label", "Close");
+    close.addEventListener("click", function(){ box.close(); });
+    [close,
+     el("h2", {id: "plan-info-name", text: pl.name}),
+     pl.price ? el("div", {cls: "price", text: pl.price}) : null,
+     el("p", {cls: "lead", text: pl.line || ""}),
+     shown,
+     el("p", {cls: "foot", text: pl.key === "lifetime"
+       ? "Paid once: never billed again, and it stays with the server for good."
+       : "Monthly, for one server. Cancel any time and it runs to the end of the month."})
+    ].forEach(function(n){ if (n) box.appendChild(n); });
+    box.showModal();
+  }
+  // Clicking outside the box closes it.
+  $("plan-info").addEventListener("click", function(e){
+    if (e.target === this) this.close();
+  });
+
+  // Any plan card opens its plan. A buy button inside keeps doing its own job.
+  function readable(card, pl, groups){
+    card.classList.add("clickable");
+    var more = el("button", {type: "button", cls: "more", text: "See what's included →"});
+    var action = card.querySelector(".btn, .have");
+    card.insertBefore(more, action || null);
+    card.addEventListener("click", function(e){
+      if (e.target.closest("a, button") && e.target !== more) return;
+      showPlan(pl, groups);
+    });
+    return card;
+  }
+
   // One card per plan on sale. Plans the server has (or has better) are marked
   // instead of sold again.
   // A plan picked on a button elsewhere (the $promo panel links here with
@@ -845,12 +922,12 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         action = button(label, "btn " + (pl.key === "lifetime" ? "gold" : "gold soft"),
                         "/api/premium/checkout", forGuild, {plan: pl.key});
       }
-      wrap.appendChild(el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "") + (pl.owned ? " owned" : "")
+      wrap.appendChild(readable(el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "") + (pl.owned ? " owned" : "")
                                    + (pl.key === wantedPlan && !pl.owned ? " picked" : "")}, [
         pl.key === "lifetime" ? el("span", {cls: "tag", text: "Pay once"}) : null,
         el("h3", {text: pl.name}),
         el("div", {cls: "price", text: pl.price || ""}),
-        el("p", {text: pl.line}), action]));
+        el("p", {text: pl.line}), action]), pl, p.perks));
     });
     return el("div", {}, [wrap, p.price_note ? el("p", {cls: "price-note", text: p.price_note}) : null]);
   }
@@ -871,7 +948,9 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
             (p.price || "the monthly price") + ", unless you cancel before then in Manage billing."
           : (p.ending ? "It ends on " : "It renews by ") + until + ". Thank you for supporting Paper."}));
       if (p.billing) panel.appendChild(button("Manage billing", "btn ghost", "/api/premium/portal"));
-      if (upgrades) panel.append(el("h3", {cls: "plans-head", text: "Go further"}), planCards(p));
+      // Every plan stays readable, even with the best one already here.
+      panel.append(el("h3", {cls: "plans-head", text: upgrades ? "Go further" : "Every plan"}),
+                   planCards(p));
     } else {
       panel.append(
         el("h2", {text: "\u2728 Paper Premium"}),
@@ -1393,11 +1472,11 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     // The plans, to read here; each server's own page has the buttons.
     var onSale = (sale.plans || []).filter(function(pl){ return pl.on_sale; });
     if (onSale.length) list.appendChild(el("div", {cls: "plans"}, onSale.map(function(pl){
-      return el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "")
+      return readable(el("div", {cls: "plan" + (pl.key === "lifetime" ? " best" : "")
                            + (pl.key === wantedPlan ? " picked" : "")}, [
         pl.key === "lifetime" ? el("span", {cls: "tag", text: "Pay once"}) : null,
         el("h3", {text: pl.name}), el("div", {cls: "price", text: pl.price || ""}),
-        el("p", {text: pl.line})]);
+        el("p", {text: pl.line})]), pl, sale.perks);
     })));
     if (onSale.length && sale.price_note)
       list.appendChild(el("p", {cls: "price-note", text: sale.price_note}));

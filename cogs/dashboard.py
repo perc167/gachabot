@@ -153,12 +153,19 @@ class Dashboard(commands.Cog):
             await self.runner.cleanup()
 
     async def load_price(self):
-        """The Premium price from Stripe, for buttons and $upgrade. Doesn't
-        hold up the bot starting, and a failure only means no price shown."""
-        try:
-            await billing.load_price_label()
-        except (billing.BillingError, OSError, asyncio.TimeoutError):
-            log.warning("couldn't read the Premium price from Stripe")
+        """The plans' prices from Stripe, for buttons and $upgrade. Doesn't
+        hold up the bot starting. Read again every few minutes while any
+        plan on sale has no price yet (Stripe was briefly unreachable, or
+        the variables were being changed), and hourly after, so a price
+        changed in Stripe shows up without a restart."""
+        while True:
+            try:
+                await billing.load_price_label()
+            except (billing.BillingError, OSError, asyncio.TimeoutError):
+                log.warning("couldn't read the plans' prices from Stripe")
+            missing = [p for p in billing.PLANS
+                       if billing.plan_on_sale(p) and not billing.plan_label(p)]
+            await asyncio.sleep(300 if missing else 3600)
 
     # ------------------------------------------------------------ the link
 
