@@ -1,6 +1,8 @@
-"""$serversetup: build a whole server in one go. A Premium Plus feature.
+"""$serversetup: set up a whole server, one yes-or-no question at a time.
+A Premium Plus feature.
 
-Four parts, each optional, picked from a menu before anything happens:
+Each step in STEPS is a question; nothing happens until the last screen's
+Build it, and then only the yeses are built, in order:
 
     roles      staff roles from Owner to Trial, with colours (a gradient and
                an icon too where the server has those unlocked), dividers,
@@ -9,9 +11,15 @@ Four parts, each optional, picked from a menu before anything happens:
                (logs, mod-logs), wired to Paper's jail and mod log
     forum      a MUST READ category with a how-to-mod forum: the mod guide
                and the command list as posts (data/guides/)
-    community  info, chat and voice channels, a Member role new people get,
-               level roles, and Paper switched on in them: welcomes,
-               level-ups, the gacha channel and Join To Create
+    welcome    #welcome, with Paper's welcomes and goodbyes in it
+    channels   rules, announcements, general, media, bot-cmds
+    member     a Member role new people get
+    gacha      #gacha, with rolling kept to it
+    levels     #level-ups and level roles
+    voice      voice channels with Join To Create
+    automod    invite, mass mention and spam filters on
+    antinuke   on, if the owner (or an antinuke admin) is the one asking
+    antialt    new accounts jailed, hardban look-alikes flagged
 
 Nothing is made twice: anything already there with the same name is used
 as it is, so it's safe to run again, or to run one part at a time.
@@ -26,6 +34,7 @@ import discord
 from discord.ext import commands
 
 import billing
+import config
 
 GUIDES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                       "data", "guides")
@@ -81,24 +90,51 @@ LEVEL_ROLES = [
 ]
 MEMBER = (fancy("Member"), 0xB9A8FF, 0xE3DAFF)
 
-PARTS = {
-    "roles": ("Roles", "Owner, Co-owner, Admin, Mod and Trial with colours, dividers,"
-                       " and the Jailed, imuted and rmuted roles"),
-    "staff": ("Staff area and logs", "jail, moderator-only, jail vc and mod vc, then"
-                                     " logs and mod-logs, all hooked up to Paper"),
-    "forum": ("How-to-mod forum", "a MUST READ category with the mod guide and the"
-                                  " command list as forum posts"),
-    "community": ("Community channels", "welcome, rules, general, media, gacha,"
-                                        " level-ups, voice with Join To Create, a"
-                                        " Member role and level roles"),
+# One question each, asked in this order and built in this order. Every
+# step is safe to run again: what's already there is kept as it is.
+# key: (emoji, title, the question, what a yes makes or switches on)
+STEPS = {
+    "roles": ("\U0001f451", "Staff roles", "Make staff roles?",
+              "Owner, Co-owner, Admin, Mod and Trial with colours and dividers, and the"
+              " Jailed, imuted and rmuted roles Paper's moderation uses."),
+    "staff": ("\U0001f6e1\ufe0f", "Staff area and logs", "Make a staff area and logs?",
+              "jail, moderator-only, jail vc and mod vc, then logs and mod-logs, all hidden"
+              " from members and hooked up to Paper's jail and mod log."),
+    "forum": ("\U0001f4d6", "How-to-mod forum", "Make a how-to-mod forum for your staff?",
+              "A MUST READ category with the mod guide and the command list as posts."),
+    "welcome": ("\U0001f44b", "Welcomes", "Greet people who join and leave?",
+                "A #welcome channel, with Paper's welcome and goodbye messages in it."),
+    "channels": ("\U0001f4ac", "Chat channels", "Make the usual chat channels?",
+                 "#rules and #announcements (read-only), then #general, #media and #bot-cmds."),
+    "member": ("\U0001f9d1", "Member role", "Give everyone who joins a Member role?",
+               "A Member role, handed out automatically to new members."),
+    "gacha": ("\U0001f3b2", "Gacha", "Use Paper's gacha game?",
+              "A #gacha channel, with rolling and claiming kept to it so chat stays clear."),
+    "levels": ("\U0001f4c8", "Levels", "Use levels and level roles?",
+               "A #level-ups channel for level-up messages, and roles at levels"
+               " 5, 10, 20, 30 and 50."),
+    "voice": ("\U0001f50a", "Voice rooms", "Make voice channels with Join To Create?",
+              "A voice category with Join To Create (everyone gets their own room),"
+              " general vc and music."),
+    "automod": ("\U0001f916", "Automod", "Switch on automod?",
+                "Deletes invite links, mass mentions and spam, and warns or jails the sender."),
+    "antinuke": ("\U0001f6a8", "Antinuke", "Switch on the antinuke?",
+                 "Stops anyone (even an admin) mass-banning, deleting channels or roles,"
+                 " or adding bots, strips their roles and undoes what it can."
+                 " Only the server owner can switch it on."),
+    "antialt": ("\U0001f575\ufe0f", "Anti-alt", "Catch ban evaders' new accounts?",
+                "Accounts under 7 days old are jailed when they join, and look-alikes of"
+                " hardbanned users are flagged to staff."),
 }
-
+PARTS = tuple(STEPS)
+YES, NO = "\u2705", "\u2716\ufe0f"
 
 class Build:
     """One run of the builder: makes what's missing, remembers what it did."""
 
-    def __init__(self, bot, guild, prefix: str):
+    def __init__(self, bot, guild, prefix: str, author=None):
         self.bot, self.guild, self.db, self.prefix = bot, guild, bot.db, prefix
+        self.author = author
         self.made, self.kept, self.problems = [], [], []
         self.features = set(guild.features)
         self.can = guild.me.guild_permissions
@@ -267,10 +303,35 @@ class Build:
             for title, filename in posts:
                 await channel.send(f"# {title}\n" + self.guide(filename)[:1900])
 
-    async def build_community(self):
+    async def build_welcome(self):
+        info = await self.category(category_name("info"))
+        welcome = await self.text("welcome", info, self.read_only())
+        for kind in ("welcome", "goodbye"):
+            if not self.guild.get_channel(self.db.greeting(self.guild.id, kind)["channel_id"]):
+                self.db.set_greeting(self.guild.id, kind, channel_id=welcome.id)
+
+    async def build_channels(self):
+        info = await self.category(category_name("info"))
+        await self.text("rules", info, self.read_only(), topic="Read these first.")
+        await self.text("announcements", info, self.read_only())
+        chat = await self.category(category_name("chat"))
+        for name in ("general", "media", "bot-cmds"):
+            await self.text(name, chat)
+
+    async def build_member(self):
         gid = self.guild.id
         member = await self.role(*MEMBER)
         self.db.replace_autoroles(gid, [*self.db.autoroles_of(gid), member.id])
+
+    async def build_gacha(self):
+        chat = await self.category(category_name("chat"))
+        gacha = await self.text("gacha", chat, topic=f"Roll with {self.prefix}w, {self.prefix}h"
+                                                     f" and {self.prefix}m.")
+        if not self.db.allowed_channels(self.guild.id):
+            self.db.allow_channel(self.guild.id, gacha.id)
+
+    async def build_levels(self):
+        gid = self.guild.id
         pairs = []
         for level, name, colour, second in LEVEL_ROLES:
             role = await self.role(name, colour, second, hoist=level >= 20)
@@ -279,79 +340,171 @@ class Build:
                     ((r["level"], r["role_id"]) for r in self.db.level_roles_of(gid))}
         existing.update(dict(pairs))
         self.db.replace_level_roles(gid, sorted(existing.items()))
-
-        info = await self.category(category_name("info"))
-        welcome = await self.text("welcome", info, self.read_only())
-        await self.text("rules", info, self.read_only(), topic="Read these first.")
-        await self.text("announcements", info, self.read_only())
         chat = await self.category(category_name("chat"))
-        await self.text("general", chat)
-        await self.text("media", chat)
-        gacha = await self.text("gacha", chat, topic=f"Roll with {self.prefix}w, {self.prefix}h"
-                                                     f" and {self.prefix}m.")
-        await self.text("bot-cmds", chat)
         level_ups = await self.text("level-ups", chat, self.read_only())
+        levels = self.bot.get_cog("Levels")
+        if levels:
+            levels.save_settings(gid, {"channel": level_ups.id})
+
+    async def build_voice(self):
         voice = await self.category(category_name("voice"))
         join = await self.voice("Join To Create", voice)
         await self.voice("general vc", voice)
         await self.voice("music", voice)
+        if not self.guild.get_channel(self.db.get_vc_setting(self.guild.id, "create_channel")):
+            self.db.set_vc_setting(self.guild.id, "create_channel", join.id)
 
-        # Paper, switched on in them.
-        for kind in ("welcome", "goodbye"):
-            if not self.guild.get_channel(self.db.greeting(gid, kind)["channel_id"]):
-                self.db.set_greeting(gid, kind, channel_id=welcome.id)
-        levels = self.bot.get_cog("Levels")
-        if levels:
-            levels.save_settings(gid, {"channel": level_ups.id})
-        if not self.guild.get_channel(self.db.get_vc_setting(gid, "create_channel")):
-            self.db.set_vc_setting(gid, "create_channel", join.id)
-        if not self.db.allowed_channels(gid):
-            self.db.allow_channel(gid, gacha.id)
+    def switch_on(self, label: str, is_on: bool, turn_on):
+        """A setting rather than a channel: counted as kept if it was already on."""
+        if is_on:
+            self.kept.append(label)
+            return
+        turn_on()
+        self.made.append(label)
+
+    async def build_automod(self):
+        # Spam is a Premium filter, and the builder is Plus, so it's there.
+        gid, keys = self.guild.id, ("invites", "mentions", "spam")
+        on = self.db.automod_all(gid)
+
+        def turn_on():
+            for key in keys:
+                self.db.set_automod(gid, f"{key}_on", 1)
+        self.switch_on("automod: invites, mass mentions, spam",
+                       all(on.get(f"{k}_on") == "1" for k in keys), turn_on)
+
+    def owner_ran_it(self) -> bool:
+        uid = getattr(self.author, "id", None)
+        return uid is not None and (
+            uid == getattr(self.guild, "owner_id", None) or uid in config.OWNERS
+            or uid in self.db.antinuke_people(self.guild.id, "admin"))
+
+    async def build_antinuke(self):
+        if not self.owner_ran_it():
+            self.problems.append(f"The antinuke is the owner's to switch on: ask them to"
+                                 f" run `{self.prefix}antinuke on`.")
+            return
+        gid = self.guild.id
+        self.switch_on("antinuke: on", self.db.antinuke_get(gid, "enabled") == 1,
+                       lambda: self.db.antinuke_set(gid, "enabled", 1))
+
+    async def build_antialt(self):
+        gid = self.guild.id
+        self.switch_on("anti-alt: on", self.db.antinuke_get(gid, "alt:enabled") == 1,
+                       lambda: self.db.antinuke_set(gid, "alt:enabled", 1))
+        if not self.punishment("jail_role"):
+            self.problems.append("Anti-alt kicks new accounts until there's a jail: say yes"
+                                 " to the staff area, or run "
+                                 f"`{self.prefix}setupmod`.")
 
     async def run(self, parts):
-        for part in ("roles", "staff", "forum", "community"):
+        for part in STEPS:
             if part in parts:
                 await getattr(self, f"build_{part}")()
 
 
-class SetupMenu(discord.ui.View):
-    """Choose the parts, then build."""
+class SetupWizard(discord.ui.View):
+    """One question at a time: yes or no to each part, then build."""
 
     def __init__(self, cog, ctx):
-        super().__init__(timeout=300)
+        super().__init__(timeout=600)
         self.cog, self.ctx = cog, ctx
-        self.parts = set(PARTS)
-        self.picker = discord.ui.Select(
-            placeholder="What should I build?", min_values=1, max_values=len(PARTS),
-            options=[discord.SelectOption(label=label, value=key, description=line[:100],
-                                          default=True)
-                     for key, (label, line) in PARTS.items()])
-        self.picker.callback = self.picked
-        self.add_item(self.picker)
+        self.keys = list(STEPS)
+        self.answers = {}            # key -> True / False
+        self.at = 0
         self.message = None
+        self.show()
+
+    # ----------------------------------------------------------- screens
+
+    def show(self):
+        self.clear_items()
+        if self.at < len(self.keys):
+            for item in (self.yes, self.no, self.back, self.rest, self.cancel):
+                self.add_item(item)
+            self.back.disabled = self.at == 0
+        else:
+            for item in (self.build_button, self.again, self.cancel):
+                self.add_item(item)
+            self.build_button.disabled = not any(self.answers.values())
+
+    def embed(self) -> discord.Embed:
+        if self.at >= len(self.keys):
+            picked = [k for k in self.keys if self.answers.get(k)]
+            skipped = [k for k in self.keys if not self.answers.get(k)]
+            lines = [f"\u2705 {STEPS[k][0]} **{STEPS[k][1]}**" for k in picked]
+            if skipped:
+                lines.append("\nSkipped: " + ", ".join(STEPS[k][1] for k in skipped))
+            embed = discord.Embed(title="\U0001f3d7\ufe0f Ready to build",
+                                  description="\n".join(lines) or "Nothing picked.",
+                                  colour=0xE5C55A)
+            embed.set_footer(text="Anything already here with the same name is kept,"
+                                  " so it's safe to run again.")
+            return embed
+        key = self.keys[self.at]
+        emoji, title, question, what = STEPS[key]
+        embed = discord.Embed(title=f"{emoji} {question}", description=what, colour=0xE5C55A)
+        done = [(YES if self.answers[k] else NO) + " " + STEPS[k][1]
+                for k in self.keys[:self.at]]
+        if done:
+            embed.add_field(name="So far", value=" \u00b7 ".join(done)[:1024], inline=False)
+        embed.set_footer(text=f"Step {self.at + 1} of {len(self.keys)} \u00b7 {title}")
+        return embed
+
+    async def move(self, interaction, answer=None, to=None):
+        if answer is not None:
+            self.answers[self.keys[self.at]] = answer
+            self.at += 1
+        if to is not None:
+            self.at = to
+        self.show()
+        await interaction.response.edit_message(embed=self.embed(), view=self)
 
     async def interaction_check(self, interaction):
         if interaction.user.id != self.ctx.author.id:
-            await interaction.response.send_message("Only whoever ran it can build.",
+            await interaction.response.send_message("Only whoever ran it can answer.",
                                                     ephemeral=True)
             return False
         return True
 
-    async def picked(self, interaction):
-        self.parts = set(self.picker.values)
-        for option in self.picker.options:
-            option.default = option.value in self.parts
-        await interaction.response.edit_message(view=self)
+    # ----------------------------------------------------------- buttons
 
-    @discord.ui.button(label="Build it", style=discord.ButtonStyle.success, emoji="🏗️", row=1)
-    async def go(self, interaction, button):
+    @discord.ui.button(label="Yes", style=discord.ButtonStyle.success, emoji="\u2705")
+    async def yes(self, interaction, button):
+        await self.move(interaction, True)
+
+    @discord.ui.button(label="No", style=discord.ButtonStyle.secondary, emoji="\u2716\ufe0f")
+    async def no(self, interaction, button):
+        await self.move(interaction, False)
+
+    @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary, emoji="\u25c0\ufe0f")
+    async def back(self, interaction, button):
+        await self.move(interaction, to=max(0, self.at - 1))
+
+    @discord.ui.button(label="Yes to the rest", style=discord.ButtonStyle.primary,
+                       emoji="\u23e9", row=1)
+    async def rest(self, interaction, button):
+        for key in self.keys[self.at:]:
+            self.answers[key] = True
+        await self.move(interaction, to=len(self.keys))
+
+    @discord.ui.button(label="Build it", style=discord.ButtonStyle.success,
+                       emoji="\U0001f3d7\ufe0f")
+    async def build_button(self, interaction, button):
         self.stop()
         await interaction.response.edit_message(
-            content="🏗️ Building… this takes a minute. Please don't run it twice.",
+            content="\U0001f3d7\ufe0f Building\u2026 this takes a minute. Please don't run it twice.",
             embed=None, view=None)
-        await self.cog.build(self.ctx, self.parts, interaction.message)
+        await self.cog.build(self.ctx, {k for k, v in self.answers.items() if v},
+                             interaction.message)
 
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, row=1)
+    @discord.ui.button(label="Start over", style=discord.ButtonStyle.secondary,
+                       emoji="\U0001f501")
+    async def again(self, interaction, button):
+        self.answers.clear()
+        await self.move(interaction, to=0)
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger, row=1)
     async def cancel(self, interaction, button):
         self.stop()
         await interaction.response.edit_message(content="Cancelled. Nothing was made.",
@@ -363,6 +516,7 @@ class SetupMenu(discord.ui.View):
                 await self.message.edit(view=None)
             except discord.HTTPException:
                 pass
+
 
 
 class Builder(commands.Cog):
@@ -377,8 +531,8 @@ class Builder(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
     async def serversetup(self, ctx):
-        """Premium Plus: build the server's roles, channels, staff area, logs and
-        a how-to-mod forum, with Paper set up in them."""
+        """Premium Plus: set the server up one question at a time: roles,
+        channels, staff area, logs, a mod forum, and every part of Paper."""
         if not self.bot.db.is_plus(ctx.guild.id):
             plans = " or ".join(f"**{billing.PLANS[k][3]}**"
                                 + (f" ({billing.plan_label(k)})" if billing.plan_label(k) else "")
@@ -389,22 +543,18 @@ class Builder(commands.Cog):
         if ctx.guild.id in self.building:
             await ctx.send("I'm already building this server.")
             return
-        embed = discord.Embed(
-            title="🏗️ Build this server",
-            description=("Pick what to make, then press **Build it**. Anything that's"
-                         " already here with the same name is kept as it is, so it's safe"
-                         " to run again.\n\n"
-                         + "\n".join(f"**{label}:** {line}" for label, line in PARTS.values())),
-            colour=0xE5C55A)
-        embed.set_footer(text="Put Paper's role at the top of the role list first, so it"
-                              " can manage everything it makes.")
-        view = SetupMenu(self, ctx)
-        view.message = await ctx.send(embed=embed, view=view)
+        view = SetupWizard(self, ctx)
+        view.message = await ctx.send(
+            f"🏗️ **Let's set up {ctx.guild.name}.** {len(STEPS)} quick questions, yes or no;"
+            " nothing is made until you press **Build it** at the end.\n"
+            "-# First, drag Paper's role to the top of the role list, so it can manage"
+            " everything it makes.",
+            embed=view.embed(), view=view, allowed_mentions=discord.AllowedMentions.none())
 
     async def build(self, ctx, parts, message):
         guild = ctx.guild
         self.building.add(guild.id)
-        run = Build(self.bot, guild, ctx.prefix)
+        run = Build(self.bot, guild, ctx.prefix, author=ctx.author)
         try:
             await run.run(parts)
         except discord.HTTPException as e:
@@ -419,8 +569,10 @@ class Builder(commands.Cog):
             lines.append(f"Already here, kept: {len(run.kept)}")
         lines += run.problems[:8]
         if "staff" in parts or "roles" in parts:
-            lines.append(f"Give your staff their roles, then read the how-to-mod forum."
-                         f" `{ctx.prefix}dashboard` changes the rest.")
+            lines.append("Give your staff their roles"
+                         + (", then read the how-to-mod forum." if "forum" in parts else "."))
+        lines.append(f"`{ctx.prefix}dashboard` changes the rest, and `{ctx.prefix}serversetup`"
+                     f" again adds anything you skipped.")
         text = "\n".join(lines)[:2000]
         try:
             await message.edit(content=text)

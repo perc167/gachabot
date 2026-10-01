@@ -520,8 +520,9 @@ async def main():
 
     BG = PAID + 80
     fake_guild = _Guild(BG)
+    fake_guild.owner_id = 4242
     fake_bot = NS(db=db, get_cog=lambda name: lv if name == "Levels" else None)
-    run = bd.Build(fake_bot, fake_guild, "$")
+    run = bd.Build(fake_bot, fake_guild, "$", author=NS(id=4242))
     await run.run(set(bd.PARTS))
     names = {r.name for r in fake_guild.roles}
     owner = discord.utils.get(fake_guild.roles, name=bd.fancy("OWNER"))
@@ -554,6 +555,45 @@ async def main():
           and db.get_vc_setting(BG, "create_channel") == by_name["Join To Create"].id
           and db.allowed_channels(BG) == {by_name["gacha"].id}
           and len(db.level_roles_of(BG)) == 5 and len(db.autoroles_of(BG)) == 1)
+    check("and switched on: automod, antinuke, anti-alt",
+          db.automod_all(BG).get("invites_on") == "1" and db.automod_all(BG).get("spam_on") == "1"
+          and db.antinuke_get(BG, "enabled") == 1 and db.antinuke_get(BG, "alt:enabled") == 1)
+    check("the info category has #welcome first",
+          [c.name for c in by_name[bd.category_name("info")].channels][:2] == ["welcome", "rules"])
+
+    # Only the owner may switch the antinuke on; anyone else is told to ask.
+    other_guild = _Guild(BG + 1)
+    other_guild.owner_id = 4242
+    someone = bd.Build(fake_bot, other_guild, "$", author=NS(id=7))
+    await someone.run({"antinuke", "gacha"})
+    check("an admin who isn't the owner can't switch the antinuke on",
+          db.antinuke_get(BG + 1, "enabled") == 0
+          and any("antinuke on" in p for p in someone.problems)
+          and {c.name for c in other_guild.channels} == {bd.category_name("chat"), "gacha"})
+
+    # The wizard: one question a step, back, yes to the rest, then a summary.
+    wiz = bd.SetupWizard(NS(), NS(author=NS(id=1), guild=other_guild, prefix="$"))
+    first = wiz.embed()
+    check("the wizard opens on the first question",
+          "Make staff roles?" in first.title and "Step 1 of" in first.footer.text
+          and wiz.back.disabled and wiz.yes in wiz.children)
+    wiz.answers["roles"] = False
+    wiz.at = 1
+    wiz.show()
+    check("each answer shows under So far",
+          "Staff roles" in wiz.embed().fields[0].value and not wiz.back.disabled)
+    for key in wiz.keys[1:]:
+        wiz.answers[key] = key in ("gacha", "antialt")
+    wiz.at = len(wiz.keys)
+    wiz.show()
+    end = wiz.embed()
+    check("the last screen sums up and offers Build it",
+          "Gacha" in end.description and "Anti-alt" in end.description
+          and "Skipped:" in end.description and wiz.build_button in wiz.children
+          and not wiz.build_button.disabled)
+    wiz.answers = {k: False for k in wiz.keys}
+    wiz.show()
+    check("Build it is off when every answer is no", wiz.build_button.disabled)
     count = (len(fake_guild.roles), len(fake_guild.channels))
     again = bd.Build(fake_bot, fake_guild, "$")
     await again.run(set(bd.PARTS))

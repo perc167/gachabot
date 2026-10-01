@@ -403,7 +403,7 @@ CATEGORIES = [
     ("\u2728", "Premium", [
         ("upgrade", "Paper Premium"),
         ("promo", "a panel to add Paper"),
-        ("serversetup", "build the server (Plus)"),
+        ("serversetup", "step-by-step server setup (Plus)"),
         ("event", "server events"),
         ("event start", "start one now"),
         ("event stop", "end one early"),
