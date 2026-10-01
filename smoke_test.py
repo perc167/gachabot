@@ -217,9 +217,14 @@ async def main():
     base_rolls = db.get_setting(EV, "roll_limit")
     db.add_event(EV, "rolls", 5, now - 10, now + 3600, 0, 0)
     check("an event does nothing without Premium", db.get_setting(EV, "roll_limit") == base_rolls)
-    billing.apply_subscription(db, {"id": "sub_ev", "status": "active",
+    billing.apply_subscription(db, {"id": "sub_evp", "status": "active",
                                     "current_period_end": future,
                                     "metadata": {"guild_id": str(EV)}})
+    check("an event does nothing on Premium either: events are Plus",
+          db.get_setting(EV, "roll_limit") == base_rolls)
+    billing.apply_subscription(db, {"id": "sub_ev", "status": "active",
+                                    "current_period_end": future,
+                                    "metadata": {"guild_id": str(EV), "tier": "plus"}})
     check("a rolls event adds rolls while it runs", db.get_setting(EV, "roll_limit") == base_rolls + 5)
     db.set_setting(EV, "karuda_grab_percent", 60)
     db.add_event(EV, "karuda", 300, now - 10, now + 3600, 0, 0)
@@ -260,11 +265,62 @@ async def main():
     PAID, FREE = GUILD + 5, GUILD + 6          # GUILD + 5 subscribed above
     paid_perks = perks.effective(db, PAID, ALICE)
     free_perks = perks.effective(db, FREE, ALICE)
-    check("a Premium server's players get the gacha perks",
-          all(paid_perks[k] - free_perks[k] == v for k, v in premium.GACHA_PERK.items()))
+    check("a Premium server's players get Premium's gacha perks",
+          all(paid_perks[k] - free_perks[k] == v
+              for k, v in premium.GACHA_PERK["premium"].items()))
+    plus_perks = perks.effective(db, PL, ALICE)       # PL is Lifetime by now
+    check("a Plus or Lifetime server's players get the bigger ones",
+          all(plus_perks[k] - free_perks[k] == v
+              for k, v in premium.GACHA_PERK["plus"].items())
+          and plus_perks["rolls"] > paid_perks["rolls"])
+
+    # Plans: each feature comes with one plan, and Plus has all of Premium.
+    check("Premium has Premium's features but not Plus's",
+          db.has_feature(PAID, "xp_boosts") and not db.has_feature(PAID, "events")
+          and not db.has_feature(PAID, "server_rt"))
+    check("Plus has everything", all(db.has_feature(PL, f) for f in premium.FEATURES))
+    check("a free server has none of it",
+          not any(db.has_feature(FREE, f) for f in premium.FEATURES))
+
+    # Gacha numbers: a range per plan, Plus the widest.
+    check("a free server sets rolls up to 12", db.setting_range(FREE, "roll_limit") == (1, 12))
+    check("Premium up to 15, Plus up to 25",
+          db.setting_range(PAID, "roll_limit") == (1, 15)
+          and db.setting_range(PL, "roll_limit") == (1, 25))
+    db.set_setting(PL, "roll_limit", 25)
+    check("Plus keeps 25 rolls", db.get_setting(PL, "roll_limit") == 25)
+    check("the next plan up is named when a number won't fit",
+          "Premium Plus: 1 to 25" in premium.more_room("roll_limit", 0)
+          and premium.more_room("roll_limit", 2) == "")
+    import config as range_config
+    for key, ranges in premium.SETTING_RANGES.items():
+        default, low, high, _t = range_config.GUILD_SETTINGS[key]
+        if not (ranges[0][0] <= default <= ranges[0][1]
+                and low <= ranges[2][0] and ranges[2][1] <= high):
+            check(f"{key}'s ranges fit its default and its limits", False, str(ranges))
+    gdb_path = os.path.join(tempfile.mkdtemp(), "grand.db")
+    import db as grand_dbmod
+    gdb = grand_dbmod.Database(gdb_path)
+    gdb.set_setting(77, "roll_limit", 40)            # set before ranges came in
+    gdb.set_setting(78, "roll_limit", 11)
+    gdb.conn.execute("DELETE FROM guild_settings WHERE key = 'pref:grandfather_ranges'")
+    gdb.conn.commit()
+    gdb.close()
+    gdb = grand_dbmod.Database(gdb_path)
+    check("a server that set 40 rolls before keeps 40",
+          gdb.get_setting(77, "roll_limit") == 40 and gdb.setting_range(77, "roll_limit") == (1, 40))
+    check("one inside the free range gets nothing extra",
+          gdb.setting_range(78, "roll_limit") == (1, 12))
+    gdb.reset_settings(77)
+    check("and resetting its settings doesn't lose it",
+          gdb.setting_range(77, "roll_limit") == (1, 40))
+    gdb.set_setting(79, "roll_limit", 40)            # set after: a lapsed plan's
+    check("a number above the range now is held to it", gdb.get_setting(79, "roll_limit") == 12)
+    gdb.close()
     check("a free server's players get none of them",
           free_perks["karuda_percent"] == 0 and free_perks["rolls"] == 0)
-    check("the perks read as words", "karuda" in perks.describe(paid_perks))
+    check("the perks read as words", "rolls" in perks.describe(paid_perks)
+          and "karuda" in perks.describe(plus_perks))
     check("the Premium list fits in one Discord message",
           len(premium.perk_lines()) < 1500, str(len(premium.perk_lines())))
     check("Stripe's price reads as words",
@@ -1143,8 +1199,8 @@ async def main():
     check("karuda leaderboard", db.top_karuda(GUILD)[0]["user_id"] == ALICE)
 
     # 11. Settings round-trip and rejection of unknown keys.
-    db.set_setting(GUILD, "roll_limit", 42)
-    check("setting persists", db.get_setting(GUILD, "roll_limit") == 42)
+    db.set_setting(GUILD, "roll_limit", 11)
+    check("setting persists", db.get_setting(GUILD, "roll_limit") == 11)
     check("other guild keeps default",
           db.get_setting(999, "roll_limit") == config.GUILD_SETTINGS["roll_limit"][0])
     db.reset_settings(GUILD)

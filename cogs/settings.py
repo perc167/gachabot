@@ -3,7 +3,15 @@ import discord
 from discord.ext import commands
 
 import config
+import premium
 
+
+
+def out_of_range(db, ctx, key: str, low: int, high: int) -> str:
+    """Why a value wasn't taken, and which plan would take it."""
+    more = premium.more_room(key, db.plan_rank(ctx.guild.id))
+    return (f"`{key}` can be {low:,} to {high:,} here."
+            + (f" {more}. `{ctx.prefix}upgrade` to see the plans." if more else ""))
 
 class Settings(commands.Cog):
     def __init__(self, bot):
@@ -21,10 +29,13 @@ class Settings(commands.Cog):
         )
         for key, (default, low, high, description) in config.GUILD_SETTINGS.items():
             current = values[key]
+            low, high = self.bot.db.setting_range(ctx.guild.id, key)
             marker = "" if current == default else " *(changed)*"
             embed.add_field(
                 name=f"{key} = {current}{marker}",
-                value=f"{description}\nrange {low}–{high}, default {default}",
+                value=f"{description}\nrange {low}–{high}, default {default}"
+                      + (f"\n✨ {more}" if (more := premium.more_room(
+                          key, self.bot.db.plan_rank(ctx.guild.id))) else ""),
                 inline=False,
             )
         await ctx.send(embed=embed)
@@ -41,9 +52,9 @@ class Settings(commands.Cog):
                 + ", ".join(f"`{k}`" for k in config.GUILD_SETTINGS)
             )
             return
-        _, low, high, _ = config.GUILD_SETTINGS[key]
+        low, high = self.bot.db.setting_range(ctx.guild.id, key)
         if not low <= value <= high:
-            await ctx.send(f"`{key}` must be between {low} and {high}.")
+            await ctx.send(out_of_range(self.bot.db, ctx, key, low, high))
             return
         self.bot.db.set_setting(ctx.guild.id, key, value)
         await ctx.send(f"`{key}` is now **{value}**.")

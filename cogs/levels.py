@@ -35,6 +35,7 @@ from discord.ext import commands, tasks
 
 import boardcard
 import config
+import premium
 import profilecard
 import rankcard
 import utils
@@ -349,7 +350,7 @@ class Levels(commands.Cog):
         Role and channel boosts share one table: a Discord id is never both
         a role and a channel, so the ids can't collide."""
         guild_id = member.guild.id
-        if not self.db.is_premium(guild_id):
+        if not self.db.has_feature(guild_id, "xp_boosts"):
             return amount
         boosts = {row["role_id"]: row["percent"]
                   for row in self.db.level_boosts_of(guild_id)}
@@ -397,7 +398,7 @@ class Levels(commands.Cog):
                 return place.name if place else "deleted channel"
             first = day - ACTIVITY_DAYS + 1
             background = None
-            if self.db.is_premium(gid):
+            if self.db.has_feature(gid, "rank_cards"):
                 background = (self.db.rank_background(gid, member.id)
                               or self.db.rank_background(gid, 0))
             avatar = await member.display_avatar.replace(size=256, format="png").read()
@@ -435,7 +436,7 @@ class Levels(commands.Cog):
             level, into, needed = level_for(row["xp"])
             place = self.db.level_rank(gid, member.id)
             background = None
-            if self.db.is_premium(gid):
+            if self.db.has_feature(gid, "rank_cards"):
                 background = (self.db.rank_background(gid, member.id)
                               or self.db.rank_background(gid, 0))
             avatar = await member.display_avatar.replace(size=256, format="png").read()
@@ -651,8 +652,8 @@ class Levels(commands.Cog):
             self.db.set_rank_background(gid, ctx.author.id, None)
             await ctx.send("Your rank card uses the server's background again.")
             return
-        if not self.db.is_premium(gid):
-            await ctx.send("Custom rank cards come with Paper Premium."
+        if not self.db.has_feature(gid, "rank_cards"):
+            await ctx.send(f"Custom rank cards come with {premium.needs('rank_cards')}."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
             return
         try:
@@ -704,7 +705,8 @@ class Levels(commands.Cog):
                 icon = await guild.icon.replace(size=128, format="png").read()
             except (discord.HTTPException, ValueError):
                 icon = None
-        background = self.db.rank_background(gid, 0) if self.db.is_premium(gid) else None
+        background = (self.db.rank_background(gid, 0)
+                      if self.db.has_feature(gid, "rank_cards") else None)
         # Drawing takes a moment; keep it off the bot's main loop.
         return await asyncio.to_thread(
             boardcard.render, guild.name, entries, self.colour(gid), background, icon,
@@ -770,8 +772,8 @@ class Levels(commands.Cog):
     @leaderboard.command(name="month", aliases=["monthly", "thismonth"])
     async def levels_month(self, ctx, which: str = None):
         """Premium: who earned the most XP this month. `last` for last month."""
-        if not self.db.is_premium(ctx.guild.id):
-            await ctx.send("The monthly leaderboard comes with Paper Premium."
+        if not self.db.has_feature(ctx.guild.id, "monthly_board"):
+            await ctx.send(f"The monthly leaderboard comes with {premium.needs('monthly_board')}."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
             return
         month = month_now()
@@ -1171,8 +1173,8 @@ class Levels(commands.Cog):
         rows = self.db.level_boosts_of(ctx.guild.id)
         lines = [f"{self.boost_label(ctx.guild, r['role_id'])} earns"
                  f" **{r['percent'] / 100:g}x** XP" for r in rows]
-        note = "" if self.db.is_premium(ctx.guild.id) else (
-            "\n\n*XP boosts are a Paper Premium feature, so they're paused on"
+        note = "" if self.db.has_feature(ctx.guild.id, "xp_boosts") else (
+            f"\n\n*XP boosts come with {premium.needs('xp_boosts')}, so they're paused on"
             f" this server. `{ctx.prefix}upgrade` to see how to get it.*")
         await ctx.send(embed=discord.Embed(
             title="XP boosts",
@@ -1188,8 +1190,8 @@ class Levels(commands.Cog):
     async def levels_boost_add(self, ctx, target: BoostTarget, percent: int):
         """Premium: a role, channel or category earns this percent of normal
         XP, e.g. 150 for 1.5x."""
-        if not self.db.is_premium(ctx.guild.id):
-            await ctx.send("XP boosts are a Paper Premium feature."
+        if not self.db.has_feature(ctx.guild.id, "xp_boosts"):
+            await ctx.send(f"XP boosts come with {premium.needs('xp_boosts')}."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
             return
         low, high = BOOST_RANGE
@@ -1224,8 +1226,8 @@ class Levels(commands.Cog):
             self.db.set_rank_background(gid, 0, None)
             await ctx.send("Rank cards are back to the starry default.")
             return
-        if not self.db.is_premium(gid):
-            await ctx.send("Custom rank cards come with Paper Premium."
+        if not self.db.has_feature(gid, "rank_cards"):
+            await ctx.send(f"Custom rank cards come with {premium.needs('rank_cards')}."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
             return
         try:

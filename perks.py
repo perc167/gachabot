@@ -274,8 +274,9 @@ def effective(db, guild_id: int, user_id: int) -> dict:
     sources = [*badge_perks, tower_perks(db.tower_floors_of(guild_id, user_id))]
     if player["soulmate_id"]:
         sources.append(SOULMATE_PERK)
-    if db.is_premium(guild_id):
-        sources.append(premium.GACHA_PERK)
+    plan = db.plan_rank(guild_id)
+    if plan:
+        sources.append(premium.GACHA_PERK["plus" if plan >= 2 else "premium"])
     if player_boosts(db, guild_id, user_id):
         sources.append(premium.PLAYER_PERK)
     result = combine(*sources)

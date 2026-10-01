@@ -14,6 +14,7 @@ import discord
 
 import botprofile
 import config
+import premium
 import weekly
 from cogs import automod as automod_cog
 from cogs import events as events_cog
@@ -145,9 +146,11 @@ def gacha_state(bot, guild) -> dict:
 
 def _setting(db, gid, key):
     default, low, high, label = config.GUILD_SETTINGS[key]
+    switch = low == 0 and high == 1
+    low, high = db.setting_range(gid, key)
     return {"key": key, "value": db.get_setting(gid, key), "default": default,
-            "min": low, "max": high, "label": label,
-            "switch": low == 0 and high == 1}
+            "min": low, "max": high, "label": label, "switch": switch,
+            "more": premium.more_room(key, db.plan_rank(gid))}
 
 
 def gacha_save(bot, guild, body) -> list:
@@ -159,10 +162,13 @@ def gacha_save(bot, guild, body) -> list:
         if key not in config.GUILD_SETTINGS:
             problems.append(f"There's no setting called {key}.")
             continue
-        _d, low, high, label = config.GUILD_SETTINGS[key]
+        label = config.GUILD_SETTINGS[key][3]
+        low, high = db.setting_range(guild.id, key)
         number = _id(value)
         if number is None or not low <= number <= high:
-            problems.append(f"{label}: pick from {low:,} to {high:,}.")
+            more = premium.more_room(key, db.plan_rank(guild.id))
+            problems.append(f"{label}: pick from {low:,} to {high:,}."
+                            + (f" {more}." if more else ""))
         else:
             clean[key] = number
 
@@ -235,6 +241,7 @@ def mod_state(bot, guild) -> dict:
         "channels": _channels(guild),
         "roles": _roles(guild),
         "premium": db.is_premium(gid),
+        "plus": db.has_feature(gid, "warn_punishments"),
         "free_punishments": FREE_WARN_PUNISHMENTS,
         "automod": {
             "settings": automod_cog.settings_of(db, gid),
@@ -299,9 +306,9 @@ def mod_save(bot, guild, body) -> list:
         seen.add(threshold)
         rows.append((threshold, action, seconds))
 
-    if len(rows) > FREE_WARN_PUNISHMENTS and not db.is_premium(guild.id):
+    if len(rows) > FREE_WARN_PUNISHMENTS and not db.has_feature(guild.id, "warn_punishments"):
         problems.append(f"Free servers can have {FREE_WARN_PUNISHMENTS} warn"
-                        " punishments. Paper Premium allows up to 50.")
+                        f" punishments. {premium.needs('warn_punishments')} allows up to 50.")
 
     ignored = []
     for value in body.get("lockdown_ignored") or []:
@@ -312,13 +319,13 @@ def mod_save(bot, guild, body) -> list:
     auto = body.get("automod")
     auto_changes, auto_words, auto_exempt = {}, None, None
     if isinstance(auto, dict):
-        premium = db.is_premium(guild.id)
+        smarter = db.has_feature(guild.id, "automod")
         for key, (name, _w, paid, _a) in automod_cog.FILTERS.items():
             row = (auto.get("filters") or {}).get(key)
             if not isinstance(row, dict):
                 continue
             on = bool(row.get("on"))
-            if on and paid and not premium:
+            if on and paid and not smarter:
                 problems.append(f"The {name.lower()} filter comes with Premium.")
             action = str(row.get("action", "")).lower()
             if action not in automod_cog.ACTIONS:
@@ -436,6 +443,7 @@ def extras_state(bot, guild) -> dict:
     now = time.time()
     return {
         "premium": db.is_premium(gid),
+        "plus": db.has_feature(gid, "events"),
         "events": [{"id": e["id"], "kind": e["kind"], "strength": e["strength"],
                     "starts_at": e["starts_at"], "ends_at": e["ends_at"],
                     "running": e["starts_at"] <= now,
@@ -460,7 +468,7 @@ def extras_save(bot, guild, body) -> list:
     db = bot.db
     gid = guild.id
     problems = []
-    premium = db.is_premium(gid)
+    plus = db.has_feature(gid, "champions")
     channel = None
     if body.get("champ_channel"):
         channel = _text_channel(guild, body["champ_channel"])
@@ -475,8 +483,9 @@ def extras_save(bot, guild, body) -> list:
                 problems.append(f"The {kind} champion role has to be one I can give.")
             roles[kind] = role
     wants = bool(channel or any(roles.values()) or body.get("report_on"))
-    if wants and not premium:
-        problems.append("Champions and the staff report come with Premium.")
+    if wants and not plus:
+        problems.append("Champions and the staff report come with"
+                        f" {premium.needs('champions')}.")
     if problems:
         return problems
     was_on = weekly.champions_on(db, gid)

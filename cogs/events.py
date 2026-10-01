@@ -16,6 +16,7 @@ import discord
 from discord.ext import commands, tasks
 
 import config
+import premium
 from cogs.modtools import describe_duration, parse_duration
 
 # kind: (name, emoji, default strength, lowest, highest, how strength reads)
@@ -78,8 +79,8 @@ class Events(commands.Cog):
     def schedule(self, guild_id, kind, strength, starts_at, length, channel_id,
                  by) -> str:
         """Make an event, or say why not. Shared with the dashboard."""
-        if not self.db.is_premium(guild_id):
-            return "Server events are a Paper Premium feature."
+        if not self.db.has_feature(guild_id, "events"):
+            return f"Server events come with {premium.needs('events')}."
         if problem := check(kind, strength, length):
             return problem
         if len(self.db.events_of(guild_id)) >= MAX_UPCOMING:
@@ -105,8 +106,8 @@ class Events(commands.Cog):
                     else "<t:%d:f> for %s" % (row["starts_at"],
                                               describe_duration(row["ends_at"] - row["starts_at"])))
             lines.append(f"`#{row['id']}` {describe(row['kind'], row['strength'])} · {when}")
-        note = "" if self.db.is_premium(ctx.guild.id) else (
-            "\n\n*Server events come with Paper Premium."
+        note = "" if self.db.has_feature(ctx.guild.id, "events") else (
+            f"\n\n*Server events come with {premium.needs('events')}."
             f" `{ctx.prefix}upgrade` to see how to get it.*")
         await ctx.send(embed=discord.Embed(
             title="Server events",

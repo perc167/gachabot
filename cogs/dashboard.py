@@ -230,6 +230,8 @@ class Dashboard(commands.Cog):
             text = (f"\u2728 **{ctx.guild.name}** has {name} for good. Thank you!"
                     if tier == "lifetime" else
                     f"\u2728 **{ctx.guild.name}** has {name} until <t:{row['until']}:D>.")
+            if tier == "premium":
+                text += ("\n\n\U0001f451 **Premium Plus adds:**\n" + premium.perk_lines("plus"))
             if plans:
                 text += "\n\nGo further:\n" + plans + f"\n-# {billing.PRICE_NOTE}"
             if link:
@@ -237,7 +239,9 @@ class Dashboard(commands.Cog):
         else:
             text = ("\u2728 **Paper Premium** for this server. Everything in Paper"
                     " stays free; Premium adds these for everyone here:\n\n"
-                    + premium.perk_lines())
+                    + premium.perk_lines("premium")
+                    + "\n\n\U0001f451 **Premium Plus and Lifetime add:**\n"
+                    + premium.perk_lines("plus"))
             if billing.configured():
                 text += (f"\n\n{plans}\n-# {billing.PRICE_NOTE}\n\nTry Premium free for {billing.TRIAL_DAYS} days."
                          + (f" An admin can pick a plan on the dashboard: <{link}>" if link else ""))
@@ -963,8 +967,9 @@ class Dashboard(commands.Cog):
         if error:
             return error
         guild = found[0]
-        if not self.bot.db.is_premium(guild.id):
-            return problem(402, "Case history export is a Premium feature.")
+        if not self.bot.db.has_feature(guild.id, "case_export"):
+            return problem(402, "Case history export comes with"
+                                f" {premium.needs('case_export')}.")
         import csv
         import io
         out = io.StringIO()

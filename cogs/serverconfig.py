@@ -8,6 +8,8 @@ import discord
 from discord.ext import commands
 
 import config
+import premium
+from cogs.settings import out_of_range
 
 # command name -> (setting key, unit shown in the reply)
 SETTERS = {
@@ -44,16 +46,19 @@ class ServerConfig(commands.Cog):
     async def setter(self, ctx, value: int = None):
         """Friendly wrappers around $set: $setrolls 20, $setclaim 60, ..."""
         key, unit = SETTERS[ctx.invoked_with.lower()]
-        default, low, high, description = config.GUILD_SETTINGS[key]
+        default, _low, _high, description = config.GUILD_SETTINGS[key]
+        low, high = self.bot.db.setting_range(ctx.guild.id, key)
         if value is None:
             current = self.bot.db.get_setting(ctx.guild.id, key)
+            more = premium.more_room(key, self.bot.db.plan_rank(ctx.guild.id))
             await ctx.send(
                 f"`{key}` is **{current}** {unit} (default {default},"
                 f" range {low}–{high}).\n{description}"
+                + (f"\n✨ {more}" if more else "")
             )
             return
         if not low <= value <= high:
-            await ctx.send(f"`{key}` must be between {low} and {high}.")
+            await ctx.send(out_of_range(self.bot.db, ctx, key, low, high))
             return
         self.bot.db.set_setting(ctx.guild.id, key, value)
         await ctx.send(f"`{key}` is now **{value}** {unit}.")

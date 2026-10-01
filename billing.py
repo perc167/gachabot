@@ -50,7 +50,7 @@ PLANS = {
     "premium": ("STRIPE_PRICE_ID", "subscription", "premium", "Paper Premium",
                 "Everything in Premium, with a free week first"),
     "plus": ("STRIPE_PLUS_PRICE_ID", "subscription", "plus", "Paper Premium Plus",
-             "Premium, and the server builder"),
+             "Premium, and your gacha set your way, events, champions and the server builder"),
     "lifetime": ("STRIPE_LIFETIME_PRICE_ID", "payment", "lifetime", "Paper Lifetime",
                  "Premium Plus for this server forever. Pay once, never again"),
 }

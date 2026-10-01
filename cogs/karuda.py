@@ -262,7 +262,8 @@ class Karuda(commands.Cog):
             drops.append((key, name, multiplier, colour, amount))
         db.update_player(
             gid, ctx.author.id, daily_ready_at=utils.now() + (
-                premium.DAILY_COOLDOWN if db.is_premium(gid) else DAILY_COOLDOWN)
+                premium.DAILY_COOLDOWN if db.has_feature(gid, "fast_daily")
+                else DAILY_COOLDOWN)
         )
 
         view = ShardDrops(

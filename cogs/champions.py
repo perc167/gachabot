@@ -17,6 +17,7 @@ import discord
 from discord.ext import commands, tasks
 
 import config
+import premium
 import weekly
 from cogs.modtools import ACTIONS
 from cogs.voice import fmt_time
@@ -74,8 +75,9 @@ class Champions(commands.Cog):
         return self.db.get_pref(guild_id, "cardcolour", config.CARD_COLOUR)
 
     def premium_note(self, ctx):
-        return ("" if self.db.is_premium(ctx.guild.id) else
-                f"\n\n*This comes with Paper Premium. `{ctx.prefix}upgrade` to see how to get it.*")
+        return ("" if self.db.has_feature(ctx.guild.id, "champions") else
+                f"\n\n*This comes with {premium.needs('champions')}."
+                f" `{ctx.prefix}upgrade` to see how to get it.*")
 
     def switch_on(self, guild_id):
         """Starting champions counts from now, not from last week."""
@@ -109,9 +111,9 @@ class Champions(commands.Cog):
                        allowed_mentions=discord.AllowedMentions.none())
 
     async def premium_only(self, ctx) -> bool:
-        if self.db.is_premium(ctx.guild.id):
+        if self.db.has_feature(ctx.guild.id, "champions"):
             return True
-        await ctx.send("Weekly champions come with Paper Premium."
+        await ctx.send(f"Weekly champions come with {premium.needs('champions')}."
                        f" `{ctx.prefix}upgrade` to see how to get it.")
         return False
 
@@ -171,8 +173,8 @@ class Champions(commands.Cog):
         if state not in ("on", "off"):
             await ctx.send("Say `on` or `off`.")
             return
-        if state == "on" and not self.db.is_premium(gid):
-            await ctx.send("The staff report comes with Paper Premium."
+        if state == "on" and not self.db.has_feature(gid, "staff_report"):
+            await ctx.send(f"The staff report comes with {premium.needs('staff_report')}."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
             return
         self.db.set_premium_setting(gid, "report_on", 1 if state == "on" else 0)
@@ -249,7 +251,7 @@ class Champions(commands.Cog):
         db = self.db
         for guild in self.bot.guilds:
             gid = guild.id
-            if not db.is_premium(gid):
+            if not db.has_feature(gid, "champions"):
                 continue
             if weekly.champions_on(db, gid):
                 done = db.get_premium_setting(gid, "champ_week")

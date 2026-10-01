@@ -149,8 +149,17 @@ class About(commands.Cog):
             return
 
         blurb, values = PRESETS[key]
+        trimmed = False
+        values = dict(values)
         for setting, value in values.items():
-            db.set_setting(ctx.guild.id, setting, value)
+            low, high = db.setting_range(ctx.guild.id, setting)
+            fitted = max(low, min(high, value))
+            trimmed = trimmed or fitted != value
+            values[setting] = fitted
+            db.set_setting(ctx.guild.id, setting, fitted)
+        if trimmed:
+            blurb += ("\n\n*Some numbers were brought into this server's range;"
+                      f" Premium Plus sets them all. `{prefix}upgrade`*")
         await ctx.send(
             embed=discord.Embed(
                 title=f"Preset: {key}",

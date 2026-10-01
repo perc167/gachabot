@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 
 import config
+import premium
 from cogs.modtools import (ACTIONS, FREE_WARN_PUNISHMENTS, VARIABLES,
                            describe_duration, parse_duration, render)
 
@@ -120,9 +121,10 @@ class ModSettings(commands.Cog):
                 return
         others = [r for r in self.db.warn_punishments_of(ctx.guild.id)
                   if r["threshold"] != threshold]
-        if len(others) >= FREE_WARN_PUNISHMENTS and not self.db.is_premium(ctx.guild.id):
+        if (len(others) >= FREE_WARN_PUNISHMENTS
+                and not self.db.has_feature(ctx.guild.id, "warn_punishments")):
             await ctx.send(f"Free servers can have {FREE_WARN_PUNISHMENTS} warn"
-                           " punishments; Paper Premium allows up to 50."
+                           f" punishments; {premium.needs('warn_punishments')} allows up to 50."
                            f" `{ctx.prefix}upgrade` to see how to get it.")
             return
         self.db.set_warn_punishment(ctx.guild.id, threshold, action, seconds)

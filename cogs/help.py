@@ -38,7 +38,7 @@ CATEGORIES = [
         ("ru", "rolls left"),
         ("daily", "free rolls reset, every 20h"),
         ("us", "use a banked rolls reset"),
-        ("rt", "free claim reset (Opal IV / Premium)"),
+        ("rt", "free claim reset (Opal IV / Plus)"),
         ("limroul", "how deep the rolls go"),
     ]),
     ("\U0001f48d", "Your harem", [

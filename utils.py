@@ -403,7 +403,7 @@ class Cooldowns:
         return "used"
 
     def rt_unlocked(self, guild_id: int, user_id: int) -> bool:
-        return (self.db.is_premium(guild_id)
+        return (self.db.has_feature(guild_id, "server_rt")
                 or perks.player_boosts(self.db, guild_id, user_id)
                 or self.db.badge_levels(guild_id, user_id).get("opal", 0) >= 4)
 

@@ -462,14 +462,14 @@ class Rolling(commands.Cog):
     @commands.command(name="rt", aliases=["resetclaimtimer", "freeclaim"])
     @commands.guild_only()
     async def rt(self, ctx):
-        """Reset your claim timer for free, every 20 hours (Opal IV, Premium or
-        Player Premium)."""
+        """Reset your claim timer for free, every 20 hours (Opal IV, Premium
+        Plus or Player Premium)."""
         cooldowns = self.bot.cooldowns
         gid, uid = ctx.guild.id, ctx.author.id
         if not cooldowns.rt_unlocked(gid, uid):
             await ctx.send(
                 f"`{ctx.prefix}rt` comes with **Opal IV** (`{ctx.prefix}badges`),"
-                f" a Premium server, or your own Player Premium"
+                f" a Premium Plus server, or your own Player Premium"
                 f" (`{ctx.prefix}playerpremium`). Until then, `{ctx.prefix}resetclaim`"
                 f" buys a claim reset with karuda.")
             return

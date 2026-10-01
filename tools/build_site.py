@@ -478,6 +478,7 @@ code,kbd{
 .pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold)}
 .pgroup ul{margin:0 0 8px;padding-left:17px;font-size:14px;color:var(--dim)}
 .pgroup li{margin-bottom:3px}
+.pgroup h3 .plus{font:600 11px var(--body);color:#1a1405;background:var(--gold);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
 .btn.gold:hover{background:#f0d27a}
 .nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
   padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
@@ -1433,9 +1434,10 @@ $userinfo · $serverinfo · $steal</code>"""),
 
     import premium
     premium_html = "".join(
-        f'<div class="pgroup"><h3>{icon} {esc(title)}</h3><ul>'
+        f'<div class="pgroup"><h3>{icon} {esc(title)}'
+        + (' <span class="plus">Plus</span>' if plan == "plus" else "") + '</h3><ul>'
         + "".join(f"<li>{esc(line)}</li>" for line in lines) + "</ul></div>"
-        for icon, title, lines in premium.PERK_GROUPS)
+        for icon, title, plan, lines in premium.PERK_GROUPS)
 
     link = invite_url or bot_invite
     invite = (f'<a class="btn" href="{esc(link)}">Add Paper to your server</a>'

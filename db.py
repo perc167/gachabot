@@ -6,6 +6,7 @@ import time
 from typing import Optional
 
 import config
+import premium
 
 log = logging.getLogger("gacha.db")
 
@@ -676,6 +677,7 @@ class Database:
         self._convert_old_badges()
         self._refund_old_towers()
         self._instant_snipes()
+        self._grandfather_ranges()
         self.conn.executescript(INDEXES)
         self.conn.commit()
 
@@ -699,6 +701,28 @@ class Database:
             self.conn.execute(
                 "INSERT OR REPLACE INTO guild_settings (guild_id, key, value)"
                 " VALUES (0, ?, 1)", ("pref:instant_snipes",))
+
+    def _grandfather_ranges(self):
+        """The gacha numbers got a range per plan (premium.SETTING_RANGES).
+        A server that had already set one outside the free range keeps it:
+        its value is written down once as legacy:<key>, and setting_range
+        always allows it. Runs once."""
+        done = self.conn.execute(
+            "SELECT value FROM guild_settings WHERE guild_id = 0 AND key = ?",
+            ("pref:grandfather_ranges",)).fetchone()
+        if done:
+            return
+        with self.conn:
+            for key, ranges in premium.SETTING_RANGES.items():
+                low, high = ranges[0]
+                self.conn.execute(
+                    "INSERT OR IGNORE INTO guild_settings (guild_id, key, value)"
+                    " SELECT guild_id, ?, value FROM guild_settings"
+                    " WHERE key = ? AND guild_id != 0 AND (value < ? OR value > ?)",
+                    (f"legacy:{key}", key, low, high))
+            self.conn.execute(
+                "INSERT OR REPLACE INTO guild_settings (guild_id, key, value)"
+                " VALUES (0, ?, 1)", ("pref:grandfather_ranges",))
 
     def _refund_old_towers(self):
         """The tower used to be climbed in a fixed order, a set perk per
@@ -1109,6 +1133,14 @@ class Database:
         """Premium Plus or Lifetime: the server builder."""
         return self.premium_tier(guild_id) in ("plus", "lifetime")
 
+    def plan_rank(self, guild_id: int) -> int:
+        """0 free, 1 Premium, 2 Plus or Lifetime (premium.RANK)."""
+        return premium.RANK.get(self.premium_tier(guild_id) or "free", 0)
+
+    def has_feature(self, guild_id: int, feature: str) -> bool:
+        """Does this server's plan include a feature in premium.FEATURES?"""
+        return self.plan_rank(guild_id) >= premium.RANK[premium.FEATURES[feature]]
+
     def set_player_premium(self, user_id: int, status: str, until: int,
                            customer: str = "", subscription: str = ""):
         row = self.player_premium_of(user_id)
@@ -1160,13 +1192,13 @@ class Database:
 
     def event_strength(self, guild_id: int, kind: str):
         """The strongest event of this kind running now, or None. Only while
-        the server has Premium."""
+        the server has Premium Plus."""
         now = int(time.time())
         row = self.conn.execute(
             "SELECT MAX(strength) AS s FROM server_events WHERE guild_id = ?"
             " AND kind = ? AND starts_at <= ? AND ends_at > ?",
             (guild_id, kind, now, now)).fetchone()
-        if not row or row["s"] is None or not self.is_premium(guild_id):
+        if not row or row["s"] is None or not self.has_feature(guild_id, "events"):
             return None
         return row["s"]
 
@@ -2383,7 +2415,11 @@ class Database:
             (guild_id, key),
         ).fetchone()
         value = row["value"] if row else default
-        # Server events (Premium) lift these two while they run. Everything
+        if key in premium.SETTING_RANGES:
+            # A plan that lapses takes its wider range with it.
+            low, high = self.setting_range(guild_id, key)
+            value = max(low, min(high, value))
+        # Server events (Plus) lift these two while they run. Everything
         # that reads rolls or grab payouts reads them here, so an event
         # reaches all of it and stops by itself when it ends.
         if key == "roll_limit":
@@ -2393,6 +2429,21 @@ class Database:
             if rush:
                 value = min(100, value * rush // 100)
         return value
+
+    def setting_range(self, guild_id: int, key: str) -> tuple:
+        """(low, high) a setting may be set to on this server now: its plan's
+        range, widened to take in a value it set before ranges came in."""
+        _default, low, high, _text = config.GUILD_SETTINGS[key]
+        ranges = premium.SETTING_RANGES.get(key)
+        if not ranges:
+            return low, high
+        low, high = ranges[min(self.plan_rank(guild_id), 2)]
+        row = self.conn.execute(
+            "SELECT value FROM guild_settings WHERE guild_id = ? AND key = ?",
+            (guild_id, f"legacy:{key}")).fetchone()
+        if row:
+            low, high = min(low, row["value"]), max(high, row["value"])
+        return low, high
 
     def all_settings(self, guild_id: int) -> dict:
         return {k: self.get_setting(guild_id, k) for k in config.GUILD_SETTINGS}
@@ -2602,7 +2653,9 @@ class Database:
         return counts
 
     def reset_settings(self, guild_id: int):
-        self.conn.execute("DELETE FROM guild_settings WHERE guild_id = ?", (guild_id,))
+        # A grandfathered value is the server's to keep, reset or not.
+        self.conn.execute("DELETE FROM guild_settings WHERE guild_id = ?"
+                          " AND key NOT LIKE 'legacy:%'", (guild_id,))
         self.conn.commit()
 
     # ---------- players ----------

@@ -847,6 +847,13 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 
   // ---- Paper Premium: what it is, and the one button that matters
   // The perks come from the bot (premium.py), grouped: Gacha, Levels...
+  function perkSections(groups){
+    var mine = function(t){ return (groups || []).filter(function(g){ return g.tier === t; }); };
+    return el("div", {}, [
+      el("h3", {cls: "plans-head", text: "Paper Premium"}), perks(mine("premium")),
+      el("h3", {cls: "plans-head", text: "Premium Plus and Lifetime add"}), perks(mine("plus"))]);
+  }
+
   function perks(groups){
     return el("div", {cls: "pgroups"}, (groups || []).map(function(g){
       return el("div", {cls: "pgroup"}, [
@@ -865,7 +872,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     var rank = PLAN_RANK[pl.key] || 1;
     var tier = function(g){ return GROUP_RANK[g.tier] || 1; };
     // What the plan adds over Premium goes first, so it's what you see.
-    var mine = (groups || []).filter(function(g){ return tier(g) <= rank; })
+    var mine = (groups || []).filter(function(g){ return tier(g) <= rank && !(g.replaced && rank > 1); })
       .sort(function(a, b){ return tier(b) - tier(a); });
     var shown = perks(mine);
     mine.forEach(function(g, i){
@@ -963,7 +970,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       panel.append(
         el("h2", {text: "\u2728 Paper Premium"}),
         el("p", {}, ["Everything in Paper stays free. Premium adds the extras other bots charge more for, for everyone on this server:"]),
-        perks(p.perks),
+        perkSections(p.perks),
         p.for_sale ? planCards(p)
                    : el("p", {cls: "pp-note", text: "Coming soon. It isn't on sale just yet."}));
     }
@@ -1128,7 +1135,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
           var n = number(f.value, f.min, f.max);
           numbers[f.key] = {input: n};
           return field(f.label, n, "From " + f.min.toLocaleString() + " to " +
-                       f.max.toLocaleString() + ". Default " + f.default.toLocaleString() + ".");
+                       f.max.toLocaleString() + ". Default " + f.default.toLocaleString() + "." +
+                       (f.more ? " \u2728 " + f.more + "." : ""));
         })));
       });
       var switches = {};
@@ -1178,11 +1186,11 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       addP.addEventListener("click", function(){ punish.appendChild(punishRow({})); partChanged(); });
       form.appendChild(card("Warn punishments",
         "What happens by itself when someone reaches a number of warnings. Timeouts take a length like 10m, 1h or 1d." +
-        (d.premium ? "" : " Free servers can have " + d.free_punishments + "; Premium allows up to 50."),
+        (d.plus ? "" : " Free servers can have " + d.free_punishments + "; Premium Plus allows up to 50."),
         [punish, el("div", {cls: "actions"}, [addP])]));
 
       var exportBtn = el("button", {type: "button", cls: "btn ghost", text: "Download case history (.csv)"});
-      exportBtn.disabled = !d.premium;
+      exportBtn.disabled = !d.plus;
       exportBtn.addEventListener("click", function(){
         var headers = {"X-Paper": "1"};
         if (token) headers["Authorization"] = "Bearer " + token;
@@ -1195,7 +1203,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       });
       form.appendChild(card("Case history",
         "Every warning, jail, mute, kick and ban, with who did it and why, as a spreadsheet.",
-        [d.premium ? null : el("div", {cls: "lock"}, ["✨ Comes with Paper Premium."]),
+        [d.plus ? null : el("div", {cls: "lock"}, ["✨ Comes with Premium Plus."]),
          el("div", {cls: "actions"}, [exportBtn])]));
 
       // ---- automod
@@ -1254,8 +1262,10 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     },
 
     extras: function(d, form){
-      if (!d.premium) form.appendChild(el("section", {cls: "card note-card"}, [el("p", {},
-        ["These come with Paper Premium. ",
+      if (!d.plus) form.appendChild(el("section", {cls: "card note-card"}, [el("p", {},
+        [d.premium ? "Server events, weekly champions and the staff report come with Premium Plus. "
+                   : "These come with Paper Premium; server events, weekly champions and the"
+                     + " staff report with Premium Plus. ",
          el("button", {type: "button", cls: "linkish", text: "See Premium",
                        onclick: function(){ history.pushState(null, "", "/dashboard?premium=1"); route(); }})])]));
 
@@ -1284,7 +1294,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       var hours = el("input", {type: "number", value: 2, min: 0.25, max: 168, step: 0.25});
       var where = select([["", "Don't announce"]].concat(d.channels.map(function(c){ return [c.id, "#" + c.name]; })), "");
       var add = el("button", {type: "button", cls: "btn gold", text: "Add event"});
-      if (!d.premium) add.disabled = true;
+      if (!d.plus) add.disabled = true;
       add.addEventListener("click", function(){
         act("POST", "/api/events", {kind: kind.value, strength: Number(strength.value),
           starts_at: start.value ? Math.floor(new Date(start.value).getTime() / 1000) : 0,
@@ -1507,7 +1517,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
       " charge more for, to one server and everyone in it. Every server can try Premium free for " +
       (sale.trial_days || 7) + " days first:";
     var list = $("pp-perks"); list.textContent = "";
-    list.appendChild(perks(sale.perks));
+    list.appendChild(perkSections(sale.perks));
     // The plans, to read here; each server's own page has the buttons.
     var onSale = (sale.plans || []).filter(function(pl){ return pl.on_sale; });
     if (onSale.length) list.appendChild(el("div", {cls: "plans"}, onSale.map(function(pl){

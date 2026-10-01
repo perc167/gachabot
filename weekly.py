@@ -28,4 +28,4 @@ def champions_on(db, guild_id: int) -> bool:
 def tracking(db, guild_id: int) -> bool:
     """Whether this server's week is being counted: Premium, with champions
     switched on. Nobody else's messages are recorded."""
-    return champions_on(db, guild_id) and db.is_premium(guild_id)
+    return champions_on(db, guild_id) and db.has_feature(guild_id, "champions")
