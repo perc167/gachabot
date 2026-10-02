@@ -866,6 +866,9 @@ class ModTools(commands.Cog):
             matched += 1
             return True
 
+        logs = ctx.bot.get_cog("ChatLogs")
+        if logs:  # so the chat log names the mod, not Paper
+            logs.expect(ctx.channel.id, ctx.author, f"{ctx.prefix}{ctx.invoked_with}")
         try:
             await ctx.message.delete()
         except discord.HTTPException:

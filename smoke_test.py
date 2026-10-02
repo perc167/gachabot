@@ -930,12 +930,24 @@ async def main():
     LG, LOGCH, TALK = GUILD + 900, 9001, 9002
     sent = []
 
+    PAPER, MOD = 7000, 7001
+    audit = {"entries": []}   # what the fake server's audit log holds right now
+
+    async def fake_audit_logs(action=None, limit=10):
+        for entry in audit["entries"]:
+            if entry.action == action:
+                yield entry
+    fake_guild = NS(id=LG, audit_logs=fake_audit_logs,
+                    me=NS(id=PAPER, guild_permissions=NS(view_audit_log=False)),
+                    get_channel=lambda cid: FakeLogChannel() if cid == LOGCH else None)
+
     class FakeLogChannel:
         id = LOGCH
+        guild = fake_guild
         async def send(self, embed=None, file=None, **kw):
             sent.append((embed, file))
-    fake_guild = NS(id=LG, get_channel=lambda cid: FakeLogChannel() if cid == LOGCH else None)
     real_get_guild = b.get_guild
+    real_delay, cl.AUDIT_DELAY = cl.AUDIT_DELAY, 0
     b.get_guild = lambda gid: fake_guild if gid == LG else None
 
     class Person(NS):
@@ -982,9 +994,54 @@ async def main():
               len(sent) == 4 and "3 messages purged" in embed.description
               and "1 were too old" in embed.description
               and "alice" in transcript and "two" in transcript)
+
+        # Who deleted it.
+        def deleter():
+            return {f.name: f.value for f in sent[-1][0].fields}.get("Deleted by", "")
+
+        async def delete_alices(mid):
+            await logs.on_raw_message_delete(NS(guild_id=LG, channel_id=TALK, message_id=mid,
+                                                cached_message=msg("hi", mid=mid)))
+            return deleter()
+        check("without View Audit Log the log says so",
+              "View Audit Log" in await delete_alices(10))
+        fake_guild.me.guild_permissions.view_audit_log = True
+        check("no audit entry means the sender deleted it",
+              await delete_alices(11) == "The sender")
+        now = discord.utils.utcnow()
+
+        def entry(eid, count, user_id, ago=0, bulk=False, is_bot=False, reason=None):
+            return NS(id=eid, user=NS(id=user_id, bot=is_bot, mention=f"<@{user_id}>"),
+                      reason=reason, created_at=now - _dt.timedelta(seconds=ago),
+                      action=(discord.AuditLogAction.message_bulk_delete if bulk
+                              else discord.AuditLogAction.message_delete),
+                      target=NS(id=TALK if bulk else ALICE),
+                      extra=NS(count=count, channel=NS(id=TALK)))
+        audit["entries"] = [entry(500, 1, MOD)]
+        check("a new audit entry names the mod", await delete_alices(12) == f"<@{MOD}>")
+        check("the same entry again means the sender this time",
+              await delete_alices(13) == "The sender")
+        audit["entries"] = [entry(500, 2, MOD)]
+        check("a merged entry whose count went up names the mod",
+              await delete_alices(14) == f"<@{MOD}>")
+        audit["entries"] = [entry(501, 1, MOD, ago=600)]
+        check("an old entry seen for the first time isn't this delete",
+              await delete_alices(15) == "The sender")
+        audit["entries"] = [entry(502, 1, PAPER)]
+        check("Paper's own deletes say so",
+              (await delete_alices(16)).startswith("Paper"))
+        logs.expect(TALK, NS(mention=f"<@{MOD}>"), "$purge")
+        check("Paper's purge names the mod who ran it",
+              await delete_alices(17) == f"<@{MOD}> with `$purge`")
+        logs.expected.clear()
+        audit["entries"] = [entry(503, 40, 8000, bulk=True, is_bot=True, reason="raid cleanup")]
+        await logs.on_raw_bulk_message_delete(NS(guild_id=LG, channel_id=TALK,
+                                                 message_ids={1, 2}, cached_messages=[]))
+        check("another bot's purge names it, with the reason",
+              deleter() == "<@8000> (a bot)\nReason: raid cleanup")
     finally:
         b.get_guild = real_get_guild
-
+        cl.AUDIT_DELAY = real_delay
 
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
