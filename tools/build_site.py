@@ -507,9 +507,11 @@ code,kbd{
 .marquee.moving:hover .track{animation-play-state:paused}
 .marquee.still .track{margin-inline:auto}
 @keyframes drift{to{transform:translateX(-50%)}}
+/* Fewer animations asked for: it still drifts (a frozen strip just looks
+   broken, with a scrollbar), but at half the speed, and it still stops
+   under the pointer. */
 @media(prefers-reduced-motion:reduce){
-  .marquee.moving .track{animation:none}
-  .marquee{overflow-x:auto}
+  .marquee.moving .track{animation-duration:calc(var(--dur,60s) * 2)}
 }
 .srv{display:flex;align-items:center;gap:13px;text-align:left;flex:none}
 .srv img,.srv .ph{width:52px;height:52px;border-radius:50%;flex:none;
