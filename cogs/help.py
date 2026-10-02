@@ -333,6 +333,7 @@ CATEGORIES = [
         ("setupmod", "jail, roles, log"),
         ("setupmod reset", "start over"),
         ("modlog", "pick the log channel"),
+        ("chatlog", "log deleted & edited messages"),
         ("staffroles", "staff roles"),
         ("staffroles add", "make a role staff"),
         ("staffroles list", "see them"),

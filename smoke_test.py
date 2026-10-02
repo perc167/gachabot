@@ -916,6 +916,76 @@ async def main():
           and len(db.reminders_of(ALICE)) == 2 and db.remove_reminder(rid, BOB) == 0)
     check("time ago reads short", ut.ago(90) == "1m" and ut.ago(7200) == "2h" and ut.ago(5) == "5s")
 
+    # Chat logs: deletes, edits and purges reach the chosen channel, and
+    # bots, link-preview "edits" and the log channel itself never do.
+    from cogs import chatlogs as cl
+    import datetime as _dt
+    logs = b.get_cog("ChatLogs")
+    check("chat logs load with their command",
+          logs is not None and b.get_command("chatlog") is not None
+          and b.get_command("messagelog").name == "chatlog")
+    check("the bot remembers enough messages to log their text",
+          b._connection.max_messages == cl.MESSAGE_CACHE)
+    check("long text is clipped", cl.clip("x" * 50, 10) == "x" * 9 + "…" and cl.clip(None, 5) == "")
+    LG, LOGCH, TALK = GUILD + 900, 9001, 9002
+    sent = []
+
+    class FakeLogChannel:
+        id = LOGCH
+        async def send(self, embed=None, file=None, **kw):
+            sent.append((embed, file))
+    fake_guild = NS(id=LG, get_channel=lambda cid: FakeLogChannel() if cid == LOGCH else None)
+    real_get_guild = b.get_guild
+    b.get_guild = lambda gid: fake_guild if gid == LG else None
+
+    class Person(NS):
+        def __str__(self):
+            return "alice"
+    def person(bot=False):
+        return Person(id=ALICE, bot=bot, display_avatar=NS(url="https://a/b.png"))
+    def msg(text, bot=False, mid=1):
+        return NS(id=mid, author=person(bot), content=text, attachments=[], stickers=[],
+                  created_at=_dt.datetime(2026, 10, 2, tzinfo=_dt.timezone.utc),
+                  jump_url=f"https://discord.com/channels/{LG}/{TALK}/{mid}")
+    try:
+        await logs.on_raw_message_delete(NS(guild_id=LG, channel_id=TALK, message_id=1,
+                                            cached_message=msg("hello")))
+        check("chat logs are off until a channel is picked", sent == [])
+        db.set_mod_config(LG, cl.SETTING, LOGCH)
+        await logs.on_raw_message_delete(NS(guild_id=LG, channel_id=TALK, message_id=1,
+                                            cached_message=msg("hello")))
+        check("a deleted message is logged with its text",
+              len(sent) == 1 and "hello" in sent[0][0].description)
+        await logs.on_raw_message_delete(NS(guild_id=LG, channel_id=TALK, message_id=2,
+                                            cached_message=None))
+        check("an old deleted message is still logged, without text",
+              len(sent) == 2 and "wasn't saved" in sent[1][0].description)
+        await logs.on_raw_message_delete(NS(guild_id=LG, channel_id=TALK, message_id=3,
+                                            cached_message=msg("beep", bot=True)))
+        await logs.on_raw_message_delete(NS(guild_id=LG, channel_id=LOGCH, message_id=4,
+                                            cached_message=msg("in the log")))
+        check("bots and the log channel itself aren't logged", len(sent) == 2)
+        await logs.on_raw_message_edit(NS(guild_id=LG, channel_id=TALK,
+                                          cached_message=msg("same"), message=msg("same")))
+        check("a link preview isn't an edit", len(sent) == 2)
+        await logs.on_raw_message_edit(NS(guild_id=LG, channel_id=TALK,
+                                          cached_message=msg("teh"), message=msg("the")))
+        fields = {f.name: f.value for f in sent[-1][0].fields}
+        check("an edit shows before and after",
+              len(sent) == 3 and fields.get("Before") == "teh" and fields.get("After") == "the")
+        await logs.on_raw_bulk_message_delete(NS(guild_id=LG, channel_id=TALK,
+                                                 message_ids={1, 2, 3},
+                                                 cached_messages=[msg("one", mid=1), msg("two", mid=2)]))
+        embed, file = sent[-1]
+        transcript = file.fp.read().decode() if file else ""
+        check("a purge is one entry with a transcript",
+              len(sent) == 4 and "3 messages purged" in embed.description
+              and "1 were too old" in embed.description
+              and "alice" in transcript and "two" in transcript)
+    finally:
+        b.get_guild = real_get_guild
+
+
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
           and levelsmod.month_before(202607) == 202606)

@@ -12,6 +12,7 @@ from discord.ext import commands
 
 import backup
 import config
+from cogs import chatlogs
 from converters import NoSuchRole
 import views
 from db import Database
@@ -47,6 +48,7 @@ COGS = [
     "cogs.moderation",
     "cogs.staffpoints",
     "cogs.modtools",
+    "cogs.chatlogs",
     "cogs.modsettings",
     "cogs.voice",
     "cogs.levels",
@@ -115,6 +117,8 @@ class GachaBot(commands.Bot):
             intents=intents,
             help_command=None,
             case_insensitive=True,
+            # Chat logs can only show a deleted message's text if it's remembered.
+            max_messages=chatlogs.MESSAGE_CACHE,
         )
         # A backup parked by $restore goes in before the database opens.
         if backup.apply_pending(config.DB_PATH):
