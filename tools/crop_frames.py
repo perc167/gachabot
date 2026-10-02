@@ -152,7 +152,7 @@ def main():
         with io.open(tag_path, encoding="utf-8") as handle:
             tags = json.load(handle)
     owner = {url: key for key, urls in frames.items() for url in urls}
-    tagger = frames_tool.Tagger()
+    panel = frames_tool.Panel()
 
     done, failed, bytes_written = 0, 0, 0
     by_cut = {}
@@ -177,10 +177,9 @@ def main():
                     cut.convert("RGB").save(buffer, format="JPEG",
                                             quality=QUALITY, optimize=True)
                     data = buffer.getvalue()
-                    reading = tagger.read(cut)
-                    if ((not tag or tagger.alone(cut, tag, reading))
-                            and frames_tool.shows_face(reading[1])
-                            and frames_tool.visible(cut, reading[1])):
+                    ok, scene = panel.judge(cut, tag)
+                    if (ok and frames_tool.shows_face(scene)
+                            and frames_tool.visible(cut, scene)):
                         won = ("face", data)
                 except Exception:  # noqa: BLE001 - fall back to the proxy
                     pass
@@ -195,16 +194,16 @@ def main():
                 # A crop that cut the character out, or left somebody else
                 # in, is not worth keeping - and finding that out now saves
                 # an audit pass later.
-                reading = tagger.read(image)
-                if tag and not tagger.alone(image, tag, reading):
+                ok, scene = panel.judge(image, tag)
+                if not ok:
                     continue
                 # Whatever cut produced it, a crop with no face left in it is
                 # the shoulder-and-a-curtain shot.
-                if not frames_tool.shows_face(reading[1]):
+                if not frames_tool.shows_face(scene):
                     continue
                 # A crop can darken a frame by keeping the shadowed half of
                 # it, so the cut is judged on its own, not on the original.
-                if not frames_tool.visible(image, reading[1]):
+                if not frames_tool.visible(image, scene):
                     continue
                 won = (label, data)
                 break

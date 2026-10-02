@@ -94,7 +94,7 @@ def main():
     art = load(ART)
     frames = load(FRAMES)
     tags = load(TAGS)
-    tagger = frames_tool.Tagger()
+    panel = frames_tool.Panel()
 
     checked = not_alone = duplicate = broken = faceless = unlit = 0
     emptied = []
@@ -126,19 +126,19 @@ def main():
             # Only the frames are re-judged. The official art was chosen by
             # its own rules and is not a frame of anything.
             if url.startswith("local:frame-"):
-                if tag and not tagger.alone(image, tag):
+                ok, scene = panel.judge(image, tag)
+                if not ok:
                     not_alone += 1
                     continue
                 # A frame with no face is a torso, a shoulder, or a speck in
                 # a landscape. It passes every identity check and is still
                 # not a picture of anybody.
-                reading = tagger.read(image)
-                if not frames_tool.shows_face(reading[1]):
+                if not frames_tool.shows_face(scene):
                     faceless += 1
                     continue
                 # The one the album was complained about twice: her, alone,
                 # face in shot, and too dark or too close to make out.
-                if not frames_tool.visible(image, reading[1]):
+                if not frames_tool.visible(image, scene):
                     unlit += 1
                     continue
 

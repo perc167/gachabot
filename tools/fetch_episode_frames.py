@@ -288,6 +288,63 @@ class Tagger:
         return True
 
 
+class Panel:
+    """Both models: whichever one knows a character answers for them.
+
+    WD is sure of the 2,751 characters it was taught, and every threshold in
+    this file - crowding, lettering, faces, darkness - was measured against
+    its confidence. Camie knows ten times as many characters and is vaguer
+    about all of it. So Camie is asked who somebody is, but only when WD has
+    never heard of them, and WD is asked what kind of shot it is either way.
+
+    The sweep, the cropper and the audit all ask the same questions of the
+    same pair, which is the point: they disagreed before, and the two that
+    only knew WD quietly discarded everything the one that knew both found.
+    """
+
+    def __init__(self, with_camie: bool = True):
+        self.wd = Tagger()
+        self.camie = None
+        if not with_camie:
+            return
+        try:
+            from camie import CamieTagger
+
+            self.camie = CamieTagger(keep_above=0.20)
+            self.camie.label = "Camie"
+            self.camie.shortlist_at = CAMIE_SHORTLIST
+            self.camie.confirm_at = CAMIE_CONFIRM
+            self.camie.margin = CAMIE_MARGIN
+        except Exception as error:  # noqa: BLE001 - WD alone still works
+            print(f"  (second tagger unavailable: {type(error).__name__})")
+
+    def knows(self, tag: str):
+        """(the model that can name them, the name it knows them by)."""
+        tag = ALIASES.get(tag, tag)
+        if tag in self.wd.characters:
+            return self.wd, tag
+        if self.camie is not None and tag in self.camie.characters:
+            return self.camie, tag
+        return None, tag
+
+    def judge(self, image, tag: str) -> tuple:
+        """(is it them alone, what kind of shot it is).
+
+        A character neither model knows cannot be checked, and refusing
+        every picture of them is worse than letting them through: that is
+        how a character ends up with an empty album.
+        """
+        scene = self.wd.read(image)[1]
+        model, tag = self.knows(tag)
+        if model is None:
+            return True, scene
+        if model is self.wd:
+            return self.wd.alone(image, tag), scene
+        # Camie names them; WD says whether anybody else is in shot.
+        people = model.read(image)[0]
+        return model.alone(image, tag, (people, scene)), scene
+
+
 def image_from(data: bytes):
     from PIL import Image
 
@@ -818,6 +875,9 @@ def main():
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--one-model", action="store_true",
                         help="WD only, skipping the characters it cannot name")
+    parser.add_argument("--skip-swept", action="store_true",
+                        help="carry on an interrupted top-up rather than"
+                             " starting it over from the first series")
     parser.add_argument("--need", type=int, default=0,
                         help="only look for characters who have fewer than"
                              " this many frames already")
@@ -915,8 +975,15 @@ def main():
     done = json.load(io.open(args.out + ".series", encoding="utf-8")) \
         if args.resume and os.path.exists(args.out + ".series") else []
     # A top-up is deliberately going back over swept series, so the record of
-    # what has been done is not a reason to skip.
-    done = set() if (args.need or args.series) else set(done)
+    # what has been done is not a reason to skip - unless this is the same
+    # top-up carrying on after being interrupted, which is what --skip-swept
+    # says. A long sweep gets stopped to let the frames it has already found
+    # be cropped and shipped, and starting it from the top each time means
+    # the back half of the roster is never reached.
+    if args.skip_swept:
+        done = set(done)
+    else:
+        done = set() if (args.need or args.series) else set(done)
 
     started, scanned = time.time(), 0
     order = sorted(known.items(),
