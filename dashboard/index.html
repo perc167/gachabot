@@ -1171,6 +1171,14 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
         return [c.id, "#" + c.name + (c.category ? "  ·  " + c.category : "")]; })), d.log_channel);
       form.appendChild(card("Mod log", "Every jail, mute, warning, kick and ban is posted here.",
         [field("Channel", log)]));
+      var chatLog = select([["", "Off"]].concat(d.channels.map(function(c){
+        return [c.id, "#" + c.name + (c.category ? "  ·  " + c.category : "")]; })), d.chat_log_channel);
+      var chatParts = [field("Channel", chatLog)];
+      if (!d.audit_log_ok) chatParts.push(el("p", {cls: "hint",
+        text: "Give Paper the View Audit Log permission so the log can say which mod deleted a message."}));
+      form.appendChild(card("Chat log",
+        "Every deleted and edited message, and every purge, with who deleted it. Pick a channel only staff can see.",
+        chatParts));
 
       function punishRow(p){
         var at = number(p.threshold || "", 1, 50); at.placeholder = "Warnings";
@@ -1245,7 +1253,8 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 
       return function(){
         return {
-          staff_roles: staff.value(), log_channel: log.value, lock_role: lockRole.value,
+          staff_roles: staff.value(), log_channel: log.value, chat_log_channel: chatLog.value,
+          lock_role: lockRole.value,
           lockdown_ignored: skip.value(),
           automod: {
             filters: Object.keys(amRows).reduce(function(o, k){

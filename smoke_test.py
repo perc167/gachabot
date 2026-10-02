@@ -1039,6 +1039,26 @@ async def main():
                                                  message_ids={1, 2}, cached_messages=[]))
         check("another bot's purge names it, with the reason",
               deleter() == "<@8000> (a bot)\nReason: raid cleanup")
+
+        # The dashboard's chat log setting.
+        import webparts
+        text_channel = discord.TextChannel.__new__(discord.TextChannel)
+        text_channel.id = 9100
+        dash_guild = NS(id=LG, me=fake_guild.me,
+                        get_channel=lambda cid: text_channel if cid == 9100 else None)
+        check("the dashboard saves a chat log channel",
+              webparts.mod_save(b, dash_guild, {"chat_log_channel": "9100"}) == []
+              and db.get_mod_config(LG, cl.SETTING) == 9100)
+        check("the dashboard refuses a channel from somewhere else",
+              webparts.mod_save(b, dash_guild, {"chat_log_channel": "555"})
+              and db.get_mod_config(LG, cl.SETTING) == 9100)
+        check("the dashboard can turn chat logs off",
+              webparts.mod_save(b, dash_guild, {"chat_log_channel": ""}) == []
+              and db.get_mod_config(LG, cl.SETTING) == 0)
+        check("saving other settings leaves the chat log alone",
+              db.set_mod_config(LG, cl.SETTING, 9100) is None
+              and webparts.mod_save(b, dash_guild, {}) == []
+              and db.get_mod_config(LG, cl.SETTING) == 9100)
     finally:
         b.get_guild = real_get_guild
         cl.AUDIT_DELAY = real_delay

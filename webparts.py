@@ -17,6 +17,7 @@ import config
 import premium
 import weekly
 from cogs import automod as automod_cog
+from cogs import chatlogs
 from cogs import events as events_cog
 from cogs import serversetup
 from cogs.modtools import FREE_WARN_PUNISHMENTS, describe_duration, parse_duration
@@ -230,6 +231,8 @@ def mod_state(bot, guild) -> dict:
         "ready": bool(db.get_mod_config(gid, "jail_role")),
         "jail_channel": str(db.get_mod_config(gid, "jail_channel") or ""),
         "log_channel": str(db.get_mod_config(gid, "log_channel") or ""),
+        "chat_log_channel": str(db.get_mod_config(gid, chatlogs.SETTING) or ""),
+        "audit_log_ok": guild.me.guild_permissions.view_audit_log if guild.me else False,
         "lock_role": str(db.get_mod_config(gid, "lock_role") or ""),
         "staff_roles": [str(r) for r in db.staff_roles_of(gid)],
         "punishments": [{"threshold": r["threshold"], "action": r["action"],
@@ -266,6 +269,13 @@ def mod_save(bot, guild, body) -> list:
         log_channel = _text_channel(guild, log)
         if not log_channel:
             problems.append("Pick a text channel in this server for the mod log.")
+
+    chat = body.get("chat_log_channel")
+    chat_channel = None
+    if chat is not None and chat != "":
+        chat_channel = _text_channel(guild, chat)
+        if not chat_channel:
+            problems.append("Pick a text channel in this server for the chat log.")
 
     lock = body.get("lock_role")
     lock_role = None
@@ -357,6 +367,8 @@ def mod_save(bot, guild, body) -> list:
         db.replace_automod_exempt(gid, auto_exempt)
     if log is not None:
         db.set_mod_config(gid, "log_channel", log_channel.id if log_channel else 0)
+    if chat is not None:
+        db.set_mod_config(gid, chatlogs.SETTING, chat_channel.id if chat_channel else 0)
     if lock is not None:
         db.set_mod_config(gid, "lock_role", lock_role.id if lock_role else 0)
     if body.get("staff_roles") is not None:
