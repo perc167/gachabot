@@ -2225,61 +2225,67 @@ class Database:
                 f"SELECT c.* {source} {where} ORDER BY RANDOM() LIMIT 1", args
             ).fetchone()
 
-        # Deliberately not counted through the join: at a hundred thousand
-        # rows that is a full scan on every single roll. The depth of the
-        # ranking is the same for everyone, and an index knows it instantly.
-        if gender or kind:
-            # A narrowed pool has its own depth. Using the whole roster's
-            # would push the target past the end of the slice again and
-            # again, and the fallback would hand back the same character
-            # every time.
-            deepest = self.conn.execute(
-                f"SELECT MAX(c.like_rank) AS deepest {source} {where}", args
-            ).fetchone()["deepest"] or 0
-        else:
-            deepest = self.conn.execute(
-                "SELECT MAX(like_rank) AS deepest FROM characters"
-            ).fetchone()["deepest"] or 0
-        if not deepest:
-            return self.conn.execute(
-                f"SELECT c.* {source} {where} ORDER BY RANDOM() LIMIT 1", args
-            ).fetchone()
-        # Counted over exactly the same set the branch below picks from.
-        # Anything unranked - a server's own character, or one an owner added
-        # by hand - would otherwise be unrollable the moment bias is on.
-        unranked = self.conn.execute(
-            f"SELECT COUNT(*) AS c {source} {where} AND c.like_rank <= 0", args
-        ).fetchone()["c"]
-        total = deepest + unranked
+        # Picked by position in this server's own pool, never by rank number.
+        # Rank numbers have gaps wherever $limroul, a switched-off source or
+        # a claim takes characters out, and a number landing in a gap meant
+        # the next character along - past the last one left, the same
+        # character on most rolls. Positions have no gaps.
+        ranked, unranked = self._pool_counts(
+            (guild_id, include_claimed, gender, kind), source, where, args)
+        if not ranked + unranked:
+            return None
 
-        # No popularity rank means a rank window would shut them out
-        # completely, so give them exactly their share of the rolls instead.
-        if unranked and random.random() < unranked / total:
-            return self.conn.execute(
+        # No popularity rank means no place in the ranking, so they get
+        # exactly their share of the rolls instead. Anything unranked - a
+        # server's own character, or one an owner added by hand - would
+        # otherwise be unrollable the moment bias is on.
+        if unranked and random.random() < unranked / (ranked + unranked):
+            row = self.conn.execute(
                 f"SELECT c.* {source} {where} AND c.like_rank <= 0"
                 f" ORDER BY RANDOM() LIMIT 1",
                 args,
             ).fetchone()
+            if row is not None or not ranked:
+                return row
 
         exponent = 1.0 + min(100, max(0, bias)) / 100.0
-        # 1 + int(...) rather than int(...): random() never returns 1.0, so
-        # the product never reaches `deepest` and the very last character in
-        # the ranking could not be drawn at all. One in a hundred thousand
-        # hardly shows, but "unreachable" is not a rounding error.
-        target = min(deepest, 1 + int(deepest * (random.random() ** exponent)))
+        # random() is below 1, so this runs 0 to ranked - 1: the very last
+        # character is reachable and nothing points past the end.
+        position = min(ranked - 1, int(ranked * (random.random() ** exponent)))
         row = self.conn.execute(
-            f"SELECT c.* {source} {where} AND c.like_rank >= ?"
-            f" ORDER BY c.like_rank LIMIT 1",
-            (*args, target),
+            f"SELECT c.* {source} {where} AND c.like_rank > 0"
+            f" ORDER BY c.like_rank LIMIT 1 OFFSET ?",
+            (*args, position),
         ).fetchone()
         if row is None:
-            # Everyone past the target is claimed; fall back up the ranking.
+            # The count is up to a minute old and the pool has shrunk since:
+            # anyone ranked, at random - never one fixed fallback.
             row = self.conn.execute(
                 f"SELECT c.* {source} {where} AND c.like_rank > 0"
-                f" ORDER BY c.like_rank DESC LIMIT 1",
+                f" ORDER BY RANDOM() LIMIT 1",
                 args,
             ).fetchone()
         return row
+
+    # Counting a pool walks all of it, so a count is kept this long. Stale by
+    # a claim or two it only moves a roll one place; set_setting forgets a
+    # server's counts, so $limroul and the like count again at once.
+    POOL_COUNT_SECONDS = 60
+
+    def _pool_counts(self, key: tuple, source: str, where: str, args: tuple) -> tuple:
+        """(ranked, unranked) characters in a roll's pool."""
+        counts = self.__dict__.setdefault("_counts", {})
+        now = time.time()
+        hit = counts.get(key)
+        if hit and hit[0] > now:
+            return hit[1], hit[2]
+        row = self.conn.execute(
+            f"SELECT COALESCE(SUM(c.like_rank > 0), 0) AS r,"
+            f" COALESCE(SUM(c.like_rank <= 0), 0) AS u {source} {where}",
+            args,
+        ).fetchone()
+        counts[key] = (now + self.POOL_COUNT_SECONDS, row["r"], row["u"])
+        return row["r"], row["u"]
 
     # ---------- character images ----------
 
@@ -2449,6 +2455,10 @@ class Database:
         return {k: self.get_setting(guild_id, k) for k in config.GUILD_SETTINGS}
 
     def set_setting(self, guild_id: int, key: str, value: int):
+        # A setting can change who rolls ($limroul): count the pool again.
+        counts = self.__dict__.get("_counts", {})
+        for cached in [k for k in counts if k[0] == guild_id]:
+            del counts[cached]
         self.conn.execute(
             "INSERT INTO guild_settings (guild_id, key, value) VALUES (?, ?, ?)"
             " ON CONFLICT (guild_id, key) DO UPDATE SET value = excluded.value",

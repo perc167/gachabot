@@ -3283,6 +3283,20 @@ async def main():
     check("every biased roll is a real character",
           all(1 <= r <= POOL for r in leaning))
 
+    # $limroul cuts the pool short of the deepest rank. Rolls used to aim at
+    # a rank number over the whole roster, and every aim past the cut fell
+    # back to the last character left: the same one on most rolls.
+    CAPPED = GUILD + 70
+    wdb.set_setting(CAPPED, "roll_rank_limit", 5000)
+    capped = [wdb.random_character(CAPPED, True, 35) for _ in range(2000)]
+    most = max(collections.Counter(r["id"] for r in capped).values())
+    check("a capped pool doesn't roll the same character over and over",
+          most <= 10, f"one character came up {most} times in 2,000")
+    check("and stays inside the cap", all(r["claim_rank"] <= 5000 for r in capped))
+    check("and still leans towards the famous",
+          share([r["like_rank"] for r in capped], 500) > 0.15,
+          f"{share([r['like_rank'] for r in capped], 500):.3f} in the top tenth")
+
     # Characters with no popularity rank - one a server invented, one an
     # owner added by hand - must still reach the table when bias is on. Two
     # unranked among twenty thousand would surface once in ten thousand rolls,
