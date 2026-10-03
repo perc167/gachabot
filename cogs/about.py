@@ -87,7 +87,7 @@ class About(commands.Cog):
         embed.set_footer(text=f"{prefix}tuto to start · {prefix}help for everything")
         await ctx.send(embed=embed)
 
-    @commands.command(name="support", aliases=["vote", "patreon", "join", "donate"])
+    @commands.command(name="support", aliases=["patreon", "join", "donate"])
     async def support(self, ctx):
         """Getting help, what's free, and Paper's policies."""
         prefix = ctx.prefix or config.PREFIX

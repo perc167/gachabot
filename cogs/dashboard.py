@@ -139,6 +139,7 @@ class Dashboard(commands.Cog):
         app.router.add_get("/api/rankbg.jpg", self.api_rankbg_get)
         app.router.add_post("/api/botprofile", self.api_botprofile)
         app.router.add_post("/stripe/webhook", self.stripe_webhook)
+        app.router.add_post("/topgg/webhook", self.topgg_webhook)
         app.router.add_get("/api/part/{part}", self.api_part_get)
         app.router.add_post("/api/part/{part}", self.api_part_save)
         app.router.add_get("/api/levels", self.api_get)
@@ -947,6 +948,19 @@ class Dashboard(commands.Cog):
         except (billing.BillingError, OSError) as e:
             return problem(502, f"Couldn't open billing: {e}")
         return web.json_response({"url": url}, headers=HEADERS)
+
+    async def topgg_webhook(self, request):
+        """A top.gg vote. cogs/votes.py checks the secret and does the rest."""
+        votes = self.bot.get_cog("Votes")
+        if votes is None:
+            return web.Response(status=503)
+        try:
+            payload = await request.json()
+        except (ValueError, UnicodeDecodeError):
+            return web.Response(status=400)
+        status = await votes.handle_webhook(request.headers.get("Authorization", ""),
+                                            payload if isinstance(payload, dict) else {})
+        return web.Response(status=status)
 
     async def stripe_webhook(self, request):
         payload = await request.read()

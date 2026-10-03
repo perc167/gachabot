@@ -46,7 +46,7 @@ TOP = [
     "like", "profile", "top",
     # everyday
     "help", "snipe", "editsnipe", "afk", "userinfo", "serverinfo", "remind", "role",
-    "steal", "level", "leaderboard", "upgrade", "dashboard",
+    "steal", "level", "leaderboard", "upgrade", "dashboard", "vote",
     # moderation
     "jail", "unjail", "timeout", "untimeout", "warn", "warnings", "kick", "ban",
     "unban", "softban", "purge", "lockdown", "unlockdown", "history",

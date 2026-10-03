@@ -1166,6 +1166,75 @@ async def main():
     check("reacting to a slash command's message says the reaction instead",
           stand_in_said == ["✅"] and stand_in.id == 1)
 
+    # top.gg votes: a banked karuda reward, and a weekly draw from every vote.
+    from cogs import votes as vt
+    voter = b.get_cog("Votes")
+    monday = 1767535200  # Monday 5 Jan 2026, midnight in Queensland
+    wk = vt.week_of(monday)
+    check("weeks start at Monday midnight, Queensland time",
+          vt.week_start(wk) == monday and vt.week_of(monday - 1) == wk - 1
+          and vt.week_of(monday + vt.WEEK - 1) == wk)
+    VA, VB, VG = 880001, 880002, GUILD + 950
+    check("a vote is saved", voter.record(VA, False, now=monday + 100))
+    check("top.gg retrying the same vote isn't counted twice",
+          not voter.record(VA, False, now=monday + 130))
+    voter.record(VA, True, now=monday + 50000)
+    voter.record(VA, False, now=monday + 100000)
+    voter.record(VB, False, now=monday + 200000)
+    karuda_before = db.get_player(VG, VA)["karuda"]
+    paid = voter.claim(VG, VA, now=monday + 300000)
+    check("$vote pays banked votes into the server it's used in, weekends double",
+          paid == vt.REWARD * 4 and db.get_player(VG, VA)["karuda"] == karuda_before + paid)
+    check("a vote pays out once", voter.claim(VG, VA) == 0 and not voter.banked(VA))
+    for i in range(vt.BANK_LIMIT + 5):
+        voter.record(VB, False, now=monday + 400000 + i * 100)
+    check("only the newest votes stay banked",
+          voter.claim(VG, VB) == vt.REWARD * vt.BANK_LIMIT)
+    old_secret = os.environ.get("TOPGG_WEBHOOK_SECRET")
+    os.environ["TOPGG_WEBHOOK_SECRET"] = "s3cret"
+    thanked = []
+    real_thank = voter.thank
+
+    async def fake_thank(user_id, weekend):
+        thanked.append(user_id)
+    voter.thank = fake_thank
+    try:
+        check("a webhook without the secret is refused",
+              await voter.handle_webhook("wrong", {"user": "123"}) == 401)
+        check("a malformed vote is refused", await voter.handle_webhook("s3cret", {}) == 400)
+        check("top.gg's test button isn't counted",
+              await voter.handle_webhook("s3cret", {"user": "880003", "type": "test"}) == 200
+              and not voter.banked(880003))
+        check("a real vote is saved and thanked",
+              await voter.handle_webhook("s3cret", {"user": "880003", "type": "upvote",
+                                                    "isWeekend": True}) == 200
+              and thanked == [880003] and voter.banked(880003)[0]["weekend"] == 1)
+    finally:
+        voter.thank = real_thank
+        if old_secret is None:
+            os.environ.pop("TOPGG_WEBHOOK_SECRET", None)
+        else:
+            os.environ["TOPGG_WEBHOOK_SECRET"] = old_secret
+    result = voter.draw(wk, now=monday + vt.WEEK + 60)
+    week_total = len(voter.week_votes(wk))
+    check("the draw picks one vote from that week",
+          result and result["user_id"] in (VA, VB) and result["entries"] == week_total
+          and result["voters"] == 2
+          and result["theirs"] == voter.entries_of(result["user_id"], wk))
+    check("a week is drawn once", voter.draw(wk) is None)
+    check("a week nobody voted in has no winner", voter.draw(wk - 3) is None)
+    winner = NS(id=result["user_id"], mention=f"<@{result['user_id']}>",
+                display_avatar=NS(url="https://cdn.example/a.png"))
+    content, embed, view = voter.announcement(result, winner)
+    check("the winner's announcement mentions them, with odds and a vote button",
+          winner.mention in content and winner.mention in embed.description
+          and "Giveaway" in embed.title and embed.thumbnail.url == "https://cdn.example/a.png"
+          and any(f.name.endswith("odds") for f in embed.fields)
+          and view.children[0].url == vt.VOTE_URL)
+    check("/vote is a top-level slash command",
+          b.tree.get_command("vote") is not None
+          and b.tree.get_command("votes") is None)
+
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
           and levelsmod.month_before(202607) == 202606)

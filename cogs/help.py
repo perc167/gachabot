@@ -128,6 +128,7 @@ CATEGORIES = [
         ("access", "what you can use"),
         ("redeem", "use a premium key"),
         ("stats", "pool and server totals"),
+        ("vote", "vote on top.gg: karuda + giveaway"),
         ("myid", "your Discord id"),
         ("invite", "add the bot elsewhere"),
         ("ping", "is it awake"),
@@ -606,6 +607,8 @@ CATEGORIES = [
         ("backup", "DM the owners a backup"),
         ("restore", "restore a backup (DM)"),
         ("keystats", "keys made and spent"),
+        ("votes", "this week's votes"),
+        ("votegiveaway", "the weekly vote draw"),
     ]),
 ]
 
