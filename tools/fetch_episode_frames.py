@@ -334,12 +334,16 @@ class Panel:
         every picture of them is worse than letting them through: that is
         how a character ends up with an empty album.
         """
-        scene = self.wd.read(image)[1]
+        # Read once and pass the reading on. Asking alone() to work it out
+        # again doubles the cost of every picture, which over a few hundred
+        # albums is the difference between minutes and hours.
+        reading = self.wd.read(image)
+        scene = reading[1]
         model, tag = self.knows(tag)
         if model is None:
             return True, scene
         if model is self.wd:
-            return self.wd.alone(image, tag), scene
+            return self.wd.alone(image, tag, reading), scene
         # Camie names them; WD says whether anybody else is in shot.
         people = model.read(image)[0]
         return model.alone(image, tag, (people, scene)), scene
@@ -878,6 +882,8 @@ def main():
     parser.add_argument("--skip-swept", action="store_true",
                         help="carry on an interrupted top-up rather than"
                              " starting it over from the first series")
+    parser.add_argument("--second-only", action="store_true",
+                        help="sweep only for the characters WD cannot name")
     parser.add_argument("--need", type=int, default=0,
                         help="only look for characters who have fewer than"
                              " this many frames already")
@@ -933,6 +939,12 @@ def main():
             else:
                 strangers += 1
         extra += len(theirs)
+        # A sweep aimed at the characters WD cannot name, for when those are
+        # the ones still missing. It visits only the series that have any,
+        # and does not spend the budget re-asking about people who are
+        # already full.
+        if args.second_only:
+            mine = []
         if mine or theirs:
             known[series] = [(tagger, mine), (second, theirs)]
     total_people = sum(len(p) for groups in known.values()

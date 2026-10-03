@@ -12,3 +12,4 @@ assets/shards/_preview.png
 *.before-restore*
 paper-backup-*
 .cache/
+data/art_marks.json

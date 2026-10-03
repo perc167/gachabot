@@ -38,6 +38,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ART = os.path.join(ROOT, "data", "character_art.json")
 FRAMES = os.path.join(ROOT, "data", "character_frames.json")
 TAGS = os.path.join(ROOT, "data", "character_art_tags.json")
+# Fingerprints of the linked pictures, so a second audit does not download
+# them all again only to hash them.
+MARKS = os.path.join(ROOT, "data", "art_marks.json")
 ART_DIR = os.path.join(ROOT, "assets", "characters")
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -51,6 +54,11 @@ SAME_BITS = 8
 def load(path: str) -> dict:
     with io.open(path, encoding="utf-8") as handle:
         return json.load(handle)
+
+
+def save_marks(marks: dict):
+    with io.open(MARKS, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(marks, handle, ensure_ascii=False)
 
 
 def open_image(url: str, fetch):
@@ -67,7 +75,9 @@ def open_image(url: str, fetch):
             return image
         except Exception:  # noqa: BLE001 - a broken file is a dropped entry
             return None
-    data = fetch(url, tries=2)
+    # A linked picture that is slow is not worth a minute of the clock;
+    # there are hundreds of them and the audit has to finish.
+    data = fetch(url, tries=2, timeout=20)
     if not data:
         return None
     try:
@@ -96,6 +106,44 @@ def main():
     tags = load(TAGS)
     panel = frames_tool.Panel()
 
+    marks_seen = {}
+    if os.path.exists(MARKS):
+        marks_seen = load(MARKS)
+    had_marks = len(marks_seen)
+
+    # Every linked picture that still needs a fingerprint, fetched several at
+    # a time. One at a time it was ten seconds each and two hours in total,
+    # because most of that was sitting waiting on a server rather than doing
+    # anything. A dead link is remembered as dead, so it costs its forty
+    # seconds once rather than on every run.
+    wanted = [url for key in frames for url in (art.get(key) or [])
+              if not url.startswith("local:") and url not in marks_seen]
+    if wanted:
+        print(f"fetching {len(wanted):,} linked pictures to fingerprint"
+              f" (of {sum(len(art.get(k) or []) for k in frames):,})",
+              flush=True)
+        from concurrent.futures import ThreadPoolExecutor
+        from PIL import Image
+
+        def mark_of(url):
+            data = frames_tool.fetch(url, tries=1, timeout=15)
+            if not data:
+                return url, ""
+            try:
+                image = Image.open(io.BytesIO(data))
+                image.load()
+            except Exception:  # noqa: BLE001 - a broken link is a dead link
+                return url, ""
+            return url, frames_tool.fingerprint(image)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for number, (url, mark) in enumerate(pool.map(mark_of, wanted), 1):
+                marks_seen[url] = mark
+                if number % 100 == 0:
+                    save_marks(marks_seen)
+                    print(f"  {number:,}/{len(wanted):,}", flush=True)
+        save_marks(marks_seen)
+
     checked = not_alone = duplicate = broken = faceless = unlit = 0
     emptied = []
     for key in sorted(frames):
@@ -106,19 +154,33 @@ def main():
         kept, marks = [], []
 
         for url in album:
-            image = open_image(url, frames_tool.fetch)
             checked += 1
-            if image is None:
-                # A bundled file that is not there is really gone. A link
-                # that would not load might be the network having a moment,
-                # and deleting somebody's art over that is not on.
-                if url.startswith("local:"):
-                    broken += 1
+            # A linked picture is never re-judged - only the frames are - so
+            # the single thing it is fetched for is its fingerprint, to catch
+            # the same picture appearing twice. Remembering that between runs
+            # turns seven hundred downloads into none, which is the whole
+            # difference between an audit you can run after every sweep and
+            # one that takes two hours.
+            remembered = None if url.startswith("local:") else marks_seen.get(url)
+            if remembered is not None:
+                # "" means the link would not load. That is not grounds for
+                # deleting somebody's art - the server may simply have been
+                # down - so it stays, and it is not compared against anything.
+                if not remembered:
+                    kept.append(url)
                     continue
-                kept.append(url)
-                continue
+                mark = remembered
+            else:
+                image = open_image(url, frames_tool.fetch)
+                if image is None:
+                    # A bundled file that is not there is really gone.
+                    if url.startswith("local:"):
+                        broken += 1
+                        continue
+                    kept.append(url)
+                    continue
+                mark = frames_tool.fingerprint(image)
 
-            mark = frames_tool.fingerprint(image)
             if any(frames_tool.alike(mark, seen) for seen in marks):
                 duplicate += 1
                 continue
@@ -175,6 +237,10 @@ def main():
     if args.dry_run:
         print("\nDry run, nothing written.")
         return 0
+
+    if len(marks_seen) != had_marks:
+        save_marks(marks_seen)
+        print(f"remembered {len(marks_seen) - had_marks:,} more fingerprints")
 
     with io.open(ART, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(art, handle, ensure_ascii=False)
