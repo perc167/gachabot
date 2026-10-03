@@ -1235,6 +1235,31 @@ async def main():
           b.tree.get_command("vote") is not None
           and b.tree.get_command("votes") is None)
 
+    # Adding Paper is one click away: buttons on $help and $invite, and a hello
+    # when it joins a server.
+    from cogs import profile as prof, about as ab
+    check("no invite link before Paper is logged in", prof.invite_url(NS(application_id=None, user=None)) == "")
+    link = prof.invite_url(NS(application_id=1550497695582519418, user=None))
+    check("the invite link names Paper and its permissions",
+          "client_id=1550497695582519418" in link and "permissions=" in link)
+    buttons = prof.links_view(NS(application_id=1550497695582519418, user=None)).children
+    check("the buttons are Add Paper, Vote and Website",
+          [x.label for x in buttons] == ["Add Paper", "Vote", "Website"])
+    check("the hello skips Vote", [x.label for x in prof.links_view(
+        NS(application_id=1, user=None), vote=False).children] == ["Add Paper", "Website"])
+
+    def chan(name, can=True):
+        return NS(name=name, permissions_for=lambda me: NS(send_messages=can, embed_links=can))
+    check("the hello goes to the system channel when Paper can post there",
+          ab.hello_channel(NS(me=1, system_channel=chan("welcome"),
+                              text_channels=[chan("general")])).name == "welcome")
+    check("else to a general chat",
+          ab.hello_channel(NS(me=1, system_channel=chan("sys", False),
+                              text_channels=[chan("rules"), chan("general-chat")])).name == "general-chat")
+    check("and nowhere if Paper can't post anywhere",
+          ab.hello_channel(NS(me=1, system_channel=None,
+                              text_channels=[chan("rules", False)])) is None)
+
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
           and levelsmod.month_before(202607) == 202606)

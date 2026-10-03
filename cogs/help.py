@@ -773,9 +773,14 @@ class Help(commands.Cog):
             return
 
         messages = batches(help_pages(prefix))
+        from cogs.profile import links_view
+        last = len(messages) - 1
         try:
-            for embeds in messages:
-                await ctx.author.send(embeds=embeds)
+            for i, embeds in enumerate(messages):
+                if i == last:
+                    await ctx.author.send(embeds=embeds, view=links_view(self.bot))
+                else:
+                    await ctx.author.send(embeds=embeds)
         except discord.Forbidden:
             # DMs closed. Post it here rather than failing silently, which
             # would look like the command is broken.

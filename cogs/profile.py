@@ -44,6 +44,29 @@ INVITE_PERMISSIONS = discord.Permissions(
     move_members=True,
 )
 
+SITE_URL = "https://gachabot.perc-1fc.workers.dev"
+
+
+def invite_url(bot) -> str:
+    """The link that adds Paper to a server, or "" before it's logged in."""
+    client_id = bot.application_id or (bot.user.id if bot.user else None)
+    if not client_id:
+        return ""
+    return discord.utils.oauth_url(client_id, permissions=INVITE_PERMISSIONS, scopes=("bot",))
+
+
+def links_view(bot, vote: bool = True) -> discord.ui.View:
+    """Add Paper / Vote / Website buttons, for anywhere people meet the bot."""
+    from cogs.votes import VOTE_URL
+    view = discord.ui.View()
+    url = invite_url(bot)
+    if url:
+        view.add_item(discord.ui.Button(label="Add Paper", emoji="➕", url=url))
+    if vote:
+        view.add_item(discord.ui.Button(label="Vote", emoji="🗳️", url=VOTE_URL))
+    view.add_item(discord.ui.Button(label="Website", emoji="🌐", url=SITE_URL))
+    return view
+
 
 class Profile(commands.Cog):
     def __init__(self, bot):
@@ -142,10 +165,12 @@ class Profile(commands.Cog):
         if not ctx.bot.user:
             await ctx.send("Not logged in yet.")
             return
-        url = discord.utils.oauth_url(
-            ctx.bot.user.id, permissions=INVITE_PERMISSIONS, scopes=("bot",)
-        )
-        await ctx.send(f"<{url}>")
+        embed = discord.Embed(
+            title="Add Paper to your server", colour=config.CARD_COLOUR,
+            description=("An anime gacha with 100,000+ characters, moderation, levels,"
+                         " voice rooms and automod, all free. Every command works with"
+                         " / or $."))
+        await ctx.send(embed=embed, view=links_view(ctx.bot))
 
     @commands.command(name="ping")
     async def ping(self, ctx):

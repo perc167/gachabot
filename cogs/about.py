@@ -52,9 +52,48 @@ PRESETS = {
     ),
 }
 
+def hello_channel(guild):
+    """Where to say hello on joining: the system channel, else a general chat,
+    else the first channel Paper can post embeds in. None if there's nowhere."""
+    def usable(channel):
+        me = channel.permissions_for(guild.me)
+        return me.send_messages and me.embed_links
+
+    if guild.system_channel and usable(guild.system_channel):
+        return guild.system_channel
+    channels = [c for c in guild.text_channels if usable(c)]
+    for channel in channels:
+        if any(word in channel.name for word in ("general", "chat", "lounge")):
+            return channel
+    return channels[0] if channels else None
+
+
 class About(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild):
+        """One hello, so a new server knows where to start."""
+        channel = hello_channel(guild)
+        if channel is None:
+            return
+        p = config.PREFIX
+        embed = discord.Embed(
+            title="Thanks for adding Paper! \U0001f49c", colour=config.CARD_COLOUR,
+            description=(
+                "Every command works as a slash command or with "
+                f"`{p}`.\n\n"
+                f"\U0001f3b2 **Gacha:** `/w` to roll a character, then press Claim. `/dk` for daily karuda.\n"
+                f"\U0001f6e1️ **Moderation:** `{p}setupmod @Mod` makes the jail, mute roles and mod log.\n"
+                f"\U0001f4c8 **Levels, voice rooms and more:** `{p}help` sends everything to your DMs.\n"
+                "⚙️ **Settings:** the dashboard on the website has every option.\n\n"
+                f"Keep the gacha to one channel with `{p}channelallow #channel`."))
+        from cogs.profile import links_view
+        try:
+            await channel.send(embed=embed, view=links_view(self.bot, vote=False))
+        except discord.HTTPException:
+            pass
 
     @commands.command(name="about", aliases=["wiki", "aboutbot", "miscellaneous"])
     async def about(self, ctx):
