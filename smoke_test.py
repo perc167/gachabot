@@ -1063,6 +1063,109 @@ async def main():
         b.get_guild = real_get_guild
         cl.AUDIT_DELAY = real_delay
 
+    # Slash commands: one for every public $ command, inside Discord's limits,
+    # and each one runs the $ command itself.
+    from cogs import slash as sl
+    from discord import app_commands as _ac
+    tree_items = b.tree.get_commands()
+    slash_groups = [i for i in tree_items if isinstance(i, _ac.Group)]
+    routes = {}
+    for item in tree_items:
+        for cmd in (item.commands if isinstance(item, _ac.Group) else [item]):
+            routes[cmd.extras["prefix_command"]] = cmd.qualified_name
+    check("slash commands fit Discord's limits",
+          len(tree_items) <= sl.TOP_LIMIT
+          and all(len(g.commands) <= sl.GROUP_LIMIT for g in slash_groups),
+          f"{len(tree_items)} top-level, biggest group {max(len(g.commands) for g in slash_groups)}")
+    owner_section = {n for _e, t, rows in __import__("cogs.help", fromlist=["x"]).CATEGORIES
+                     if t == "Bot owner" for n, _w in rows}
+    no_slash = [c.qualified_name for c in b.walk_commands()
+                if c.qualified_name not in routes and c.qualified_name not in owner_section]
+    check("every command but the owner's has a slash version", not no_slash, str(no_slash[:10]))
+    check("owner commands get none", not any(n in routes for n in owner_section))
+    check("the everyday ones keep their name",
+          routes.get("waifu") == "w" and routes.get("ban") == "ban" and routes.get("level") == "level")
+    check("the rest sit in groups by area",
+          routes.get("warn list") == "mod warn-list" and routes.get("vc lock") == "vc lock"
+          and routes.get("vc") == "vc help" and routes.get("chatlog") == "modsetup chatlog")
+    for item in tree_items:
+        item.to_dict(b.tree)  # raises if Discord would refuse a name or option
+    check("Discord would accept every name and option", True)
+
+    alea_opts = sl.options_of(b.get_command("alea"))
+    check("a skipped option before a given one gets its $ default",
+          sl.build_args(alea_opts, [None, 50]) == "1 50")
+    purge_opts = sl.options_of(b.get_command("purge"))
+    check("a skipped Optional is left out for the $ parser to skip",
+          sl.build_args(purge_opts, [None, 25]) == "25")
+    say_opts = sl.options_of(b.get_command("say"))
+    check("text at the end goes in as typed",
+          sl.build_args(say_opts, ['he said "hi" there']) == 'he said "hi" there')
+    jk_opts = sl.options_of(b.get_command("jankenpon"))
+    check("text in the middle is quoted", sl.build_args(jk_opts, ["two words"]) == '"two words"')
+    check("pictures are an upload option where the $ command reads attachments",
+          any(k is discord.Attachment for _n, k, *_ in sl.options_of(b.get_command("addcustom"))))
+
+    class FakeFollowup:
+        def __init__(self):
+            self.sent = []
+        async def send(self, content=None, *, wait=False, ephemeral=False, **kw):
+            self.sent.append((content, ephemeral))
+            return NS(id=len(self.sent))
+
+    class FakeResponse:
+        done = False
+        async def defer(self, **kw):
+            self.done = True
+        def is_done(self):
+            return self.done
+
+    class FakeInteraction:
+        def __init__(self, command):
+            self.client, self.command, self.data = b, command, {"type": 1}
+            self.message, self.channel, self.channel_id = None, None, 55
+            self.guild_id, self.guild, self.id, self._state = None, None, 999, b._connection
+            self.namespace, self.command_failed = [], False
+            self.user = discord.User(state=b._connection, data={
+                "id": str(ALICE), "username": "alice", "discriminator": "0", "avatar": None})
+            self.response, self.followup, self.deleted = FakeResponse(), FakeFollowup(), False
+        def is_expired(self):
+            return False
+        async def delete_original_response(self):
+            self.deleted = True
+
+    def slash_cmd(path):
+        node = b.tree.get_command(path.split()[0])
+        return node.get_command(path.split()[1]) if " " in path else node
+
+    said = FakeInteraction(slash_cmd("words say"))
+    await slash_cmd("words say").callback(said, text="hello there")
+    check("/words say runs $say and answers in the slash reply",
+          said.followup.sent and "hello there" in (said.followup.sent[0][0] or ""), str(said.followup.sent))
+    me = FakeInteraction(slash_cmd("paper myid"))
+    await slash_cmd("paper myid").callback(me, member=None)
+    check("/paper myid sees who ran it", me.followup.sent == [(f"`{ALICE}`", False)])
+    rolled = FakeInteraction(slash_cmd("paper alea"))
+    await slash_cmd("paper alea").callback(rolled, low=5, high=5)
+    check("number options reach the $ command", "5" in (rolled.followup.sent[0][0] or ""))
+    b.add_check(lambda ctx: False)
+    try:
+        blocked = FakeInteraction(slash_cmd("paper myid"))
+        await slash_cmd("paper myid").callback(blocked, member=None)
+    finally:
+        b.remove_check(b._checks[-1])
+    check("a command switched off here says so privately, not silently",
+          blocked.deleted and blocked.followup.sent
+          and blocked.followup.sent[-1][1] is True, str(blocked.followup.sent))
+    stand_in_said = []
+    stand_in = sl.MessageStandIn(NS(id=1, content=""), NS(send=lambda text: _said(text)))
+    async def _said(text):
+        stand_in_said.append(text)
+    await stand_in.add_reaction("✅")
+    await stand_in.delete()
+    check("reacting to a slash command's message says the reaction instead",
+          stand_in_said == ["✅"] and stand_in.id == 1)
+
     # The monthly leaderboard: months roll over, and only XP earned counts.
     check("months roll over the year", levelsmod.month_before(202601) == 202512
           and levelsmod.month_before(202607) == 202606)

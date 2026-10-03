@@ -72,6 +72,7 @@ COGS = [
     "cogs.personalise",
     "cogs.find",
     "cogs.help",
+    "cogs.slash",  # last: it builds a slash command for every command above
 ]
 
 
