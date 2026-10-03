@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Paper is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
+<meta name="color-scheme" content="dark">
+<meta property="og:title" content="Paper">
+<meta property="og:image" content="https://gachabot.perc-1fc.workers.dev/img/paper-512.png">
+<meta name="theme-color" content="#7C6BF0">
+<link rel="icon" type="image/png" href="img/favicon.png">
+<link rel="apple-touch-icon" href="img/paper-180.png">
+<meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">
+<meta property="og:type" content="website">
+<title>Privacy Policy · Paper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+:root{
+  --ink:#0D0B14; --panel:#171324; --raise:#1F1A30; --line:#2C2444;
+  --text:#ECE8F7; --dim:#948CAE; --faint:#6B6484;
+  --accent:#7C6BF0; --accent-soft:#9C8FF5; --gold:#E5C55A; --rose:#EE7FA8;
+  --ok:#43B581;
+  --display:"Sora","Segoe UI",system-ui,sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box}
+/* The hidden attribute loses to any display rule - .grid's display:grid
+   kept the roster on screen under the Secret tab - so it has to win. */
+[hidden]{display:none!important}
+/* The browser's own scroll anchoring would fight the tab code, which keeps
+   a clicked tab still itself. */
+html{background:var(--ink);overflow-anchor:none;scroll-behavior:smooth}
+body{
+  margin:0;background:transparent;color:var(--text);
+  font-family:var(--body);font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---- the sky: stars on a canvas, and two soft glows ---- */
+#sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
+.glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;
+  filter:blur(90px);opacity:.28}
+.glow.a{width:620px;height:620px;left:-180px;top:-160px;
+  background:radial-gradient(circle,var(--accent),transparent 70%);
+  animation:float 26s ease-in-out infinite alternate}
+.glow.b{width:560px;height:560px;right:-200px;top:38vh;
+  background:radial-gradient(circle,var(--rose),transparent 70%);opacity:.16;
+  animation:float 32s ease-in-out infinite alternate-reverse}
+@keyframes float{to{transform:translate(60px,40px) scale(1.08)}}
+
+/* ---- motion: sections rise in as they scroll into view, and whatever a
+   tab reveals slides in. Browsers restart an animation when an element
+   goes from hidden to shown, so the tabs need no code for it. ---- */
+.js section,.js footer{opacity:0;transform:translateY(18px);
+  transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+.js section.in,.js footer.in{opacity:1;transform:none}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.group,[data-panel]{animation:rise .38s cubic-bezier(.2,.7,.2,1) both}
+.group:nth-child(2){animation-delay:.04s}
+.group:nth-child(3){animation-delay:.08s}
+.group:nth-child(4){animation-delay:.12s}
+.group:nth-child(n+5){animation-delay:.16s}
+.step{animation:rise .38s cubic-bezier(.2,.7,.2,1) both}
+.step:nth-child(2){animation-delay:.05s}
+.step:nth-child(3){animation-delay:.1s}
+.step:nth-child(n+4){animation-delay:.15s}
+.card,.cmd{transition:border-color .15s,transform .15s}
+.cmd:hover{border-color:var(--accent);transform:translateY(-1px)}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .js section,.js footer{opacity:1;transform:none;transition:none}
+  .group,[data-panel],.step,.glow{animation:none}
+  .feature,.seg,.card,.cmd{transition:none}
+  .feature:hover,.cmd:hover{transform:none}
+}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:20px}
+a{color:var(--accent-soft);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent-soft);outline-offset:3px;border-radius:4px}
+
+/* ---- nav ---- */
+nav{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
+  background:rgba(13,11,20,.86);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.nav-in{display:flex;align-items:center;gap:22px;height:58px}
+.brand{
+  font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em;
+  color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
+}
+.brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
+  box-shadow:0 0 0 1px rgba(156,143,245,.45)}
+
+/* ---- the account chip, right of Dashboard ---- */
+.acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
+  padding:4px 12px 4px 4px;border-radius:999px;border:1px solid var(--line);
+  background:var(--panel);white-space:nowrap;max-width:190px}
+.acct:hover{border-color:var(--accent);text-decoration:none}
+.acct img{width:26px;height:26px;border-radius:50%;object-fit:cover}
+.acct .nm{overflow:hidden;text-overflow:ellipsis}
+.acct.out{padding:6px 14px;font-family:var(--display);font-weight:600}
+@media(max-width:700px){.acct .nm{display:none}.acct{padding:3px}}
+
+/* ---- the hero's artwork ---- */
+.hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
+.hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:560/1285;
+  max-height:520px;justify-self:end;
+  box-shadow:0 30px 80px -30px rgba(124,107,240,.7),0 0 0 1px rgba(156,143,245,.25);
+  -webkit-mask-image:linear-gradient(#000 78%,transparent);
+  mask-image:linear-gradient(#000 78%,transparent)}
+.hero-art img{width:100%;height:100%;object-fit:cover;display:block;
+  animation:drift-art 14s ease-in-out infinite alternate}
+@keyframes drift-art{to{transform:scale(1.04) translateY(-6px)}}
+@media(max-width:880px){.hero{grid-template-columns:1fr}.hero-art{display:none}}
+@media(prefers-reduced-motion:reduce){.hero-art img{animation:none}}
+.nav-in a.link{color:var(--dim);font-size:14px;font-weight:500}
+.nav-in a.link:hover{color:var(--text);text-decoration:none}
+@media(max-width:700px){.nav-in a.link{display:none}}
+
+/* ---- hero ---- */
+header{padding-block:64px 44px;border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-family:var(--mono);font-size:12px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--accent-soft);margin:0 0 14px;
+}
+h1{
+  font-family:var(--display);font-weight:700;letter-spacing:-.03em;
+  font-size:clamp(34px,6vw,58px);line-height:1.04;margin:0 0 18px;
+  text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--accent-soft)}
+.lede{font-size:clamp(16px,2vw,19px);color:var(--dim);max-width:60ch;margin:0}
+.cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.btn{
+  font-family:var(--display);font-weight:600;font-size:15px;
+  padding:11px 20px;border-radius:10px;border:1px solid transparent;
+  background:var(--accent);color:#0C0A14;display:inline-block;
+}
+.btn:hover{background:var(--accent-soft);text-decoration:none}
+.btn.ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn.ghost:hover{border-color:var(--accent);background:var(--raise)}
+
+.stats{display:flex;flex-wrap:wrap;gap:34px;margin-top:40px}
+.stat b{
+  display:block;font-family:var(--display);font-weight:700;
+  font-size:30px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+}
+.stat i{font-style:normal;font-size:13px;color:var(--faint);
+  font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase}
+
+/* ---- sections ---- */
+section{padding-block:60px;border-bottom:1px solid var(--line)}
+h2{
+  font-family:var(--display);font-weight:600;letter-spacing:-.02em;
+  font-size:clamp(23px,3vw,30px);margin:0 0 8px;text-wrap:balance;
+}
+.sub{color:var(--dim);margin:0 0 30px;max-width:62ch}
+
+/* ---- setup: a real sequence, so it is numbered ---- */
+.steps{display:grid;gap:16px}
+.step{
+  display:grid;grid-template-columns:44px 1fr;gap:18px;align-items:start;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px 22px;
+}
+.step .num{
+  font-family:var(--mono);font-size:13px;color:var(--accent-soft);
+  background:var(--raise);border:1px solid var(--line);border-radius:9px;
+  width:36px;height:36px;display:grid;place-items:center;
+}
+/* Without this a grid column is as wide as its longest command line, and
+   on a phone that pushes the whole card off the side of the screen. */
+.step>div{min-width:0}
+.step h3{font-family:var(--display);font-weight:600;font-size:17px;margin:4px 0 6px}
+.step p{margin:0 0 10px;color:var(--dim);font-size:15px}
+.step p:last-child{margin-bottom:0}
+code,kbd{
+  font-family:var(--mono);font-size:13.5px;
+  background:var(--raise);border:1px solid var(--line);
+  padding:2px 7px;border-radius:6px;color:var(--gold);white-space:nowrap;
+}
+.cmdline{
+  display:block;background:#0A0812;border:1px solid var(--line);
+  border-radius:10px;padding:12px 15px;color:var(--gold);
+  font-family:var(--mono);font-size:14px;overflow-x:auto;white-space:pre;
+}
+.note{
+  border-left:2px solid var(--accent);padding-left:14px;color:var(--dim);
+  font-size:14.5px;margin-top:12px;
+}
+
+/* ---- commands ---- */
+.tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:22px}
+#q{
+  flex:1 1 260px;background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:11px 14px;color:var(--text);
+  font-family:var(--body);font-size:15px;
+}
+#q::placeholder{color:var(--faint)}
+.chip{
+  font-family:var(--mono);font-size:12px;letter-spacing:.03em;
+  background:var(--panel);border:1px solid var(--line);color:var(--dim);
+  padding:7px 12px;border-radius:999px;cursor:pointer;
+}
+.chip[aria-pressed="true"]{
+  background:var(--accent);border-color:var(--accent);color:#0C0A14;font-weight:600;
+}
+.group{margin-bottom:34px}
+.group h3{
+  font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.02em;
+  margin:0 0 12px;display:flex;align-items:center;gap:9px;color:var(--text);
+}
+.group h3 b{
+  font-family:var(--mono);font-weight:500;font-size:11px;color:var(--faint);
+  border:1px solid var(--line);border-radius:999px;padding:2px 8px;
+}
+.cmds{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(270px,1fr))}
+.cmd{
+  background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  padding:12px 14px;
+}
+.cmd .n{font-family:var(--mono);font-size:14px;color:var(--accent-soft);font-weight:500}
+.cmd .b{display:block;font-size:14px;color:var(--dim);margin-top:3px}
+.cmd .a{
+  display:block;font-family:var(--mono);font-size:11.5px;color:var(--faint);
+  margin-top:6px;overflow-wrap:anywhere;
+}
+#empty{color:var(--dim);display:none}
+.group{scroll-margin-top:80px}
+
+/* ---- the parts of the bot: big buttons that are also the tabs ---- */
+.features{display:grid;gap:14px;grid-template-columns:repeat(5,1fr)}
+@media(max-width:1100px){.features{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:760px){.features{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.features{grid-template-columns:1fr}}
+.feature{
+  position:relative;cursor:pointer;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:20px;display:flex;flex-direction:column;overflow:hidden;
+  transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;
+}
+.feature::before{
+  content:"";position:absolute;inset:0 0 auto;height:3px;background:var(--accent);
+  transform:scaleX(0);transform-origin:left;transition:transform .2s;
+}
+.feature:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px)}
+.feature.on{border-color:var(--accent);background:var(--raise);
+  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(124,107,240,.55)}
+.feature.on::before{transform:scaleX(1)}
+/* The title is the button; this stretches it over the whole card, so the
+   card clicks as one without a list and paragraph inside a <button>. */
+.feature .pick{all:unset;cursor:pointer;color:inherit}
+.feature .pick::after{content:"";position:absolute;inset:0;border-radius:14px}
+.feature .pick:focus-visible::after{outline:2px solid var(--accent-soft);outline-offset:2px}
+.feature .ic{font-size:22px;line-height:1;margin-bottom:12px}
+.feature h3{font-family:var(--display);font-weight:600;font-size:18px;margin:0 0 6px}
+.feature p{color:var(--dim);font-size:14.5px;margin:0 0 12px}
+.feature ul{margin:0 0 16px;padding-left:18px;color:var(--dim);font-size:14px}
+.feature li{margin-bottom:3px}
+.feature .go{margin-top:auto;font-family:var(--mono);font-size:12.5px;
+  color:var(--accent-soft)}
+.feature.on .go{color:var(--text)}
+
+.segs{display:grid;gap:10px;grid-template-columns:repeat(5,1fr);margin-bottom:22px}
+@media(max-width:760px){.segs{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:480px){.segs{grid-template-columns:repeat(2,1fr)}}
+.seg{
+  font:inherit;color:var(--dim);cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:9px;padding:14px 12px;border-radius:12px;
+  background:var(--panel);border:1px solid var(--line);
+  font-family:var(--display);font-weight:600;font-size:15px;
+  transition:border-color .15s,background .15s,color .15s;
+}
+.seg:hover{border-color:var(--accent);background:var(--raise);color:var(--text)}
+.seg[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
+  color:#0C0A14}
+
+/* Setup steps read as a path: a faint line joins the numbers between cards. */
+.steps{position:relative}
+.steps::before{content:"";position:absolute;left:40px;top:30px;bottom:30px;width:2px;
+  background:linear-gradient(var(--accent),var(--rose));opacity:.3}
+.step{position:relative}
+.cmdline{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:560px){
+  .step{grid-template-columns:1fr;gap:10px;padding:18px}
+  .steps::before{display:none}
+}
+.step .num{border-radius:50%;background:var(--ink);border-color:var(--accent);
+  color:var(--text);font-weight:600}
+
+.band{display:flex;flex-wrap:wrap;align-items:center;gap:22px 34px;
+  justify-content:space-between;padding:30px 32px;border-radius:18px;
+  border:1px solid var(--line);
+  background:linear-gradient(120deg,rgba(124,107,240,.18),rgba(238,127,168,.10))}
+.band h2{margin:0 0 6px}
+.band p{margin:0;color:var(--dim);max-width:52ch}
+.discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
+  font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
+  border-radius:11px;transition:background .15s,transform .15s}
+.discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
+.premium-band{border-color:rgba(229,197,90,.45);
+  background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10))}
+.btn.gold{background:var(--gold);color:#1a1405}
+.pgroups{flex-basis:100%;display:grid;gap:12px;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.pgroup{background:rgba(10,8,20,.35);border:1px solid var(--line);border-radius:12px;
+  padding:12px 14px 4px}
+.pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold)}
+.pgroup ul{margin:0 0 8px;padding-left:17px;font-size:14px;color:var(--dim)}
+.pgroup li{margin-bottom:3px}
+.pgroup h3 .plus{font:600 11px var(--body);color:#1a1405;background:var(--gold);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.btn.gold:hover{background:#f0d27a}
+.nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
+  padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
+.nav-in .dash:hover{background:var(--accent-soft);text-decoration:none}
+.page-head{padding-block:48px 8px}
+.page-head h1{font-size:clamp(30px,5vw,44px);margin-bottom:10px}
+.cmd-area{margin-top:30px;padding-top:26px;border-top:1px dashed var(--line);
+  scroll-margin-top:70px}
+.cmd-area h3.area-title{font-family:var(--display);font-weight:600;font-size:20px;
+  margin:0 0 4px}
+.jump{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0 0 28px;
+  padding:12px 16px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;font-size:13.5px}
+.jump a{color:var(--dim);white-space:nowrap}
+.jump a:hover{color:var(--text)}
+
+/* ---- servers: a slow strip of everyone using the bot ---- */
+#servers{padding-block:34px 38px;text-align:center}
+#servers .count{color:var(--dim);font-size:16px;margin:0 0 22px}
+#servers .count b{color:var(--text);font-family:var(--display);font-weight:600}
+.marquee{overflow:hidden;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 9%,#000 91%,transparent)}
+.track{display:flex;gap:46px;width:max-content;padding-inline:23px}
+.marquee.moving .track{animation:drift var(--dur,60s) linear infinite}
+.marquee.moving:hover .track{animation-play-state:paused}
+.marquee.still .track{margin-inline:auto}
+@keyframes drift{to{transform:translateX(-50%)}}
+/* Fewer animations asked for: it still drifts (a frozen strip just looks
+   broken, with a scrollbar), but at half the speed, and it still stops
+   under the pointer. */
+@media(prefers-reduced-motion:reduce){
+  .marquee.moving .track{animation-duration:calc(var(--dur,60s) * 2)}
+}
+.srv{display:flex;align-items:center;gap:13px;text-align:left;flex:none}
+.srv img,.srv .ph{width:52px;height:52px;border-radius:50%;flex:none;
+  background:var(--raise);object-fit:cover;display:grid;place-items:center;
+  font-family:var(--display);font-weight:700;color:var(--dim)}
+.srv b{display:block;font-family:var(--display);font-weight:600;font-size:15.5px;
+  max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srv i{font-style:normal;font-size:13px;color:var(--faint)}
+
+/* ---- characters ---- */
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(146px,1fr))}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  overflow:hidden;display:flex;flex-direction:column;
+}
+.card .art{
+  aspect-ratio:3/4;max-width:100%;width:100%;object-fit:cover;
+  background:var(--raise);display:block;
+}
+.card .meta{padding:9px 11px 11px}
+.card .nm{
+  font-family:var(--display);font-weight:600;font-size:13.5px;line-height:1.3;
+  display:block;overflow-wrap:anywhere;
+}
+.card .sr{font-size:11.5px;color:var(--faint);display:block;margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .kr{
+  font-family:var(--mono);font-size:11.5px;color:var(--gold);margin-top:7px;
+  display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;
+}
+.card .kr span{color:var(--faint)}
+
+/* ---- secret: original characters, one album each ---- */
+.sec-row{display:flex;flex-wrap:wrap;align-items:flex-start;
+  justify-content:space-between;gap:4px 28px}
+.secret-toggle{margin-top:4px;cursor:pointer;border-color:var(--rose);
+  color:var(--rose);flex:none}
+.secret-toggle:hover{background:var(--raise);border-color:var(--rose)}
+.secret-toggle[aria-pressed="true"]{background:var(--rose);color:#0C0A14}
+button.card{font:inherit;color:inherit;text-align:left;padding:0;
+  cursor:pointer;width:100%}
+button.card:hover{border-color:var(--rose)}
+.card .kr.tag{color:var(--rose)}
+/* White behind secret art: transparent emotes drawn with black outlines
+   disappear into a dark card. */
+.secret-card .art,#album-img{background:#fff}
+.secret-card .art{object-fit:contain}
+.secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:#0C0A14}
+
+#album{background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
+#album::backdrop{background:rgba(6,5,10,.84)}
+.album-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;
+  font-family:var(--display);font-weight:600}
+#album-count{font-family:var(--mono);font-size:12px;color:var(--faint);
+  margin-left:auto;font-variant-numeric:tabular-nums}
+#album-img{display:block;max-width:100%;max-height:72vh;margin:0 auto;
+  border-radius:8px;object-fit:contain}
+.album-nav{display:flex;justify-content:center;gap:10px;margin-top:12px}
+#album button{font:inherit;background:var(--raise);color:var(--text);
+  border:1px solid var(--line);border-radius:9px;padding:8px 18px;cursor:pointer}
+#album button:disabled{opacity:.35;cursor:default}
+#album button:hover:not(:disabled){border-color:var(--rose)}
+
+footer{padding-block:38px 56px;color:var(--faint);font-size:13.5px}
+footer p{margin:0 0 6px}
+</style>
+</head>
+<body>
+<script>document.documentElement.classList.add("js")</script>
+<div class="glow a" aria-hidden="true"></div>
+<div class="glow b" aria-hidden="true"></div>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<nav><div class="wrap nav-in">
+  <a class="brand" href="./"><img src="img/paper-180.png" alt="" width="26" height="26">Paper</a>
+  <a class="link" href="./#setup">Setup</a>
+  <a class="link" href="./#features">Features</a>
+  <a class="link" href="commands.html">Commands</a>
+  <a class="dash" href="https://gachabot-production-fbd6.up.railway.app/dashboard">Dashboard</a>
+</div></nav>
+<style>
+.doc{max-width:72ch;padding-block:8px 48px}
+.doc h2{font-size:clamp(19px,2.4vw,23px);margin:34px 0 10px}
+.doc p,.doc li{color:var(--dim);line-height:1.7}
+.doc ul{padding-left:20px}
+.doc li{margin-bottom:6px}
+.doc strong{color:var(--text);font-weight:600}
+.doc a{color:var(--accent-soft)}
+</style>
+<div class="wrap">
+<header class="page-head">
+  <p class="eyebrow">Privacy</p>
+  <h1>Privacy Policy</h1>
+  <p class="lede">Last updated 3 October 2026.</p>
+</header>
+<section class="doc">
+<p>Paper is a Discord bot run by an individual developer in Queensland,
+Australia. This page explains what Paper stores, why, and what you can do
+about it. It follows the Australian Privacy Principles, and gives everyone
+the rights the GDPR describes, wherever they live.</p>
+
+<h2>What Paper stores</h2>
+<ul>
+<li><strong>Your Discord user ID</strong>, alongside everything below. Paper
+never has your email, phone number or password.</li>
+<li><strong>Gacha:</strong> your claimed characters, wishes, likes, notes,
+nicknames, karuda, badges, tower, keys and settings.</li>
+<li><strong>Levels and activity:</strong> XP, level, message counts and time
+in voice for each server, plus daily and weekly totals for leaderboards and
+staff reports. Messages are counted, but what they say isn't saved.</li>
+<li><strong>Moderation:</strong> warnings, jails, mutes, bans and other cases
+(with the reason the moderator gave), jailed members' saved roles, forced
+nicknames and staff points.</li>
+<li><strong>Things you ask it to keep:</strong> reminders and their text, AFK
+status and reason, and server settings such as welcome messages, auto
+replies, reaction roles and automod words.</li>
+<li><strong>Dashboard login:</strong> your Discord name, avatar and the list
+of servers you're in, for 7 days per login. Only a hashed copy of the login
+token is stored.</li>
+<li><strong>Premium:</strong> payments go through Stripe. Paper stores only
+Stripe's customer and subscription IDs and the plan's status, and never sees
+card details.</li>
+</ul>
+
+<h2>What Paper keeps only briefly</h2>
+<ul>
+<li><strong>Recent messages</strong> are held in memory, never in the
+database, so snipes and chat logs can show deleted or edited text. Snipes
+expire after 2 hours, and memory is cleared whenever the bot restarts.</li>
+<li><strong>Chat logs</strong> are posted to a channel the server's staff
+choose. Those posts live in that server on Discord, not in Paper's
+database.</li>
+</ul>
+
+<h2>Why</h2>
+<p>To run the features you and your server use. Paper doesn't sell or rent
+data, doesn't show ads and doesn't build profiles of anyone.</p>
+
+<h2>Who else handles it</h2>
+<ul>
+<li><strong>Discord</strong>, the platform Paper runs on.</li>
+<li><strong>Railway</strong>, which hosts the bot and its database in the
+United States.</li>
+<li><strong>Cloudflare</strong>, which hosts this website.</li>
+<li><strong>Stripe</strong>, which processes payments.</li>
+</ul>
+<p>A daily backup of the database is sent privately to the bot's owner on
+Discord, so it can be restored if something breaks.</p>
+
+<h2>How long it's kept</h2>
+<p>Data is kept while it's in use. A server's data stays after Paper leaves,
+in case it's added back. You can ask for deletion at any time. Moderation
+records stay with the server's staff unless that server asks for them to be
+removed.</p>
+
+<h2>Your choices</h2>
+<ul>
+<li><code>$selfreset</code> and the other self-reset commands clear your own
+gacha data.</li>
+<li>Server admins can wipe their server's data with the full-reset
+commands.</li>
+<li>Email <a href="mailto:paperbot.support@gmail.com">paperbot.support@gmail.com</a> to see what Paper holds
+about you, correct it, or have it deleted. Requests are answered within 30
+days.</li>
+<li>If you're unhappy with how a request was handled, you can complain to the
+Office of the Australian Information Commissioner at
+<a href="https://www.oaic.gov.au">oaic.gov.au</a>.</li>
+</ul>
+
+<h2>Children</h2>
+<p>Paper is for people old enough to use Discord under Discord's own rules
+(13 or older in most countries).</p>
+
+<h2>Changes</h2>
+<p>Changes are posted here, and the date at the top changes with them.</p>
+</section>
+<footer>
+  <p><a href="./">Home</a> · <a href="commands.html">Commands</a> ·
+  <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a> ·
+  <a href="mailto:paperbot.support@gmail.com">paperbot.support@gmail.com</a></p>
+</footer>
+</div>
+<script>
+(function(){
+  // One part of the bot at a time, picked by its card in What it does or
+  // its button in Setup (they move together). Searching looks through every
+  // part at once.
+  var q = document.getElementById("q") || {value: "", addEventListener: function(){}};
+  var empty = document.getElementById("empty") || {style: {}};
+  var groups = Array.prototype.slice.call(
+    document.querySelectorAll("#groups .group"));
+  var tabs = Array.prototype.slice.call(document.querySelectorAll("[data-tab]"));
+  var panels = Array.prototype.slice.call(document.querySelectorAll("[data-panel]"));
+  var jumps = Array.prototype.slice.call(document.querySelectorAll(".jump"));
+  var area = "gacha";
+  var title = document.getElementById("area-title") || {};
+  var names = {};
+  tabs.forEach(function(tab){ names[tab.dataset.tab] = tab.dataset.name; });
+
+  function apply(){
+    var needle = q.value.trim().toLowerCase();
+    var anything = false;
+    groups.forEach(function(group){
+      var mine = needle ? true : group.dataset.area === area;
+      var shown = 0;
+      Array.prototype.forEach.call(group.querySelectorAll(".cmd"), function(cmd){
+        var hit = !needle || cmd.dataset.find.indexOf(needle) !== -1;
+        cmd.hidden = !hit;
+        if (hit) shown++;
+      });
+      group.hidden = !mine || shown === 0;
+      if (!group.hidden) anything = true;
+      var count = group.querySelector("h3 b");
+      if (count) count.textContent = shown;
+    });
+    jumps.forEach(function(jump){
+      jump.hidden = !!needle || jump.dataset.area !== area;
+    });
+    tabs.forEach(function(tab){
+      var on = tab.dataset.tab === area;
+      // A search shows every part, so no card is lit while it's typed.
+      var isCard = tab.classList.contains("pick");
+      var lit = on && !(isCard && needle);
+      tab.setAttribute("aria-pressed", lit ? "true" : "false");
+      if (isCard) tab.closest(".feature").classList.toggle("on", lit);
+    });
+    title.textContent = needle ? "Search results" : names[area] + " commands";
+    panels.forEach(function(panel){ panel.hidden = panel.dataset.panel !== area; });
+    empty.style.display = anything ? "none" : "block";
+  }
+
+  function choose(next){
+    area = next;
+    q.value = "";
+    apply();
+  }
+
+  tabs.forEach(function(tab){
+    tab.addEventListener("click", function(){
+      // Switching parts changes how long the command list is, and Setup's
+      // buttons sit below it, so the page would jump under the pointer.
+      // Put whatever was clicked back where it was on screen.
+      var before = tab.getBoundingClientRect().top;
+      choose(tab.dataset.tab);
+      var moved = tab.getBoundingClientRect().top - before;
+      if (moved) window.scrollBy({top: moved, behavior: "instant"});
+    });
+  });
+  q.addEventListener("input", apply);
+
+  // Links like #setup-voice open that part's tab, and on the commands
+  // page a bare #mod does.
+  function fromHash(){
+    var match = /^#(?:(setup|commands)-)?(\w+)$/.exec(location.hash);
+    if (!match || !document.querySelector('[data-tab="' + match[2] + '"]')) return;
+    choose(match[2]);
+    var target = document.getElementById(match[1] || "commands");
+    if (match[1] && target) target.scrollIntoView();
+  }
+  window.addEventListener("hashchange", fromHash);
+  apply();
+  fromHash();
+})();
+
+(function(){
+  // Servers using the bot, fetched live from the bot so the list is always
+  // current. Built with textContent: server names are other people's words.
+  var section = document.getElementById("servers");
+  var track = document.getElementById("srv-track");
+  if (!section || !window.fetch) return;
+  fetch("https://gachabot-production-fbd6.up.railway.app/api/servers").then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(data){
+      if (!data || !data.list || !data.list.length) return;
+      document.getElementById("srv-users").textContent = data.users.toLocaleString("en");
+      document.getElementById("srv-count").textContent = data.servers.toLocaleString("en");
+      if (data.servers === 1) document.getElementById("srv-word").textContent = "community";
+      function item(s, hidden){
+        var el = document.createElement("div"); el.className = "srv";
+        if (hidden) el.setAttribute("aria-hidden", "true");
+        var pic;
+        if (s.icon) {
+          pic = document.createElement("img"); pic.src = s.icon; pic.alt = "";
+          pic.loading = "lazy"; pic.width = 52; pic.height = 52;
+        } else {
+          pic = document.createElement("span"); pic.className = "ph";
+          pic.textContent = (s.name || "?").trim().charAt(0).toUpperCase();
+        }
+        var text = document.createElement("span");
+        var name = document.createElement("b"); name.textContent = s.name;
+        var count = document.createElement("i");
+        count.textContent = s.members.toLocaleString("en") + " members";
+        text.append(name, count); el.append(pic, text);
+        return el;
+      }
+      data.list.forEach(function(s){ track.appendChild(item(s)); });
+      section.hidden = false;
+      var marquee = track.parentNode;
+      // Only scroll when there's more than fits; a copy of the list follows
+      // the first so the loop has no seam.
+      if (track.scrollWidth > marquee.clientWidth) {
+        data.list.forEach(function(s){ track.appendChild(item(s, true)); });
+        marquee.style.setProperty("--dur", Math.max(25, track.scrollWidth / 2 / 35) + "s");
+        marquee.classList.add("moving");
+      } else {
+        marquee.classList.add("still");
+      }
+    }).catch(function(){});
+})();
+
+(function(){
+  var toggle = document.getElementById("secret-toggle");
+  if (!toggle) return;
+  var roster = document.getElementById("roster-grid");
+  var secret = document.getElementById("secret");
+  var title = document.getElementById("roster-title");
+  var rosterSub = document.getElementById("roster-sub");
+  var secretSub = document.getElementById("secret-sub");
+  var dialog = document.getElementById("album");
+  var img = document.getElementById("album-img");
+  var count = document.getElementById("album-count");
+  var label = document.getElementById("album-name");
+  var prev = dialog.querySelector(".prev");
+  var next = dialog.querySelector(".next");
+  var album = [], at = 0;
+
+  function show(on){
+    roster.hidden = on;
+    secret.hidden = !on;
+    rosterSub.hidden = on;
+    secretSub.hidden = !on;
+    title.textContent = on ? "Secret" : "The top of the roster";
+    toggle.textContent = on ? "Back to the roster" : "Secret";
+    toggle.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+
+  toggle.addEventListener("click", function(){
+    var on = secret.hidden;
+    show(on);
+    try { history.replaceState(null, "", on ? "#secret" : "#characters"); }
+    catch (e) {}
+  });
+
+  function paint(){
+    img.src = album[at];
+    img.alt = label.textContent + ", image " + (at + 1) + " of " + album.length;
+    count.textContent = (at + 1) + " / " + album.length;
+    prev.disabled = at === 0;
+    next.disabled = at === album.length - 1;
+  }
+  function step(by){
+    at = Math.max(0, Math.min(album.length - 1, at + by));
+    paint();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll(".secret-card"),
+    function(card){
+      card.addEventListener("click", function(){
+        album = JSON.parse(card.dataset.album);
+        at = 0;
+        label.textContent = card.dataset.name;
+        paint();
+        if (dialog.showModal) dialog.showModal();
+        else dialog.setAttribute("open", "");
+      });
+    });
+
+  prev.addEventListener("click", function(){ step(-1); });
+  next.addEventListener("click", function(){ step(1); });
+  dialog.querySelector(".close").addEventListener("click", function(){
+    dialog.close();
+  });
+  // A click on the dimmed backdrop lands on the dialog itself.
+  dialog.addEventListener("click", function(event){
+    if (event.target === dialog) dialog.close();
+  });
+  dialog.addEventListener("keydown", function(event){
+    if (event.key === "ArrowLeft") step(-1);
+    if (event.key === "ArrowRight") step(1);
+  });
+
+  // A shared link to #secret opens straight onto it.
+  if (location.hash === "#secret") {
+    show(true);
+    document.getElementById("characters").scrollIntoView();
+  }
+})();
+
+(function(){
+  // The account chip. The website and the dashboard live on different
+  // domains, so the site can't see the dashboard's login. Instead the
+  // dashboard hands over a display name and picture in the link (#me=...)
+  // when you log in or come back from it, and #me=out when you log out.
+  // It's only ever shown here, never trusted: faking it changes what one
+  // person sees in their own browser, nothing else.
+  var chip = document.getElementById("acct");
+  if (!chip) return;
+  var KEY = "paper-me", WEEK = 7 * 86400 * 1000, me = null;
+  var match = /[#&]me=([^&]+)/.exec(location.hash);
+  try {
+    if (match) {
+      if (match[1] === "out") localStorage.removeItem(KEY);
+      else {
+        var raw = JSON.parse(decodeURIComponent(escape(atob(
+          match[1].replace(/-/g, "+").replace(/_/g, "/")))));
+        localStorage.setItem(KEY, JSON.stringify({
+          n: String(raw.n || "").slice(0, 40), a: raw.a || "", until: Date.now() + WEEK}));
+      }
+      history.replaceState(null, "", location.pathname + location.search);
+    }
+    me = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (me && me.until < Date.now()) { localStorage.removeItem(KEY); me = null; }
+  } catch (e) { me = null; }
+  if (!me || !me.n) return;
+  chip.className = "acct";
+  chip.href = "https://gachabot-production-fbd6.up.railway.app/dashboard";
+  chip.textContent = "";
+  chip.title = "Signed in as " + me.n + ": open the dashboard";
+  if (/^https:\/\/cdn\.discordapp\.com\//.test(me.a)) {
+    var img = document.createElement("img"); img.src = me.a; img.alt = "";
+    chip.appendChild(img);
+  }
+  var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = me.n;
+  chip.appendChild(nm);
+})();
+
+(function(){
+  // Sections fade up as they come into view. Without IntersectionObserver
+  // they're simply shown, so nothing can stay invisible.
+  var parts = document.querySelectorAll("section, footer");
+  if (!("IntersectionObserver" in window)) {
+    parts.forEach(function(p){ p.classList.add("in"); });
+    return;
+  }
+  var seen = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("in");
+      seen.unobserve(entry.target);
+    });
+  }, {rootMargin: "0px 0px -6% 0px"});
+  parts.forEach(function(p){ seen.observe(p); });
+})();
+
+(function(){
+  // The sky: a few hundred stars that twinkle and drift up very slowly,
+  // and now and then a shooting star. It stops while the tab is hidden, and
+  // for reduced motion it's drawn once and left still.
+  var canvas = document.getElementById("sky");
+  if (!canvas || !canvas.getContext) return;
+  var ctx = canvas.getContext("2d");
+  var still = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var stars = [], shot = null, nextShot = 4000, w = 0, h = 0, frame = 0;
+
+  function build(){
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    w = window.innerWidth; h = window.innerHeight;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var count = Math.min(260, Math.round(w * h / 7000));
+    stars = [];
+    for (var i = 0; i < count; i++) {
+      stars.push({
+        x: Math.random() * w, y: Math.random() * h,
+        r: Math.random() * 1.15 + 0.25,
+        a: Math.random() * 0.55 + 0.25,
+        speed: Math.random() * 1.4 + 0.4,
+        phase: Math.random() * Math.PI * 2,
+        drift: Math.random() * 0.035 + 0.008,
+        lilac: Math.random() < 0.18
+      });
+    }
+  }
+
+  function draw(t){
+    ctx.clearRect(0, 0, w, h);
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var twinkle = still ? 1 : 0.6 + 0.4 * Math.sin(t / 1000 * s.speed + s.phase);
+      if (!still) { s.y -= s.drift; if (s.y < -2) { s.y = h + 2; s.x = Math.random() * w; } }
+      ctx.fillStyle = (s.lilac ? "rgba(201,193,255," : "rgba(255,255,255,") + (s.a * twinkle).toFixed(3) + ")";
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
+    if (still) return;
+    if (!shot && t > nextShot) {
+      shot = {x: w * (0.35 + Math.random() * 0.6), y: h * Math.random() * 0.35,
+              vx: -(5 + Math.random() * 3), vy: 2.2 + Math.random() * 1.5, life: 0};
+      nextShot = t + 8000 + Math.random() * 10000;
+    }
+    if (shot) {
+      shot.x += shot.vx; shot.y += shot.vy; shot.life++;
+      var fade = Math.max(0, 1 - shot.life / 70);
+      var tail = ctx.createLinearGradient(shot.x, shot.y, shot.x - shot.vx * 14, shot.y - shot.vy * 14);
+      tail.addColorStop(0, "rgba(255,255,255," + (0.85 * fade).toFixed(3) + ")");
+      tail.addColorStop(1, "rgba(156,143,245,0)");
+      ctx.strokeStyle = tail; ctx.lineWidth = 1.4; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(shot.x, shot.y);
+      ctx.lineTo(shot.x - shot.vx * 14, shot.y - shot.vy * 14); ctx.stroke();
+      if (fade === 0 || shot.x < -200 || shot.y > h + 200) shot = null;
+    }
+  }
+
+  function loop(t){ draw(t); frame = requestAnimationFrame(loop); }
+  function start(){ if (!still && !frame) frame = requestAnimationFrame(loop); }
+  function stop(){ if (frame) cancelAnimationFrame(frame); frame = 0; }
+
+  build();
+  if (still) draw(0); else start();
+  var resizing = 0;
+  window.addEventListener("resize", function(){
+    clearTimeout(resizing);
+    resizing = setTimeout(function(){ build(); if (still) draw(0); }, 150);
+  });
+  document.addEventListener("visibilitychange", function(){
+    if (document.hidden) stop(); else start();
+  });
+})();
+</script>
+
+</body>
+</html>

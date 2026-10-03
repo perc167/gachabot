@@ -32,9 +32,13 @@ ONCE = (
 MIN_BYTES = 80_000
 
 
+# The policy pages are short, so they skip the size check.
+SHORT_PAGES = [os.path.join(ROOT, "site", name) for name in ("privacy.html", "terms.html")]
+
+
 def main():
     failed = 0
-    for path in PAGES:
+    for path in PAGES + SHORT_PAGES:
         failed += check(path)
     return 1 if failed else 0
 
@@ -63,7 +67,7 @@ def check(PAGE):
     if "__" in head:
         problems.append("an unfilled __PLACEHOLDER__ reached the head")
 
-    if len(page) < MIN_BYTES:
+    if PAGE not in SHORT_PAGES and len(page) < MIN_BYTES:
         problems.append(f"page is {len(page):,} bytes, expected at least"
                         f" {MIN_BYTES:,} - the roster probably did not load")
 

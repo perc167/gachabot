@@ -13,6 +13,8 @@ from discord.ext import commands
 
 import config
 
+SUPPORT_EMAIL = "paperbot.support@gmail.com"
+
 # name: (blurb, {setting: value})
 #
 # Only settings that exist are listed, so a preset can never quietly write a
@@ -87,18 +89,19 @@ class About(commands.Cog):
 
     @commands.command(name="support", aliases=["vote", "patreon", "join", "donate"])
     async def support(self, ctx):
-        """Whether any of this costs anything. It does not."""
+        """Getting help, what's free, and Paper's policies."""
         prefix = ctx.prefix or config.PREFIX
+        site = "https://gachabot.perc-1fc.workers.dev"
         await ctx.send(
             embed=discord.Embed(
-                title="Free, and staying that way for you",
+                title="Help with Paper",
                 description=(
-                    "There is nothing to vote on and nothing to subscribe to."
-                    " This bot is self-hosted and free.\n\n"
-                    "Some features are meant to be premium later. Anyone"
-                    " playing before that happens keeps them — that is what"
-                    f" `{prefix}redeem` and the keys are for, and"
-                    f" `{prefix}access` shows what you already have."
+                    f"Questions, bugs or data requests: **{SUPPORT_EMAIL}**\n\n"
+                    "Every part of Paper is free to use. Premium is optional"
+                    f" and adds extras on top: `{prefix}upgrade` shows them."
+                    " Nothing free today gets taken away.\n\n"
+                    f"[Privacy Policy]({site}/privacy.html) ·"
+                    f" [Terms of Service]({site}/terms.html)"
                 ),
                 colour=config.CARD_COLOUR,
             )

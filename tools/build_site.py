@@ -26,6 +26,8 @@ import sys
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # tools/policies.py
+POLICY_PAGES = {}
 OUT = os.path.join(ROOT, "site", "index.html")
 # Original characters for the Secret button. tools/add_secret.py writes both
 # this file and the images it points at, under site/secret/.
@@ -1022,6 +1024,7 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
   AniList does not carry.</p>
   <p>Character art belongs to its creators and is shown here for
   identification.</p>
+  <p><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
 </footer>
 </div>
 
@@ -1057,7 +1060,8 @@ COMMANDS_BODY = r"""<nav><div class="wrap nav-in">
 </section>
 
 <footer>
-  <p><a href="./#setup">How to set Paper up</a> · <a href="__DASHBOARD__">Dashboard</a></p>
+  <p><a href="./#setup">How to set Paper up</a> · <a href="__DASHBOARD__">Dashboard</a> ·
+  <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
 </footer>
 </div>
 
@@ -1472,6 +1476,14 @@ $userinfo · $serverinfo · $steal</code>"""),
     page = render("Paper", HOME_BODY).replace("__SITE_URL__", SITE_URL)
     commands_page = render("Commands · Paper", COMMANDS_BODY).replace(
         "__SITE_URL__", SITE_URL)
+    import policies
+    global POLICY_PAGES
+    POLICY_PAGES = {
+        "privacy.html": render("Privacy Policy · Paper", policies.fill(policies.PRIVACY)),
+        "terms.html": render("Terms of Service · Paper", policies.fill(policies.TERMS)),
+    }
+    for name in POLICY_PAGES:
+        POLICY_PAGES[name] = POLICY_PAGES[name].replace("__SITE_URL__", SITE_URL)
     return page, commands_page, total, series, command_total, len(shown)
 
 
@@ -1501,6 +1513,11 @@ def main():
     commands_out = os.path.join(os.path.dirname(args.out), "commands.html")
     with io.open(commands_out, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(commands_page)
+
+    for name, html_text in POLICY_PAGES.items():
+        with io.open(os.path.join(os.path.dirname(args.out), name), "w",
+                     encoding="utf-8", newline="\n") as handle:
+            handle.write(html_text)
 
     print(f"{commands} commands · {total:,} characters · {series:,} series")
     print(f"  showcase: {shown} characters"

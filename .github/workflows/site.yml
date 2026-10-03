@@ -12,6 +12,8 @@ on:
       - 'cogs/**'
       - 'tutorial.py'
       - 'tools/build_site.py'
+      - 'tools/policies.py'
+      - 'tools/check_site.py'
       - 'data/characters.json'
       - 'data/extra_characters.json'
       - 'data/secret_characters.json'
