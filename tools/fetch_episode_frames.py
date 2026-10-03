@@ -70,6 +70,10 @@ DELAY = 0.2
 # into one, so an album is not six frames of the same scene.
 EPISODES = 5
 FRAMES_PER_EPISODE = 60
+# How many pages of a series' episode list to read. Ten episodes to a page,
+# so six pages reaches sixty episodes spread from the first to the last -
+# enough that a character who only appears in the back half can be found.
+EPISODE_PAGES = 6
 PER_CHARACTER = 6
 
 # On the thumbnail, enough to be worth a closer look. On the full frame,
@@ -493,6 +497,9 @@ def dull(image) -> bool:
 # --------------------------------------------------------------------------
 CATALOGUE = os.path.join(ROOT, "data", "fancaps_catalogue.json")
 FACES = os.path.join(ROOT, "data", "frame_faces.json")
+# Which episode each frame came out of, so "one picture per episode" is
+# something that can be checked rather than assumed.
+EPISODES_OF = os.path.join(ROOT, "data", "frame_episodes.json")
 CASCADE = os.path.join(CACHE_DIR, "lbpcascade_animeface.xml")
 CASCADE_URL = ("https://raw.githubusercontent.com/nagadomi/"
                "lbpcascade_animeface/master/lbpcascade_animeface.xml")
@@ -511,9 +518,11 @@ FACE_SURE = 0.40
 # An eye filling the screen is a face too, and still a poor picture.
 TOO_CLOSE = ("close-up", "eye_focus")
 
-# How many frames one episode may give. Six frames of one scene is not an
-# album, however good each of them is.
-PER_EPISODE = 2
+# How many frames one episode may give. One, so an album of six is six
+# different episodes - six rooms, six times of day, six sets of clothes.
+# Two frames of the same episode are too often the same scene thirty seconds
+# apart, which looks like a mistake even when both are good pictures.
+PER_EPISODE = 1
 
 
 def simple(title: str) -> str:
@@ -618,9 +627,12 @@ def matching_series(title: str, limit: int = 4) -> list:
     return [path for _length, _name, path in found[:limit]]
 
 
-def episodes(series_path: str) -> list:
-    page = fetch(f"{SITE}/anime/showimages.php?{series_path}").decode(
-        "utf-8", "replace")
+def episode_page(series_path: str, number: int = 1) -> tuple:
+    """(the episodes listed on one page, how many pages there are)."""
+    url = f"{SITE}/anime/showimages.php?{series_path}"
+    if number > 1:
+        url += f"&page={number}"
+    page = fetch(url).decode("utf-8", "replace")
     found = re.findall(r"episodeimages\.php\?(\d+-[A-Za-z0-9_]+/[A-Za-z0-9_]+)",
                        page)
     # Keep the order the site lists them in, without the repeats its markup
@@ -630,6 +642,36 @@ def episodes(series_path: str) -> list:
         if path not in seen:
             seen.add(path)
             out.append(path)
+    # The pager links carry the page numbers, including a half-way one like
+    # 36.5, so the count is the highest of them rounded up.
+    numbers = [float(n) for n in re.findall(r"&page=([0-9.]+)", page)]
+    highest = max(numbers) if numbers else 1.0
+    last = int(highest) + (1 if highest > int(highest) else 0)
+    return out, max(last, 1)
+
+
+def episodes(series_path: str, pages: int = EPISODE_PAGES) -> list:
+    """Episodes from across the whole run, not just the first ten.
+
+    The site lists ten episodes to a page, and this read only the first
+    page - so a 366-episode show was represented by its first ten. That is
+    one arc, one set of clothes, one set of rooms, and none of the cast who
+    arrive later: Yoruichi turns up in Bleach around episode 20 and was
+    simply unreachable, however long the sweep ran.
+
+    Pages are sampled across the range rather than all fetched, because the
+    point is a spread over the series, not every episode of it.
+    """
+    first, last = episode_page(series_path, 1)
+    if last <= 1:
+        return first
+
+    seen, out = set(first), list(first)
+    for number in spread(list(range(2, last + 1)), max(pages - 1, 0)):
+        for path in episode_page(series_path, number)[0]:
+            if path not in seen:
+                seen.add(path)
+                out.append(path)
     return out
 
 
@@ -722,6 +764,7 @@ def harvest(groups, series: str, budget: int,
 
     owner = {}                       # tag -> the model that knows them
     wanted_tags = {}                 # tag -> roster key
+    came_from = {}                   # url -> the episode it came out of
     for tagger, people in groups:
         for key, tag, _row in people:
             wanted_tags[tag] = key
@@ -814,12 +857,26 @@ def harvest(groups, series: str, budget: int,
             per_episode[episode] += 1
             prints.append(mark)
             kept.append(url)
+            came_from[url] = episode
             if box:
                 faces[url] = box
             if len(kept) >= PER_CHARACTER:
                 break
         if kept:
             found[key] = kept
+
+    # Which episode each kept frame came out of. An album is meant to be six
+    # different episodes - six rooms, six times of day - and without a record
+    # of where each picture came from that is a thing you hope for rather
+    # than a thing you can check.
+    if came_from:
+        known = {}
+        if os.path.exists(EPISODES_OF):
+            with io.open(EPISODES_OF, encoding="utf-8") as handle:
+                known = json.load(handle)
+        known.update(came_from)
+        with io.open(EPISODES_OF, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(known, handle, ensure_ascii=False, indent=0)
 
     # Where each face sits, so the crop is built around it rather than
     # guessed at.
