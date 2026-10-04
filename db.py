@@ -670,8 +670,26 @@ CREATE INDEX IF NOT EXISTS idx_characters_name
 
 class Database:
     def __init__(self, path: str = config.DB_PATH):
-        self.conn = sqlite3.connect(path, check_same_thread=False)
+        self.conn = sqlite3.connect(path, check_same_thread=False, timeout=30)
         self.conn.row_factory = sqlite3.Row
+        # One connection is shared by the bot and by everything it runs in a
+        # thread - seeding art, taking a backup, importing a roster. On the
+        # default journal every write locks the whole file, so a command that
+        # only wants to read waits behind it, and every command reads before
+        # it runs. That is felt as the bot being slow at everything rather
+        # than slow at the thing actually working.
+        #
+        # WAL lets the readers carry on while a write is in progress, and the
+        # busy timeout replaces "database is locked" with a short wait.
+        # NORMAL fsyncs at checkpoints rather than every commit, which is the
+        # usual pairing with WAL and safe against anything but power loss.
+        try:
+            self.conn.execute("PRAGMA journal_mode=WAL")
+            self.conn.execute("PRAGMA synchronous=NORMAL")
+            self.conn.execute("PRAGMA busy_timeout=30000")
+        except sqlite3.DatabaseError:
+            # A filesystem that will not do WAL is still a working database.
+            pass
         self.conn.executescript(SCHEMA)
         self._migrate()
         self._convert_old_badges()
