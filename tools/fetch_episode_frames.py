@@ -772,6 +772,8 @@ def harvest(groups, series: str, budget: int,
     shortlist = {tag: [] for tag in wanted_tags}
     faces = {}
     episode_of = {}
+    frame_mark = {}                  # frame -> what its thumbnail looks like
+    marks_by_episode = {}            # episode -> the thumbnails seen in it
 
     # Spread the sample across the seasons as well as the episodes, so a
     # show with four of them is not represented by its first.
@@ -786,6 +788,9 @@ def harvest(groups, series: str, budget: int,
             thumb = image_from(fetch(THUMB.format(frame), tries=1, timeout=20))
             if thumb is None or dull(thumb):
                 continue
+            mark = fingerprint(thumb)
+            frame_mark[frame] = mark
+            marks_by_episode.setdefault(episode, []).append(mark)
             for tagger, people in groups:
                 seen = tagger.characters_in(thumb)
                 for _key, tag, _row in people:
@@ -804,6 +809,23 @@ def harvest(groups, series: str, budget: int,
         if budget <= 0:
             break
 
+    # Footage that turns up in more than one episode is the opening or the
+    # ending: the same ninety seconds every week, usually with the staff
+    # credits written over it. Neither model can read those credits - the
+    # frame that got through carried none of the text tags at all, and the
+    # busiest-band measure put it below ordinary line art - but the fact
+    # that it is the same picture week after week gives it away. It is also
+    # not what anybody means by a frame from the episode.
+    seen_marks = [(mark, episode)
+                  for episode, marks in marks_by_episode.items()
+                  for mark in marks]
+    recurring = set()
+    for number, (mark, episode) in enumerate(seen_marks):
+        for other, elsewhere in seen_marks[number + 1:]:
+            if elsewhere != episode and alike(mark, other):
+                recurring.add(mark)
+                recurring.add(other)
+
     # Confirm the best of them at full size, where the model can be trusted.
     found = {}
     for tag, key in wanted_tags.items():
@@ -812,6 +834,8 @@ def harvest(groups, series: str, budget: int,
         kept, prints = [], []
         scored = []
         for _score, frame in candidates:
+            if frame_mark.get(frame) in recurring:
+                continue
             image = image_from(fetch(FULL.format(frame), tries=2))
             if image is None or dull(image):
                 continue
