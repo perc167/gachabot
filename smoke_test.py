@@ -1184,6 +1184,38 @@ async def main():
     check("reacting to a slash command's message says the reaction instead",
           stand_in_said == ["✅"] and stand_in.id == 1)
 
+    # Join To Create rooms: a bot left behind doesn't keep one open, and a
+    # delete that fails is kept for the sweep to try again.
+    from cogs import voice as vo
+    vcog = b.get_cog("Voice")
+    VG = 880011
+    vguild = NS(id=VG, afk_channel=None, get_channel=lambda _id: None)
+    music = NS(id=31, bot=True, guild=vguild)
+    deleted = []
+
+    def room(cid, members, fail=False):
+        async def delete(reason=None):
+            if fail:
+                raise discord.HTTPException(NS(status=500, reason="boom"), "boom")
+            deleted.append(cid)
+        db.add_temp_vc(VG, cid, ALICE)
+        return NS(id=cid, members=members, delete=delete)
+
+    check("a room with only a bot in it counts as empty",
+          not vo.has_people(NS(members=[music])) and vo.has_people(NS(members=[music, NS(bot=False)])))
+    stuck = room(9101, [], fail=True)
+    await vcog.remove_room(stuck)
+    check("a room Discord wouldn't delete is kept for the sweep", db.temp_vc(9101) is not None)
+    db.remove_temp_vc(9101)
+    left_behind = room(9102, [music])
+    await vcog.on_voice_state_update(NS(id=ALICE, bot=False, guild=vguild, roles=[]),
+                                     NS(channel=left_behind), NS(channel=None))
+    check("the last person leaving deletes the room, even with a music bot in it",
+          9102 in deleted and db.temp_vc(9102) is None)
+    bot_last = room(9103, [])
+    await vcog.on_voice_state_update(music, NS(channel=bot_last), NS(channel=None))
+    check("a bot leaving an empty room deletes it", 9103 in deleted and db.temp_vc(9103) is None)
+
     # top.gg votes: a banked karuda reward, and a weekly draw from every vote.
     from cogs import votes as vt
     voter = b.get_cog("Votes")

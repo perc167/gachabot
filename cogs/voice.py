@@ -2,7 +2,9 @@
 
 Joining the Join To Create channel makes you your own voice channel and
 moves you into it. You own it: lock it, hide it, rename it, let people in or
-keep them out. It is deleted as soon as the last person leaves.
+keep them out. It is deleted as soon as the last person leaves; a bot
+still in it doesn't keep it open. Anything missed (a restart, a failed
+delete) is swept up every ten minutes.
 
 Separately, every minute anyone spends in any voice channel (bar the AFK
 one) is counted, for `$vc stats`, a leaderboard, and roles handed out at so
@@ -12,13 +14,16 @@ A session is saved when it starts, so a restart doesn't lose it. If the bot
 was down while someone left, there is no telling when they did, so that
 session is dropped rather than guessed at.
 """
+import logging
 import time
 from typing import Optional
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 import config
+
+log = logging.getLogger("gacha.voice")
 
 RENAMES_PER_WINDOW = 2   # Discord's own limit on renaming a channel
 RENAME_WINDOW = 600
@@ -36,6 +41,12 @@ def counts(channel, guild) -> bool:
     return channel is not None and channel != guild.afk_channel
 
 
+def has_people(channel) -> bool:
+    """Whether anyone but bots is in a channel. A music bot left behind
+    doesn't keep a room open."""
+    return any(not m.bot for m in channel.members)
+
+
 class Voice(commands.Cog):
     # Read by the channel gate in bot.py and by tools/automod.py: $vc is used
     # from the voice channel's own chat, so it works in every channel.
@@ -45,6 +56,10 @@ class Voice(commands.Cog):
         self.bot = bot
         self.renames = {}   # channel id -> times it was renamed
         self.created = {}   # member id -> when their last room was made
+        self.sweep.start()
+
+    def cog_unload(self):
+        self.sweep.cancel()
 
     @property
     def db(self):
@@ -145,12 +160,37 @@ class Voice(commands.Cog):
             await self.remove_room(channel)
 
     async def remove_room(self, channel):
-        self.db.remove_temp_vc(channel.id)
-        self.renames.pop(channel.id, None)
+        """Delete a room. Its record goes only once the room has, so a
+        delete that fails is tried again by the next sweep."""
         try:
             await channel.delete(reason="Join To Create: empty")
-        except discord.HTTPException:
+        except discord.NotFound:
             pass
+        except discord.HTTPException:
+            return
+        self.db.remove_temp_vc(channel.id)
+        self.renames.pop(channel.id, None)
+
+    async def sweep_rooms(self, guild):
+        """Delete every room of this server's that nobody is in."""
+        for row in self.db.temp_vcs_in(guild.id):
+            channel = guild.get_channel(row["channel_id"])
+            if not channel:
+                self.db.remove_temp_vc(row["channel_id"])
+            elif not has_people(channel):
+                await self.remove_room(channel)
+
+    @tasks.loop(minutes=10)
+    async def sweep(self):
+        for guild in self.bot.guilds:
+            try:
+                await self.sweep_rooms(guild)
+            except Exception:
+                log.exception("couldn't sweep the rooms in %s", guild.id)
+
+    @sweep.before_loop
+    async def before_sweep(self):
+        await self.bot.wait_until_ready()
 
     async def award_hour_roles(self, member):
         """Hand out every hour role they've earned and don't have yet."""
@@ -167,9 +207,15 @@ class Voice(commands.Cog):
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
-        if member.bot or before.channel == after.channel:
+        if before.channel == after.channel:
             return
         guild = member.guild
+        if member.bot:
+            # A bot leaving can be what finally empties a room.
+            if before.channel and self.db.temp_vc(before.channel.id) \
+                    and not has_people(before.channel):
+                await self.remove_room(before.channel)
+            return
 
         was, now = counts(before.channel, guild), counts(after.channel, guild)
         if now and not was:
@@ -181,7 +227,7 @@ class Voice(commands.Cog):
         # Empty rooms go first, so moving from your room into Join To
         # Create doesn't move you back into a room that's about to vanish.
         if before.channel and self.db.temp_vc(before.channel.id) \
-                and not before.channel.members:
+                and not has_people(before.channel):
             await self.remove_room(before.channel)
 
         create = self.db.get_vc_setting(guild.id, "create_channel")
@@ -206,12 +252,7 @@ class Voice(commands.Cog):
                     self.db.drop_vc_session(guild.id, row["user_id"])
             for user_id in in_voice:
                 self.db.start_vc_session(guild.id, user_id)
-            for row in self.db.temp_vcs_in(guild.id):
-                channel = guild.get_channel(row["channel_id"])
-                if not channel:
-                    self.db.remove_temp_vc(row["channel_id"])
-                elif not channel.members:
-                    await self.remove_room(channel)
+            await self.sweep_rooms(guild)
 
     # --------------------------------------------------- rooms: commands
 
