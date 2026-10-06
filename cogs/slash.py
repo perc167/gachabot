@@ -332,15 +332,17 @@ async def run(interaction: discord.Interaction, command, options: list, values: 
 
 def make_callback(command, options: list):
     """An async function with one argument per option, for app_commands to read."""
-    space = {"run": run, "command": command, "options": options, "discord": discord}
+    # Upper case, because an option can't be: /help's option is called
+    # `command`, and it used to stand in for the command it belongs to.
+    space = {"RUN": run, "COMMAND": command, "OPTIONS": options, "DISCORD": discord}
     params = []
     for i, (name, kind, required, _param) in enumerate(options):
-        space[f"_t{i}"] = kind
-        params.append(f"{name}: _t{i}" + ("" if required else " = None"))
+        space[f"T{i}"] = kind
+        params.append(f"{name}: T{i}" + ("" if required else " = None"))
     names = ", ".join(name for name, *_ in options)
-    source = (f"async def callback(interaction: discord.Interaction"
+    source = (f"async def callback(interaction: DISCORD.Interaction"
               f"{', ' if params else ''}{', '.join(params)}):\n"
-              f"    return await run(interaction, command, options, [{names}])\n")
+              f"    return await RUN(interaction, COMMAND, OPTIONS, [{names}])\n")
     exec(source, space)
     callback = space["callback"]
     if options:

@@ -1138,6 +1138,24 @@ async def main():
         node = b.tree.get_command(path.split()[0])
         return node.get_command(path.split()[1]) if " " in path else node
 
+    # Every slash command hands over its own $ command, even one with an
+    # option called `command` (/help, /admin enable).
+    wrong_command = []
+    for item in tree_items:
+        for cmd in (item.commands if isinstance(item, _ac.Group) else [item]):
+            space = cmd.callback.__globals__
+            real_run, got = space["RUN"], []
+            async def record(interaction, command, options, values, got=got):
+                got.append(command)
+            space["RUN"] = record
+            try:
+                await cmd.callback(None, **{p.name: None for p in cmd.parameters})
+            finally:
+                space["RUN"] = real_run
+            if not got or getattr(got[0], "qualified_name", None) != cmd.extras["prefix_command"]:
+                wrong_command.append(cmd.qualified_name)
+    check("every slash command runs its own $ command", not wrong_command, str(wrong_command))
+
     said = FakeInteraction(slash_cmd("words say"))
     await slash_cmd("words say").callback(said, text="hello there")
     check("/words say runs $say and answers in the slash reply",
