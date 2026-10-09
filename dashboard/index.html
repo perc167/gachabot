@@ -12,9 +12,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 :root{
-  --ink:#0D0B14; --panel:#171324; --raise:#1F1A30; --line:#2C2444;
-  --text:#ECE8F7; --dim:#948CAE; --faint:#6B6484;
-  --accent:#7C6BF0; --accent-soft:#9C8FF5; --gold:#E5C55A; --rose:#EE7FA8;
+  --ink:#080B0D; --panel:#10171A; --raise:#172126; --line:#24343A;
+  --text:#E6EEF0; --dim:#8FA4A9; --faint:#5E7177;
+  --accent:#93C2CC; --accent-soft:#B8DCE3; --gold:#E5C55A; --mist:#5E8A96;
   --ok:#43B581; --bad:#E0525F;
   --display:"Sora","Segoe UI",system-ui,sans-serif;
   --body:"Zen Kaku Gothic New","Segoe UI",system-ui,sans-serif;
@@ -55,7 +55,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .btn{font-family:var(--display);font-weight:600;font-size:14px;padding:9px 16px;
   border-radius:9px;border:1px solid transparent;background:var(--accent);
-  color:#0C0A14;cursor:pointer}
+  color:#06090B;cursor:pointer}
 .btn:hover{background:var(--accent-soft)}
 .btn:disabled{opacity:.5;cursor:default}
 .btn.ghost{background:transparent;border-color:var(--line);color:var(--text)}
@@ -68,14 +68,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .preview{margin-top:12px;background:var(--ink);border:1px solid var(--line);
   border-radius:10px;padding:10px 13px;font-size:14.5px;overflow-wrap:anywhere}
 .preview b{font-weight:700}
-.mention{background:rgba(124,107,240,.25);color:#C9C1FF;border-radius:4px;padding:0 3px}
+.mention{background:rgba(147,194,204,.25);color:#CDE8EE;border-radius:4px;padding:0 3px}
 .chans{max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;
   padding:6px 10px;margin-top:10px}
 .chans .cat{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;
   color:var(--faint);margin:10px 0 4px}
 .chans label{display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer}
 .chans input{accent-color:var(--accent)}
-.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(13,11,20,.94);
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(8,11,13,.94);
   backdrop-filter:blur(10px);border-top:1px solid var(--line);z-index:10}
 .bar .wrap{display:flex;align-items:center;gap:12px;padding-block:14px;flex-wrap:wrap}
 .bar .msg{margin-right:auto;font-size:14px;color:var(--dim)}
@@ -87,24 +87,27 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .center{text-align:center;padding:80px 16px;color:var(--dim)}
 .center h1{margin-bottom:8px;color:var(--text)}
 
-/* ---- the sky, as on the website ---- */
+/* ---- the sky, as on the website: the glacier, snow and two glows ---- */
 html{background:var(--ink)}
 body{background:transparent}
+.backdrop{position:fixed;inset:0;z-index:-3;pointer-events:none;
+  background:linear-gradient(180deg,rgba(8,11,13,.55),rgba(8,11,13,.85) 45%,var(--ink) 85%),
+    url(/glacier.webp) center top/cover no-repeat}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;filter:blur(90px)}
 .glow.a{width:560px;height:560px;left:-180px;top:-180px;opacity:.26;
   background:radial-gradient(circle,var(--accent),transparent 70%)}
 .glow.b{width:480px;height:480px;right:-180px;bottom:-160px;opacity:.14;
-  background:radial-gradient(circle,var(--rose),transparent 70%)}
+  background:radial-gradient(circle,var(--mist),transparent 70%)}
 
 /* ---- top bar ---- */
-.top{position:sticky;top:0;z-index:20;background:rgba(13,11,20,.86);
+.top{position:sticky;top:0;z-index:20;background:rgba(8,11,13,.86);
   backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
 .top .wrap{display:flex;align-items:center;gap:14px;height:58px}
 .brand{font-family:var(--display);font-weight:700;font-size:17px;color:var(--text);
   display:flex;align-items:center;gap:9px;margin-right:auto;text-decoration:none}
 .brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
-  box-shadow:0 0 0 1px rgba(156,143,245,.45)}
+  box-shadow:0 0 0 1px rgba(184,220,227,.45)}
 .me{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--dim)}
 .me img{width:28px;height:28px;border-radius:50%}
 .btn.small{padding:6px 12px;font-size:13px;white-space:nowrap}
@@ -120,10 +123,10 @@ body{background:transparent}
 
 /* ---- login ---- */
 .login{max-width:440px;margin:12vh auto 0;text-align:center;padding:36px 28px;
-  background:rgba(23,19,36,.88);border:1px solid var(--line);border-radius:18px;
+  background:rgba(16,23,26,.88);border:1px solid var(--line);border-radius:18px;
   animation:rise .5s cubic-bezier(.2,.7,.2,1) both}
 .login .logo{width:84px;height:84px;border-radius:24px;margin:0 auto 16px;display:block;
-  object-fit:cover;box-shadow:0 14px 40px -12px rgba(124,107,240,.8),0 0 0 1px rgba(156,143,245,.4)}
+  object-fit:cover;box-shadow:0 14px 40px -12px rgba(147,194,204,.8),0 0 0 1px rgba(184,220,227,.4)}
 .login h1{font-size:24px;margin-bottom:8px}
 .login p{color:var(--dim);margin:0 0 22px}
 .discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
@@ -168,10 +171,10 @@ body{background:transparent}
   transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;
   animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
 .part::before{content:"";position:absolute;inset:0 0 auto;height:3px;
-  background:linear-gradient(90deg,var(--accent),var(--rose));transform:scaleX(0);
+  background:linear-gradient(90deg,var(--accent),var(--mist));transform:scaleX(0);
   transform-origin:left;transition:transform .25s}
 .part:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px);
-  box-shadow:0 12px 30px -16px rgba(124,107,240,.6)}
+  box-shadow:0 12px 30px -16px rgba(147,194,204,.6)}
 .part:hover::before{transform:scaleX(1)}
 .part .ic{font-size:26px;line-height:1;margin-bottom:6px}
 .part b{font-family:var(--display);font-size:19px;font-weight:600}
@@ -180,7 +183,7 @@ body{background:transparent}
 /* ---- Paper Premium ---- */
 .prem{position:relative;overflow:hidden;border-radius:18px;padding:22px 24px;
   margin-bottom:16px;border:1px solid rgba(229,197,90,.45);
-  background:linear-gradient(120deg,rgba(229,197,90,.14),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10));
+  background:linear-gradient(120deg,rgba(229,197,90,.14),rgba(147,194,204,.14) 60%,rgba(94,138,150,.10));
   animation:rise .4s cubic-bezier(.2,.7,.2,1) both}
 .prem h2{font-family:var(--display);font-size:19px;margin:0 0 4px;display:flex;
   align-items:center;gap:8px}
@@ -189,7 +192,7 @@ body{background:transparent}
 .prem li{margin-bottom:3px}
 .pgroups{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;
   margin:4px 0 18px}
-.pgroup{background:rgba(10,8,20,.35);border:1px solid rgba(255,255,255,.07);
+.pgroup{background:rgba(6,10,12,.35);border:1px solid rgba(255,255,255,.07);
   border-radius:12px;padding:12px 14px 6px}
 .pgroup h3{display:flex;align-items:center;gap:7px;margin:0 0 7px;font-size:14.5px;
   font-family:var(--display);color:var(--gold)}
@@ -207,7 +210,7 @@ body{background:transparent}
   margin-bottom:8px}
 .prem-page{margin-top:26px}
 .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:6px}
-.plan{position:relative;display:flex;flex-direction:column;gap:6px;background:rgba(10,8,20,.4);
+.plan{position:relative;display:flex;flex-direction:column;gap:6px;background:rgba(6,10,12,.4);
   border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px}
 .plan.best{border-color:rgba(229,197,90,.6);box-shadow:0 0 0 1px rgba(229,197,90,.2) inset}
 .plan.owned{opacity:.7}
@@ -219,8 +222,8 @@ body{background:transparent}
 .plan .tag{position:absolute;top:-9px;right:12px;background:var(--gold);color:#1a1405;
   font-size:11px;font-weight:700;border-radius:99px;padding:2px 9px}
 .plan .have{font-size:13.5px;color:var(--gold);font-weight:600}
-.prem.player{border-color:rgba(156,143,245,.55);
-  background:linear-gradient(120deg,rgba(124,107,240,.2),rgba(238,127,168,.12) 60%,rgba(229,197,90,.08))}
+.prem.player{border-color:rgba(184,220,227,.55);
+  background:linear-gradient(120deg,rgba(147,194,204,.2),rgba(94,138,150,.12) 60%,rgba(229,197,90,.08))}
 .prem.player .kicker{font:600 12px var(--mono);letter-spacing:.06em;text-transform:uppercase;
   color:var(--accent-soft);margin:0 0 6px}
 .prem.player .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -233,8 +236,8 @@ body{background:transparent}
 .plan .more:hover{color:var(--gold)}
 dialog.plan-info{width:min(92vw,560px);max-height:86vh;overflow:auto;border-radius:18px;
   padding:24px 24px 18px;color:var(--text);border:1px solid rgba(229,197,90,.45);
-  background:linear-gradient(160deg,#1d1733,#120f1f 70%)}
-dialog.plan-info::backdrop{background:rgba(5,4,10,.7);backdrop-filter:blur(3px)}
+  background:linear-gradient(160deg,#132026,#0B1215 70%)}
+dialog.plan-info::backdrop{background:rgba(3,5,6,.7);backdrop-filter:blur(3px)}
 .plan-info h2{font-family:var(--display);font-size:22px;margin:0}
 .plan-info .price{font-family:var(--display);font-weight:600;color:var(--gold);font-size:20px;margin:2px 0 6px}
 .plan-info .lead{color:var(--dim);margin:0 0 14px}
@@ -253,11 +256,11 @@ dialog.plan-info::backdrop{background:rgba(5,4,10,.7);backdrop-filter:blur(3px)}
 .tickgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:4px 14px}
 .tickgrid .switch.off{opacity:.45}
 .bpcard{position:relative;border-radius:14px;overflow:hidden;margin-bottom:14px;
-  background:rgba(10,8,20,.45);border:1px solid rgba(255,255,255,.07);max-width:420px}
-.bpbanner{height:92px;background:linear-gradient(120deg,rgba(124,107,240,.5),rgba(238,127,168,.35))}
+  background:rgba(6,10,12,.45);border:1px solid rgba(255,255,255,.07);max-width:420px}
+.bpbanner{height:92px;background:linear-gradient(120deg,rgba(147,194,204,.5),rgba(94,138,150,.35))}
 .bpbanner img{width:100%;height:100%;object-fit:cover;display:block}
 .bpavatar{position:absolute;left:16px;top:52px;width:72px;height:72px;border-radius:50%;
-  border:5px solid #15121f;background:#15121f;object-fit:cover}
+  border:5px solid #0F1619;background:#0F1619;object-fit:cover}
 .bpwho{padding:40px 16px 12px}
 .bpwho b{font-family:var(--display);font-size:16px}
 .bpwho .hint{margin:4px 0 0;white-space:pre-wrap;word-break:break-word}
@@ -324,6 +327,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 </style>
 </head>
 <body>
+<div class="backdrop" aria-hidden="true"></div>
 <div class="glow a" aria-hidden="true"></div>
 <div class="glow b" aria-hidden="true"></div>
 <canvas id="sky" aria-hidden="true"></canvas>
@@ -1698,7 +1702,7 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
 })();
 
 (function(){
-  // The same sky as the website, without the shooting stars.
+  // The same snow as the website.
   var canvas = document.getElementById("sky");
   if (!canvas || !canvas.getContext) return;
   var ctx = canvas.getContext("2d"), stars = [], w = 0, h = 0, frame = 0;
@@ -1711,12 +1715,17 @@ input[type=color]{width:64px;height:38px;padding:3px;border:1px solid var(--line
     stars = [];
     for (var i = 0, n = Math.min(200, Math.round(w * h / 8000)); i < n; i++)
       stars.push({x: Math.random() * w, y: Math.random() * h, r: Math.random() * 1.1 + 0.25,
-                  a: Math.random() * 0.5 + 0.2, s: Math.random() * 1.3 + 0.4, p: Math.random() * 6.3});
+                  a: Math.random() * 0.5 + 0.2, s: Math.random() * 1.3 + 0.4, p: Math.random() * 6.3,
+                  d: Math.random() * 0.28 + 0.06});
   }
   function draw(t){
     ctx.clearRect(0, 0, w, h);
     stars.forEach(function(s){
       var tw = still ? 1 : 0.6 + 0.4 * Math.sin(t / 1000 * s.s + s.p);
+      if (!still) {
+        s.y += s.d; s.x += Math.sin(t / 1000 * s.s * 0.5 + s.p) * 0.12;
+        if (s.y > h + 2) { s.y = -2; s.x = Math.random() * w; }
+      }
       ctx.fillStyle = "rgba(255,255,255," + (s.a * tw).toFixed(3) + ")";
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.2832); ctx.fill();
     });

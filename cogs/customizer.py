@@ -10,6 +10,7 @@ import discord
 from discord.ext import commands, tasks
 
 import botprofile
+import config
 
 log = logging.getLogger("customizer")
 
@@ -72,7 +73,7 @@ class Customizer(commands.Cog):
                 f"`{p}botprofile bio <text>` · ✨ an About Me\n"
                 f"`{p}botprofile reset` · everything back to Paper's own\n\n"
                 "Add `reset` to any of them to undo just that one."),
-            colour=0x7C6BF0)
+            colour=config.CARD_COLOUR)
         embed.add_field(name="Name", value=now["nick"] or f"{now['name']} (Paper's own)")
         embed.add_field(name="Bio", value=now["bio"] or "Paper's own", inline=False)
         if now["avatar"]:

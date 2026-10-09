@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="dark">
 <meta property="og:title" content="Paper">
 <meta property="og:image" content="https://gachabot.perc-1fc.workers.dev/img/paper-512.png">
-<meta name="theme-color" content="#7C6BF0">
+<meta name="theme-color" content="#93C2CC">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/paper-180.png">
 <meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">
@@ -18,9 +18,9 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 :root{
-  --ink:#0D0B14; --panel:#171324; --raise:#1F1A30; --line:#2C2444;
-  --text:#ECE8F7; --dim:#948CAE; --faint:#6B6484;
-  --accent:#7C6BF0; --accent-soft:#9C8FF5; --gold:#E5C55A; --rose:#EE7FA8;
+  --ink:#080B0D; --panel:#10171A; --raise:#172126; --line:#24343A;
+  --text:#E6EEF0; --dim:#8FA4A9; --faint:#5E7177;
+  --accent:#93C2CC; --accent-soft:#B8DCE3; --gold:#E5C55A; --mist:#5E8A96;
   --ok:#43B581;
   --display:"Sora","Segoe UI",system-ui,sans-serif;
   --body:"Zen Kaku Gothic New","Hiragino Sans","Segoe UI",system-ui,sans-serif;
@@ -39,7 +39,11 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 
-/* ---- the sky: stars on a canvas, and two soft glows ---- */
+/* ---- the sky: the glacier behind everything, snow on a canvas, and two
+   soft glows ---- */
+.backdrop{position:fixed;inset:0;z-index:-3;pointer-events:none;
+  background:linear-gradient(180deg,rgba(8,11,13,.5),rgba(8,11,13,.82) 45%,var(--ink) 85%),
+    url(img/glacier.webp) center top/cover no-repeat}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;
   filter:blur(90px);opacity:.28}
@@ -47,7 +51,7 @@ body{
   background:radial-gradient(circle,var(--accent),transparent 70%);
   animation:float 26s ease-in-out infinite alternate}
 .glow.b{width:560px;height:560px;right:-200px;top:38vh;
-  background:radial-gradient(circle,var(--rose),transparent 70%);opacity:.16;
+  background:radial-gradient(circle,var(--mist),transparent 70%);opacity:.16;
   animation:float 32s ease-in-out infinite alternate-reverse}
 @keyframes float{to{transform:translate(60px,40px) scale(1.08)}}
 
@@ -84,7 +88,7 @@ a:hover{text-decoration:underline}
 /* ---- nav ---- */
 nav{
   position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
-  background:rgba(13,11,20,.86);backdrop-filter:blur(12px);
+  background:rgba(8,11,13,.86);backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
 }
 .nav-in{display:flex;align-items:center;gap:22px;height:58px}
@@ -93,7 +97,7 @@ nav{
   color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
 }
 .brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
-  box-shadow:0 0 0 1px rgba(156,143,245,.45)}
+  box-shadow:0 0 0 1px rgba(184,220,227,.45)}
 
 /* ---- the account chip, right of Dashboard ---- */
 .acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
@@ -107,9 +111,9 @@ nav{
 
 /* ---- the hero's artwork ---- */
 .hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
-.hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:560/1285;
+.hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:1;
   max-height:520px;justify-self:end;
-  box-shadow:0 30px 80px -30px rgba(124,107,240,.7),0 0 0 1px rgba(156,143,245,.25);
+  box-shadow:0 30px 80px -30px rgba(147,194,204,.7),0 0 0 1px rgba(184,220,227,.25);
   -webkit-mask-image:linear-gradient(#000 78%,transparent);
   mask-image:linear-gradient(#000 78%,transparent)}
 .hero-art img{width:100%;height:100%;object-fit:cover;display:block;
@@ -138,7 +142,7 @@ h1 em{font-style:normal;color:var(--accent-soft)}
 .btn{
   font-family:var(--display);font-weight:600;font-size:15px;
   padding:11px 20px;border-radius:10px;border:1px solid transparent;
-  background:var(--accent);color:#0C0A14;display:inline-block;
+  background:var(--accent);color:#06090B;display:inline-block;
 }
 .btn:hover{background:var(--accent-soft);text-decoration:none}
 .btn.ghost{background:transparent;border-color:var(--line);color:var(--text)}
@@ -184,7 +188,7 @@ code,kbd{
   padding:2px 7px;border-radius:6px;color:var(--gold);white-space:nowrap;
 }
 .cmdline{
-  display:block;background:#0A0812;border:1px solid var(--line);
+  display:block;background:#050809;border:1px solid var(--line);
   border-radius:10px;padding:12px 15px;color:var(--gold);
   font-family:var(--mono);font-size:14px;overflow-x:auto;white-space:pre;
 }
@@ -207,7 +211,7 @@ code,kbd{
   padding:7px 12px;border-radius:999px;cursor:pointer;
 }
 .chip[aria-pressed="true"]{
-  background:var(--accent);border-color:var(--accent);color:#0C0A14;font-weight:600;
+  background:var(--accent);border-color:var(--accent);color:#06090B;font-weight:600;
 }
 .group{margin-bottom:34px}
 .group h3{
@@ -249,7 +253,7 @@ code,kbd{
 }
 .feature:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px)}
 .feature.on{border-color:var(--accent);background:var(--raise);
-  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(124,107,240,.55)}
+  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(147,194,204,.55)}
 .feature.on::before{transform:scaleX(1)}
 /* The title is the button; this stretches it over the whole card, so the
    card clicks as one without a list and paragraph inside a <button>. */
@@ -277,12 +281,12 @@ code,kbd{
 }
 .seg:hover{border-color:var(--accent);background:var(--raise);color:var(--text)}
 .seg[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
-  color:#0C0A14}
+  color:#06090B}
 
 /* Setup steps read as a path: a faint line joins the numbers between cards. */
 .steps{position:relative}
 .steps::before{content:"";position:absolute;left:40px;top:30px;bottom:30px;width:2px;
-  background:linear-gradient(var(--accent),var(--rose));opacity:.3}
+  background:linear-gradient(var(--accent),var(--mist));opacity:.3}
 .step{position:relative}
 .cmdline{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:560px){
@@ -295,7 +299,7 @@ code,kbd{
 .band{display:flex;flex-wrap:wrap;align-items:center;gap:22px 34px;
   justify-content:space-between;padding:30px 32px;border-radius:18px;
   border:1px solid var(--line);
-  background:linear-gradient(120deg,rgba(124,107,240,.18),rgba(238,127,168,.10))}
+  background:linear-gradient(120deg,rgba(147,194,204,.18),rgba(94,138,150,.10))}
 .band h2{margin:0 0 6px}
 .band p{margin:0;color:var(--dim);max-width:52ch}
 .discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
@@ -303,11 +307,11 @@ code,kbd{
   border-radius:11px;transition:background .15s,transform .15s}
 .discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
 .premium-band{border-color:rgba(229,197,90,.45);
-  background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(124,107,240,.14) 60%,rgba(238,127,168,.10))}
+  background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(147,194,204,.14) 60%,rgba(94,138,150,.10))}
 .btn.gold{background:var(--gold);color:#1a1405}
 .pgroups{flex-basis:100%;display:grid;gap:12px;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.pgroup{background:rgba(10,8,20,.35);border:1px solid var(--line);border-radius:12px;
+.pgroup{background:rgba(6,10,12,.35);border:1px solid var(--line);border-radius:12px;
   padding:12px 14px 4px}
 .pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold)}
 .pgroup ul{margin:0 0 8px;padding-left:17px;font-size:14px;color:var(--dim)}
@@ -315,7 +319,7 @@ code,kbd{
 .pgroup h3 .plus{font:600 11px var(--body);color:#1a1405;background:var(--gold);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
 .btn.gold:hover{background:#f0d27a}
 .nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
-  padding:7px 14px;border-radius:9px;background:var(--accent);color:#0C0A14}
+  padding:7px 14px;border-radius:9px;background:var(--accent);color:#06090B}
 .nav-in .dash:hover{background:var(--accent-soft);text-decoration:none}
 .page-head{padding-block:48px 8px}
 .page-head h1{font-size:clamp(30px,5vw,44px);margin-bottom:10px}
@@ -381,23 +385,23 @@ code,kbd{
 /* ---- secret: original characters, one album each ---- */
 .sec-row{display:flex;flex-wrap:wrap;align-items:flex-start;
   justify-content:space-between;gap:4px 28px}
-.secret-toggle{margin-top:4px;cursor:pointer;border-color:var(--rose);
-  color:var(--rose);flex:none}
-.secret-toggle:hover{background:var(--raise);border-color:var(--rose)}
-.secret-toggle[aria-pressed="true"]{background:var(--rose);color:#0C0A14}
+.secret-toggle{margin-top:4px;cursor:pointer;border-color:var(--mist);
+  color:var(--mist);flex:none}
+.secret-toggle:hover{background:var(--raise);border-color:var(--mist)}
+.secret-toggle[aria-pressed="true"]{background:var(--mist);color:#06090B}
 button.card{font:inherit;color:inherit;text-align:left;padding:0;
   cursor:pointer;width:100%}
-button.card:hover{border-color:var(--rose)}
-.card .kr.tag{color:var(--rose)}
+button.card:hover{border-color:var(--mist)}
+.card .kr.tag{color:var(--mist)}
 /* White behind secret art: transparent emotes drawn with black outlines
    disappear into a dark card. */
 .secret-card .art,#album-img{background:#fff}
 .secret-card .art{object-fit:contain}
-.secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:#0C0A14}
+.secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:#06090B}
 
 #album{background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
-#album::backdrop{background:rgba(6,5,10,.84)}
+#album::backdrop{background:rgba(3,5,6,.84)}
 .album-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;
   font-family:var(--display);font-weight:600}
 #album-count{font-family:var(--mono);font-size:12px;color:var(--faint);
@@ -408,7 +412,7 @@ button.card:hover{border-color:var(--rose)}
 #album button{font:inherit;background:var(--raise);color:var(--text);
   border:1px solid var(--line);border-radius:9px;padding:8px 18px;cursor:pointer}
 #album button:disabled{opacity:.35;cursor:default}
-#album button:hover:not(:disabled){border-color:var(--rose)}
+#album button:hover:not(:disabled){border-color:var(--mist)}
 
 footer{padding-block:38px 56px;color:var(--faint);font-size:13.5px}
 footer p{margin:0 0 6px}
@@ -416,6 +420,7 @@ footer p{margin:0 0 6px}
 </head>
 <body>
 <script>document.documentElement.classList.add("js")</script>
+<div class="backdrop" aria-hidden="true"></div>
 <div class="glow a" aria-hidden="true"></div>
 <div class="glow b" aria-hidden="true"></div>
 <canvas id="sky" aria-hidden="true"></canvas>
@@ -443,12 +448,12 @@ footer p{margin:0 0 6px}
   <div class="stats">
     <div class="stat"><b>102,192</b><i>characters</i></div>
     <div class="stat"><b>13,266</b><i>series</i></div>
-    <div class="stat"><b>479</b><i>commands</i></div>
+    <div class="stat"><b>483</b><i>commands</i></div>
     <div class="stat"><b>20</b><i>tutorial steps</i></div>
   </div>
   </div>
   <div class="hero-art" aria-hidden="true"><img src="img/paper-art.webp" alt=""
-    width="560" height="1285"></div>
+    width="560" height="560"></div>
 </header>
 
 <section id="servers" hidden aria-label="Servers using Paper">
@@ -597,8 +602,8 @@ $userinfo · $serverinfo · $steal</code></div></div></div></div>
   <h2>What it does</h2>
   <p class="sub">Four parts. Use all of them, or only the ones you need.
   Pick one to see its commands.</p>
-  <div class="features"><div class="feature"><span class="ic" aria-hidden="true">🎲</span><h3><a class="pick" href="commands.html#gacha">Gacha</a></h3><p>Roll for 102,192 characters and claim the ones worth keeping.</p><ul><li>Wishlists, likes, trades and gifts</li><li>Karuda, a shop, badges and a tower</li><li>A tutorial that pays people to learn</li></ul><span class="go">314 commands →</span></div>
-<div class="feature"><span class="ic" aria-hidden="true">🛡️</span><h3><a class="pick" href="commands.html#mod">Moderation</a></h3><p>Talk first, then decide. Every action is saved as a numbered case.</p><ul><li>Jail, timeouts, image and reaction mutes</li><li>Warnings with automatic punishments</li><li>Bans, hardbans, lockdowns and staff points</li></ul><span class="go">77 commands →</span></div>
+  <div class="features"><div class="feature"><span class="ic" aria-hidden="true">🎲</span><h3><a class="pick" href="commands.html#gacha">Gacha</a></h3><p>Roll for 102,192 characters and claim the ones worth keeping.</p><ul><li>Wishlists, likes, trades and gifts</li><li>Karuda, a shop, badges and a tower</li><li>A tutorial that pays people to learn</li></ul><span class="go">317 commands →</span></div>
+<div class="feature"><span class="ic" aria-hidden="true">🛡️</span><h3><a class="pick" href="commands.html#mod">Moderation</a></h3><p>Talk first, then decide. Every action is saved as a numbered case.</p><ul><li>Jail, timeouts, image and reaction mutes</li><li>Warnings with automatic punishments</li><li>Bans, hardbans, lockdowns and staff points</li></ul><span class="go">78 commands →</span></div>
 <div class="feature"><span class="ic" aria-hidden="true">🔊</span><h3><a class="pick" href="commands.html#voice">Voice</a></h3><p>Rooms people make and run themselves, and hours spent in voice.</p><ul><li>Join To Create, deleted when empty</li><li>Lock, hide, rename, permit, ban, transfer</li><li>Hour leaderboard and hour roles</li></ul><span class="go">21 commands →</span></div>
 <div class="feature"><span class="ic" aria-hidden="true">📈</span><h3><a class="pick" href="commands.html#levels">Levels</a></h3><p>XP for chatting and for time in voice, with roles at milestones.</p><ul><li>Rank cards and a leaderboard</li><li>Spam-proof: one message a minute counts</li><li>A little karuda every 5 levels</li></ul><span class="go">27 commands →</span></div>
 <div class="feature"><span class="ic" aria-hidden="true">👋</span><h3><a class="pick" href="commands.html#server">Server</a></h3><p>The everyday tools: roles on join, welcomes, snipes and more.</p><ul><li>Autoroles, welcome and goodbye messages</li><li>Snipe, AFK, reminders, user and server info</li><li>Reaction roles, auto replies, emoji stealing</li></ul><span class="go">40 commands →</span></div></div>
@@ -888,6 +893,7 @@ $userinfo · $serverinfo · $steal</code></div></div></div></div>
   AniList does not carry.</p>
   <p>Character art belongs to its creators and is shown here for
   identification.</p>
+  <p><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
 </footer>
 </div>
 
@@ -1153,22 +1159,22 @@ $userinfo · $serverinfo · $steal</code></div></div></div></div>
 })();
 
 (function(){
-  // The sky: a few hundred stars that twinkle and drift up very slowly,
-  // and now and then a shooting star. It stops while the tab is hidden, and
-  // for reduced motion it's drawn once and left still.
+  // The sky: snow, a couple of hundred flakes falling slowly and swaying
+  // a little, like spray drifting off the glacier. It stops while the tab is
+  // hidden, and for reduced motion it's drawn once and left still.
   var canvas = document.getElementById("sky");
   if (!canvas || !canvas.getContext) return;
   var ctx = canvas.getContext("2d");
   var still = window.matchMedia &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var stars = [], shot = null, nextShot = 4000, w = 0, h = 0, frame = 0;
+  var stars = [], w = 0, h = 0, frame = 0;
 
   function build(){
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     w = window.innerWidth; h = window.innerHeight;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var count = Math.min(260, Math.round(w * h / 7000));
+    var count = Math.min(200, Math.round(w * h / 9000));
     stars = [];
     for (var i = 0; i < count; i++) {
       stars.push({
@@ -1177,8 +1183,8 @@ $userinfo · $serverinfo · $steal</code></div></div></div></div>
         a: Math.random() * 0.55 + 0.25,
         speed: Math.random() * 1.4 + 0.4,
         phase: Math.random() * Math.PI * 2,
-        drift: Math.random() * 0.035 + 0.008,
-        lilac: Math.random() < 0.18
+        drift: Math.random() * 0.28 + 0.06,
+        ice: Math.random() < 0.18
       });
     }
   }
@@ -1188,26 +1194,13 @@ $userinfo · $serverinfo · $steal</code></div></div></div></div>
     for (var i = 0; i < stars.length; i++) {
       var s = stars[i];
       var twinkle = still ? 1 : 0.6 + 0.4 * Math.sin(t / 1000 * s.speed + s.phase);
-      if (!still) { s.y -= s.drift; if (s.y < -2) { s.y = h + 2; s.x = Math.random() * w; } }
-      ctx.fillStyle = (s.lilac ? "rgba(201,193,255," : "rgba(255,255,255,") + (s.a * twinkle).toFixed(3) + ")";
+      if (!still) {
+        s.y += s.drift;
+        s.x += Math.sin(t / 1000 * s.speed * 0.5 + s.phase) * 0.12;
+        if (s.y > h + 2) { s.y = -2; s.x = Math.random() * w; }
+      }
+      ctx.fillStyle = (s.ice ? "rgba(205,232,238," : "rgba(255,255,255,") + (s.a * twinkle).toFixed(3) + ")";
       ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
-    }
-    if (still) return;
-    if (!shot && t > nextShot) {
-      shot = {x: w * (0.35 + Math.random() * 0.6), y: h * Math.random() * 0.35,
-              vx: -(5 + Math.random() * 3), vy: 2.2 + Math.random() * 1.5, life: 0};
-      nextShot = t + 8000 + Math.random() * 10000;
-    }
-    if (shot) {
-      shot.x += shot.vx; shot.y += shot.vy; shot.life++;
-      var fade = Math.max(0, 1 - shot.life / 70);
-      var tail = ctx.createLinearGradient(shot.x, shot.y, shot.x - shot.vx * 14, shot.y - shot.vy * 14);
-      tail.addColorStop(0, "rgba(255,255,255," + (0.85 * fade).toFixed(3) + ")");
-      tail.addColorStop(1, "rgba(156,143,245,0)");
-      ctx.strokeStyle = tail; ctx.lineWidth = 1.4; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.moveTo(shot.x, shot.y);
-      ctx.lineTo(shot.x - shot.vx * 14, shot.y - shot.vy * 14); ctx.stroke();
-      if (fade === 0 || shot.x < -200 || shot.y > h + 200) shot = null;
     }
   }
 

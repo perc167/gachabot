@@ -61,7 +61,7 @@ def render(p: dict, accent_hex: int, background: bytes = None) -> bytes:
 
 def _header(card, p, accent):
     # Glass behind the header too, so it reads on a bright picture.
-    _glass(card, (MARGIN, 20, WIDTH - MARGIN, 222), 26, (14, 11, 26, 130),
+    _glass(card, (MARGIN, 20, WIDTH - MARGIN, 222), 26, (9, 14, 17, 130),
            (255, 255, 255, 22))
     size = 162
     cx, cy = MARGIN + 22 + size // 2, 121
@@ -98,7 +98,7 @@ def _header(card, p, accent):
 
 
 def _tile(card, box, label, colour):
-    _glass(card, box, 22, (14, 11, 26, 176), (255, 255, 255, 26))
+    _glass(card, box, 22, (9, 14, 17, 176), (255, 255, 255, 26))
     draw = ImageDraw.Draw(card)
     draw.text((box[0] + 24, box[1] + 18), label, font=_font(20), fill=colour)
     return draw
@@ -150,7 +150,7 @@ def _channels(card, box, title, rows, colour, empty):
     """A panel listing up to three channels, each with a bar for its share
     of the busiest one."""
     x0, y0, x1, y1 = box
-    _glass(card, box, 22, (14, 11, 26, 176), (255, 255, 255, 26))
+    _glass(card, box, 22, (9, 14, 17, 176), (255, 255, 255, 26))
     draw = ImageDraw.Draw(card)
     draw.text((x0 + 22, y0 + 14), title, font=_font(19), fill=colour)
     draw.text((x1 - 22, y0 + 15), "LAST 30 DAYS", font=_font(16), fill=FAINT, anchor="ra")
@@ -179,7 +179,7 @@ def _chart(card, box, days, accent, voice):
     """Messages and voice for each of the last 14 days, as paired bars,
     each scaled to its own busiest day."""
     x0, y0, x1, y1 = box
-    _glass(card, box, 22, (14, 11, 26, 176), (255, 255, 255, 26))
+    _glass(card, box, 22, (9, 14, 17, 176), (255, 255, 255, 26))
     draw = ImageDraw.Draw(card)
     draw.text((x0 + 22, y0 + 14), "LAST 14 DAYS", font=_font(19), fill=WHITE)
     msgs = sum(m for _d, m, _v in days)

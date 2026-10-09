@@ -39,8 +39,8 @@ SILVER = (206, 214, 232)
 BRONZE = (222, 142, 92)
 MEDALS = {1: GOLD, 2: SILVER, 3: BRONZE}
 PLACES = {1: "1ST PLACE", 2: "2ND PLACE", 3: "3RD PLACE"}
-WHITE, DIM, FAINT = (244, 240, 252), (184, 176, 208), (128, 120, 156)
-INK = (18, 14, 28)
+WHITE, DIM, FAINT = (236, 243, 245), (160, 182, 188), (104, 124, 130)
+INK = (10, 15, 18)
 
 
 def hours(seconds: int) -> str:
@@ -64,18 +64,18 @@ def _sky(size, accent) -> Image.Image:
     """The free background: the rank card's night sky, stretched to fit."""
     w, h = size
     fx, fy = w / 934, h / 800
-    base = Image.new("RGB", size, (13, 11, 20))
+    base = Image.new("RGB", size, (8, 11, 13))
     # Glows are soft, so they're drawn small and blown up: far quicker than
     # blurring the full-size picture.
-    small = Image.new("RGB", (w // 4, h // 4), (13, 11, 20))
+    small = Image.new("RGB", (w // 4, h // 4), (8, 11, 13))
     d = ImageDraw.Draw(small)
 
     def oval(box, fill):
         x0, y0, x1, y1 = box
         d.ellipse((x0 * fx, y0 * fy, x1 * fx, y1 * fy), fill=fill)
     oval((-40, -55, 130, 90), accent)
-    oval((155, 20, 275, 130), (238, 127, 168))
-    oval((-30, 110, 110, 240), (238, 127, 168))
+    oval((155, 20, 275, 130), (94, 138, 150))
+    oval((-30, 110, 110, 240), (94, 138, 150))
     oval((140, 100, 290, 250), accent)
     glow = small.filter(ImageFilter.GaussianBlur(26)).resize(size, Image.BICUBIC)
     base = Image.blend(base, glow, 0.33)
@@ -134,7 +134,7 @@ def _circle(image: bytes, size: int) -> Image.Image:
         face = Image.open(io.BytesIO(image)).convert("RGB")
         face = ImageOps.fit(face, (size, size), Image.LANCZOS)
     except Exception:
-        face = Image.new("RGB", (size, size), (44, 38, 66))
+        face = Image.new("RGB", (size, size), (26, 37, 42))
     out = face.convert("RGBA")
     mask = Image.new("L", (size * 4, size * 4), 0)
     ImageDraw.Draw(mask).ellipse((0, 0, size * 4, size * 4), fill=255)
@@ -296,7 +296,7 @@ def _medal_card(card, box, entry):
     cx = x0 + 30 + size // 2
     if first:
         _glow(card, (cx, mid), 190, GOLD, 90)
-    _glass(card, box, 26, (14, 11, 26, 176), tuple(metal) + (110,), 2)
+    _glass(card, box, 26, (9, 14, 17, 176), tuple(metal) + (110,), 2)
     # The medal's colour washing in from the left.
     wash = Image.linear_gradient("L").rotate(90).resize((x1 - x0 - 4, y1 - y0 - 4))
     wash = wash.point(lambda v: v * 64 // 255)
@@ -361,7 +361,7 @@ def _row(card, box, entry, accent):
     tall = h >= 105
     s = 1.12 if tall else h / 82        # text and pieces scale by this
     mid = (y0 + y1) // 2
-    _glass(card, box, int(18 * s), (14, 11, 26, 172), (255, 255, 255, 24))
+    _glass(card, box, int(18 * s), (9, 14, 17, 172), (255, 255, 255, 24))
     # The place, in a little glass square.
     sq = int(54 * s)
     _glass(card, (x0 + 12, mid - sq // 2, x0 + 12 + sq, mid + sq // 2), int(12 * s),
@@ -371,7 +371,7 @@ def _row(card, box, entry, accent):
               fill=WHITE, anchor="mm")
     av = int((66 if tall else 58) * s)
     acx = x0 + 12 + sq + 16 + av // 2
-    _ringed(card, entry["avatar"], (acx, mid), av, (60, 54, 88), 3)
+    _ringed(card, entry["avatar"], (acx, mid), av, (40, 56, 62), 3)
     draw = ImageDraw.Draw(card)
 
     # Right: the level, in a pill of the server's colour.

@@ -19,7 +19,7 @@ from views import Confirm, choose_character
 
 # Card colour presets, so nobody has to know hex to change it.
 COLOURS = {
-    "purple": 0x7C6BF0, "blue": 0x4EA8DE, "green": 0x43B581,
+    "glacier": 0x93C2CC, "purple": 0x7C6BF0, "blue": 0x4EA8DE, "green": 0x43B581,
     "red": 0xE0525F, "pink": 0xEE7FA8, "orange": 0xE8894B,
     "yellow": 0xE5C55A, "grey": 0x99AAB5, "black": 0x23272A,
     "white": 0xFFFFFF,

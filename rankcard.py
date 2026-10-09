@@ -65,11 +65,11 @@ def prepare_background(raw: bytes) -> bytes:
 
 def _default_background(accent) -> Image.Image:
     """The free card: a night sky tinted with the server's colour."""
-    base = Image.new("RGB", (WIDTH, HEIGHT), (13, 11, 20))
-    glow = Image.new("RGB", (WIDTH, HEIGHT), (13, 11, 20))
+    base = Image.new("RGB", (WIDTH, HEIGHT), (8, 11, 13))
+    glow = Image.new("RGB", (WIDTH, HEIGHT), (8, 11, 13))
     draw = ImageDraw.Draw(glow)
     draw.ellipse((-160, -220, 520, 360), fill=accent)
-    draw.ellipse((620, 80, 1100, 520), fill=(238, 127, 168))
+    draw.ellipse((620, 80, 1100, 520), fill=(94, 138, 150))
     glow = glow.filter(ImageFilter.GaussianBlur(110))
     base = Image.blend(base, glow, 0.35)
     stars = ImageDraw.Draw(base)
@@ -104,7 +104,7 @@ def render(name: str, avatar: bytes, level: int, into: int, needed: int,
     try:
         face = Image.open(io.BytesIO(avatar)).convert("RGB").resize((size, size))
     except Exception:
-        face = Image.new("RGB", (size, size), (40, 34, 60))
+        face = Image.new("RGB", (size, size), (24, 34, 38))
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
     left, top = 52, (HEIGHT - size) // 2
@@ -112,7 +112,7 @@ def render(name: str, avatar: bytes, level: int, into: int, needed: int,
     card.paste(face, (left, top), mask)
 
     text_x = left + size + 40
-    white, dim = (240, 236, 250), (170, 162, 196)
+    white, dim = (234, 242, 244), (150, 172, 178)
     big, mid, small = _font(40), _font(26), _font(22)
 
     shown = drawable(name) or drawable(fallback) or "member"

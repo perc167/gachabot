@@ -162,7 +162,7 @@ class Votes(commands.Cog):
         entries = self.entries_of(user_id, week_of(time.time()))
         reward = REWARD * (2 if weekend else 1)
         embed = discord.Embed(
-            title="Thanks for voting for Paper! \U0001f49c",
+            title="Thanks for voting for Paper! \U0001fa75",
             colour=GOLD,
             description=(
                 f"**{reward:,} karuda** is waiting for you"

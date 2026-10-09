@@ -80,7 +80,7 @@ class About(commands.Cog):
             return
         p = config.PREFIX
         embed = discord.Embed(
-            title="Thanks for adding Paper! \U0001f49c", colour=config.CARD_COLOUR,
+            title="Thanks for adding Paper! \U0001fa75", colour=config.CARD_COLOUR,
             description=(
                 "Every command works as a slash command or with "
                 f"`{p}`.\n\n"
