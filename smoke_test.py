@@ -538,6 +538,31 @@ async def main():
           and db.greeting(SG, "goodbye")["channel_id"] == 0)
     db.replace_autoroles(SG, [5, 6, 5])
     check("autoroles save without repeats", db.autoroles_of(SG) == [5, 6])
+
+    # The server tag role.
+    db.set_pref(SG, "tag_role", 42)
+    saved = db.get_pref(SG, "tag_role", 0)
+    db.set_pref(SG, "tag_role", 0)
+    check("the tag role saves and clears",
+          saved == 42 and db.get_pref(SG, "tag_role", 0) == 0)
+    here_tag = lambda gid, on: NS(primary_guild=NS(id=gid, identity_enabled=on,
+                                                   tag="PPR"))
+    mine = NS(id=SG)
+    check("repping this server's tag counts",
+          ss.ServerSetup.reps_tag(here_tag(SG, True), mine))
+    check("somebody else's tag doesn't",
+          not ss.ServerSetup.reps_tag(here_tag(SG + 1, True), mine))
+    check("the tag turned off doesn't",
+          not ss.ServerSetup.reps_tag(here_tag(SG, False), mine))
+    # Discord's own warning: the switch can be on with no guild behind it.
+    check("a tag with no server behind it doesn't",
+          not ss.ServerSetup.reps_tag(here_tag(None, True), mine))
+    check("a user with no tag at all doesn't",
+          not ss.ServerSetup.reps_tag(NS(primary_guild=None), mine))
+    check("putting the tag on reads as a change",
+          ss.tag_state(here_tag(SG, True)) != ss.tag_state(here_tag(SG, False)))
+    check("leaving the tag alone reads as no change",
+          ss.tag_state(here_tag(SG, True)) == ss.tag_state(here_tag(SG, True)))
     db.add_reaction_role(SG, 1, 99, ss.emoji_key("❤️"), 7)
     check("a reaction role is found by message and emoji",
           db.reaction_role(99, ss.emoji_key("❤"))["role_id"] == 7

@@ -3,6 +3,7 @@ roles, and automatic replies. The bleed features people turn on first, made
 as easy as they can be:
 
 Autoroles       $autorole opens a menu: tick the roles new members get.
+Server tag      $tagrole @role for everybody repping the server's tag.
 Welcome         $welcome #channel turns it on with a friendly default;
 Goodbye         $welcome message <text> to change what it says.
 Reaction roles  $reactionrole add <message link> <emoji> @role
@@ -55,6 +56,19 @@ def emoji_key(emoji) -> str:
 def matches(trigger: str, text: str) -> bool:
     """The trigger as a whole word or phrase in the message, any case."""
     return re.search(r"(?<!\w)" + re.escape(trigger) + r"(?!\w)", text, re.IGNORECASE) is not None
+
+
+def tag_state(user) -> tuple:
+    """Which tag they are showing, as something that can be compared.
+
+    Reading `primary_guild` builds a fresh object every time and the class
+    defines no equality, so two reads of an unchanged tag never compare
+    equal to one another. The fields have to be compared instead.
+    """
+    shown = getattr(user, "primary_guild", None)
+    if shown is None:
+        return (None, None)
+    return (shown.id, shown.identity_enabled)
 
 
 def usable_role(guild, role) -> str:
@@ -201,6 +215,131 @@ class ServerSetup(commands.Cog):
                 await member.add_roles(*roles, reason="Autorole")
             except discord.HTTPException:
                 pass
+
+    # ------------------------------------------------------- the server tag
+
+    def tag_role(self, guild):
+        """The role this server hands out for repping its tag, or None."""
+        role_id = self.db.get_pref(guild.id, "tag_role", 0)
+        return guild.get_role(role_id) if role_id else None
+
+    @staticmethod
+    def reps_tag(user, guild) -> bool:
+        """Is this server's tag the one shown beside their name?
+
+        Discord's own warning: somebody can have the tag switched on while
+        the guild id reads None, when the tag changed and they have not
+        reaffirmed it. So the id has to match, not merely the switch.
+        """
+        shown = getattr(user, "primary_guild", None)
+        return bool(shown and shown.id == guild.id and shown.identity_enabled)
+
+    async def sync_tag_role(self, member) -> bool:
+        """Hand the role over, or take it back. True if anything changed."""
+        guild = member.guild
+        role = self.tag_role(guild)
+        if role is None or member.bot:
+            return False
+        if usable_role(guild, role):
+            return False
+        if not guild.me.guild_permissions.manage_roles:
+            return False
+        wanted = self.reps_tag(member, guild)
+        if wanted == (role in member.roles):
+            return False
+        try:
+            if wanted:
+                await member.add_roles(role, reason="Reps the server tag")
+            else:
+                await member.remove_roles(role, reason="Dropped the server tag")
+        except discord.HTTPException:
+            return False
+        return True
+
+    async def catch_up_tag_role(self, guild) -> int:
+        """Put every member right in one pass, and say how many moved."""
+        changed = 0
+        for member in guild.members:
+            if await self.sync_tag_role(member):
+                changed += 1
+        return changed
+
+    def tagrole_embed(self, guild, prefix: str) -> discord.Embed:
+        role = self.tag_role(guild)
+        repping = sum(1 for m in guild.members
+                      if not m.bot and self.reps_tag(m, guild))
+        embed = discord.Embed(title="Server tag role",
+                              colour=config.CARD_COLOUR)
+        embed.add_field(name="Role", value=role.mention if role else "Off")
+        embed.add_field(name="Repping the tag", value=f"{repping:,}")
+        if role:
+            problem = usable_role(guild, role)
+            if problem:
+                embed.add_field(name="But", value=problem, inline=False)
+        embed.add_field(name="Change it", value=(
+            f"`{prefix}tagrole @role` to set it\n"
+            f"`{prefix}tagrole sync` to catch up everyone already repping\n"
+            f"`{prefix}tagrole off` to stop"), inline=False)
+        return embed
+
+    @commands.group(name="tagrole", aliases=["servertag", "tagroles"],
+                    invoke_without_command=True)
+    @commands.guild_only()
+    @commands.has_permissions(manage_roles=True)
+    async def tagrole(self, ctx, *, role: FuzzyRole = None):
+        """Give a role to everybody who reps this server's tag."""
+        if role is None:
+            await ctx.send(embed=self.tagrole_embed(ctx.guild, ctx.prefix))
+            return
+        problem = usable_role(ctx.guild, role)
+        if problem:
+            await ctx.send(problem)
+            return
+        self.db.set_pref(ctx.guild.id, "tag_role", role.id)
+        async with ctx.typing():
+            changed = await self.catch_up_tag_role(ctx.guild)
+        await ctx.send(
+            f"Anyone repping this server's tag now gets **{role.name}**."
+            f" {changed:,} sorted out just now.",
+            allowed_mentions=discord.AllowedMentions.none())
+
+    @tagrole.command(name="off", aliases=["clear", "stop", "disable"])
+    @commands.has_permissions(manage_roles=True)
+    async def tagrole_off(self, ctx):
+        """Stop giving a role for the tag."""
+        self.db.set_pref(ctx.guild.id, "tag_role", 0)
+        await ctx.send("No role for the server tag any more. Nobody has lost"
+                       " the one they already have.")
+
+    @tagrole.command(name="sync", aliases=["refresh", "catchup"])
+    @commands.has_permissions(manage_roles=True)
+    async def tagrole_sync(self, ctx):
+        """Catch up everyone who already reps the tag, or has stopped."""
+        if self.tag_role(ctx.guild) is None:
+            await ctx.send("No tag role set yet."
+                           f" `{ctx.prefix}tagrole @role` picks one.")
+            return
+        async with ctx.typing():
+            changed = await self.catch_up_tag_role(ctx.guild)
+        await ctx.send(f"Sorted {changed:,} out.")
+
+    @commands.Cog.listener()
+    async def on_user_update(self, before, after):
+        """Somebody put the tag on, or took it off.
+
+        It has to be this event rather than on_member_update: the tag lives
+        on the user, and the member copy that on_member_update is handed
+        shares that same user object, so its before and after would always
+        read alike.
+        """
+        if tag_state(before) == tag_state(after):
+            return
+        for guild in self.bot.guilds:
+            if not self.db.get_pref(guild.id, "tag_role", 0):
+                continue
+            member = guild.get_member(after.id)
+            if member is not None:
+                await self.sync_tag_role(member)
 
     # --------------------------------------------------- welcome & goodbye
 
@@ -363,6 +502,7 @@ class ServerSetup(commands.Cog):
     async def on_member_join(self, member):
         if not member.bot and not member.pending:
             await self.give_autoroles(member)
+            await self.sync_tag_role(member)
         await self.greet(member, "welcome")
 
     @commands.Cog.listener()
@@ -370,6 +510,7 @@ class ServerSetup(commands.Cog):
         # Behind membership screening, roles wait until they've agreed.
         if before.pending and not after.pending and not after.bot:
             await self.give_autoroles(after)
+            await self.sync_tag_role(after)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
