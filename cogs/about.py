@@ -103,8 +103,8 @@ class About(commands.Cog):
         embed = discord.Embed(
             title="About",
             description=(
-                "A gacha bot in the shape of Mudae, with its own roster and"
-                " its own currency.\n\n"
+                "A rolling-and-claiming gacha with its own roster and its own"
+                " currency.\n\n"
                 f"**{db.character_count():,} characters** are loaded, ranked by"
                 " how many people on AniList have actually favourited them —"
                 " so what a character is worth is measured, not guessed."

@@ -932,7 +932,7 @@ HOME_BODY = r"""<nav><div class="wrap nav-in">
 <header class="hero"><div>
   <p class="eyebrow">Gacha · Moderation · Voice · Levels</p>
   <h1>Roll for <em>__TOTAL__</em> characters.<br>Run the server too.</h1>
-  <p class="lede">A gacha bot in the shape of Mudae, with its own roster and
+  <p class="lede">A rolling-and-claiming gacha with its own roster and its own
   currency, plus the moderation, voice rooms and levels a server needs, so
   one bot does the job of four.</p>
   <div class="cta">

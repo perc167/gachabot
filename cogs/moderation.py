@@ -202,7 +202,7 @@ class Moderation(commands.Cog):
     @commands.command(name="cleanself")
     @commands.guild_only()
     async def cleanself(self, ctx):
-        """The same as $selfreset, under Mudae's name for it."""
+        """The same as $selfreset, under the name you may be used to."""
         await self.selfreset(ctx)
 
     @commands.command(name="forcedivorce", aliases=["moddivorce"])

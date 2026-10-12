@@ -347,7 +347,7 @@ class Dashboard(commands.Cog):
                 f"**Add {name} to your server** \u2014 a gacha, moderation, voice"
                 f" rooms and levels, in one bot.\n\n"
                 f"\U0001f3b2 **Gacha:** roll and claim from {total:,} characters,"
-                " Mudae style, with wishes, trades, badges and a karuda tower\n"
+                " with wishes, trades, badges and a karuda tower\n"
                 "\U0001f6e1\ufe0f **Moderation:** jail, mutes, warnings, bans, automod,"
                 " an antinuke and staff points\n"
                 "\U0001f50a **Voice:** Join To Create rooms people run themselves,"
