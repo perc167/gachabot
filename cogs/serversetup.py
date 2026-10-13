@@ -4,6 +4,7 @@ as easy as they can be:
 
 Autoroles       $autorole opens a menu: tick the roles new members get.
 Server tag      $tagrole @role for everybody repping the server's tag.
+Sticky roles    $stickyrole add @role, and it survives them leaving.
 Welcome         $welcome #channel turns it on with a friendly default;
 Goodbye         $welcome message <text> to change what it says.
 Reaction roles  $reactionrole add <message link> <emoji> @role
@@ -341,6 +342,157 @@ class ServerSetup(commands.Cog):
             if member is not None:
                 await self.sync_tag_role(member)
 
+    # ---------------------------------------------------------- sticky roles
+
+    def sticky_choice(self, guild):
+        """Which roles come back: a set of ids, or None meaning all of them."""
+        if self.db.get_pref(guild.id, "sticky_all", 0):
+            return None
+        return set(self.db.sticky_roles_of(guild.id))
+
+    def sticky_on(self, guild) -> bool:
+        chosen = self.sticky_choice(guild)
+        return chosen is None or bool(chosen)
+
+    def sticky_keeps(self, guild, role) -> bool:
+        """Is this role one to hold on to?
+
+        Not @everyone, which everyone has anyway, and not a role Discord
+        hands out itself - a booster role or a bot's own - because those
+        cannot be given back by anybody. Never the jail role: that comes
+        back on its own, from the moderation side.
+        """
+        if role.is_default() or role.managed:
+            return False
+        if role.id == self.db.get_mod_config(guild.id, "jail_role"):
+            return False
+        chosen = self.sticky_choice(guild)
+        return chosen is None or role.id in chosen
+
+    async def remember_sticky(self, member):
+        """What they had on the way out."""
+        guild = member.guild
+        if member.bot or not self.sticky_on(guild):
+            return
+        self.db.remember_roles(guild.id, member.id,
+                               [r.id for r in member.roles
+                                if self.sticky_keeps(guild, r)])
+
+    async def restore_sticky(self, member) -> int:
+        """Hand them back. Returns how many roles were returned."""
+        guild = member.guild
+        if member.bot:
+            return 0
+        saved = self.db.roles_left_with(guild.id, member.id)
+        if not saved:
+            return 0
+        # Somebody who left jailed comes back jailed and nothing else. The
+        # jail reapplies itself from the moderation side, and handing back
+        # what they had before it would quietly undo the punishment - which
+        # is the whole reason leaving and rejoining is worth watching.
+        if self.db.jail_record(guild.id, member.id):
+            return 0
+        if not guild.me.guild_permissions.manage_roles:
+            return 0
+        roles = []
+        for role_id in saved:
+            role = guild.get_role(role_id)
+            if (role and self.sticky_keeps(guild, role)
+                    and not usable_role(guild, role)
+                    and role not in member.roles):
+                roles.append(role)
+        if not roles:
+            return 0
+        try:
+            await member.add_roles(*roles, reason="Had these before leaving")
+        except discord.HTTPException:
+            return 0
+        self.db.forget_roles(guild.id, member.id)
+        return len(roles)
+
+    def stickyrole_embed(self, guild, prefix: str) -> discord.Embed:
+        chosen = self.sticky_choice(guild)
+        embed = discord.Embed(title="Sticky roles", colour=config.CARD_COLOUR,
+                              description="Roles somebody gets back when they"
+                                          " leave and come back.")
+        if chosen is None:
+            embed.add_field(name="Sticking", value="Every role they had",
+                            inline=False)
+        elif chosen:
+            shown = []
+            for role_id in chosen:
+                role = guild.get_role(role_id)
+                shown.append(role.mention if role else f"a deleted role")
+            embed.add_field(name=f"Sticking ({len(shown)})",
+                            value=", ".join(shown)[:1024], inline=False)
+        else:
+            embed.add_field(name="Sticking", value="Nothing yet, so this is off.",
+                            inline=False)
+        embed.add_field(name="For how long",
+                        value=f"{self.db.STICKY_DAYS} days after they leave")
+        embed.add_field(name="Never", value="The jail role, booster roles,"
+                                            " and anything above me")
+        embed.add_field(name="Change it", value=(
+            f"`{prefix}stickyrole add @role` to add one\n"
+            f"`{prefix}stickyrole remove @role` to drop one\n"
+            f"`{prefix}stickyrole all` for every role they had\n"
+            f"`{prefix}stickyrole clear` to turn it off"), inline=False)
+        return embed
+
+    @commands.group(name="stickyrole", aliases=["stickyroles"],
+                    invoke_without_command=True)
+    @commands.guild_only()
+    @commands.has_permissions(manage_roles=True)
+    async def stickyrole(self, ctx):
+        """Roles that come back when somebody rejoins."""
+        await ctx.send(embed=self.stickyrole_embed(ctx.guild, ctx.prefix))
+
+    @stickyrole.command(name="add")
+    @commands.has_permissions(manage_roles=True)
+    async def stickyrole_add(self, ctx, *, role: FuzzyRole):
+        """Make one role stick."""
+        problem = usable_role(ctx.guild, role)
+        if problem:
+            await ctx.send(problem)
+            return
+        self.db.set_pref(ctx.guild.id, "sticky_all", 0)
+        self.db.replace_sticky_roles(
+            ctx.guild.id, self.db.sticky_roles_of(ctx.guild.id) + [role.id])
+        await ctx.send(f"**{role.name}** will come back with them.",
+                       allowed_mentions=discord.AllowedMentions.none())
+
+    @stickyrole.command(name="remove", aliases=["delete", "del"])
+    @commands.has_permissions(manage_roles=True)
+    async def stickyrole_remove(self, ctx, *, role: FuzzyRole):
+        """Stop one role sticking."""
+        kept = [r for r in self.db.sticky_roles_of(ctx.guild.id) if r != role.id]
+        self.db.replace_sticky_roles(ctx.guild.id, kept)
+        await ctx.send(f"**{role.name}** won't come back any more.",
+                       allowed_mentions=discord.AllowedMentions.none())
+
+    @stickyrole.command(name="all", aliases=["everything"])
+    @commands.has_permissions(manage_roles=True)
+    async def stickyrole_all(self, ctx):
+        """Every role they had comes back."""
+        self.db.set_pref(ctx.guild.id, "sticky_all", 1)
+        await ctx.send("Everything they had comes back with them, apart from"
+                       " the jail role, booster roles, and anything above me.")
+
+    @stickyrole.command(name="clear", aliases=["off", "none", "reset"])
+    @commands.has_permissions(manage_roles=True)
+    async def stickyrole_clear(self, ctx):
+        """Nothing sticks."""
+        self.db.set_pref(ctx.guild.id, "sticky_all", 0)
+        self.db.replace_sticky_roles(ctx.guild.id, [])
+        await ctx.send("Nothing sticks now. Anyone who rejoins arrives with"
+                       " whatever new members get.")
+
+    @stickyrole.command(name="list", aliases=["show"])
+    @commands.has_permissions(manage_roles=True)
+    async def stickyrole_list(self, ctx):
+        """See what sticks."""
+        await ctx.send(embed=self.stickyrole_embed(ctx.guild, ctx.prefix))
+
     # --------------------------------------------------- welcome & goodbye
 
     def greeting_embed(self, guild, kind: str, p: str = "$") -> discord.Embed:
@@ -501,6 +653,8 @@ class ServerSetup(commands.Cog):
     @commands.Cog.listener()
     async def on_member_join(self, member):
         if not member.bot and not member.pending:
+            # Their own roles first, then the ones every new member gets.
+            await self.restore_sticky(member)
             await self.give_autoroles(member)
             await self.sync_tag_role(member)
         await self.greet(member, "welcome")
@@ -509,11 +663,15 @@ class ServerSetup(commands.Cog):
     async def on_member_update(self, before, after):
         # Behind membership screening, roles wait until they've agreed.
         if before.pending and not after.pending and not after.bot:
+            await self.restore_sticky(after)
             await self.give_autoroles(after)
             await self.sync_tag_role(after)
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
+        # Before the goodbye: the roles are read off the member object, and
+        # this is the last moment it exists.
+        await self.remember_sticky(member)
         await self.greet(member, "goodbye")
 
     # ------------------------------------------------------ reaction roles

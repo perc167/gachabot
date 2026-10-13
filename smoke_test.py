@@ -563,6 +563,24 @@ async def main():
           ss.tag_state(here_tag(SG, True)) != ss.tag_state(here_tag(SG, False)))
     check("leaving the tag alone reads as no change",
           ss.tag_state(here_tag(SG, True)) == ss.tag_state(here_tag(SG, True)))
+
+    # Sticky roles: what somebody gets back when they come back.
+    db.replace_sticky_roles(SG, [11, 12, 11])
+    check("sticky roles save without repeats", db.sticky_roles_of(SG) == [11, 12])
+    db.remember_roles(SG, ALICE, [11, 12, 13])
+    check("what they left with is kept",
+          db.roles_left_with(SG, ALICE) == [11, 12, 13])
+    db.conn.execute("UPDATE sticky_members SET left_at = ? WHERE guild_id = ?",
+                    (int(time.time()) - (db.STICKY_DAYS + 1) * 86400, SG))
+    db.conn.commit()
+    check("roles stop coming back after a month",
+          db.roles_left_with(SG, ALICE) == [])
+    db.remember_roles(SG, ALICE, [11])
+    db.forget_roles(SG, ALICE)
+    check("roles can be forgotten", db.roles_left_with(SG, ALICE) == [])
+    db.remember_roles(SG, ALICE, [])
+    check("somebody with nothing worth keeping leaves no row",
+          db.roles_left_with(SG, ALICE) == [])
     db.add_reaction_role(SG, 1, 99, ss.emoji_key("❤️"), 7)
     check("a reaction role is found by message and emoji",
           db.reaction_role(99, ss.emoji_key("❤"))["role_id"] == 7

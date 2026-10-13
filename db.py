@@ -413,6 +413,26 @@ CREATE TABLE IF NOT EXISTS autoroles (
     PRIMARY KEY (guild_id, role_id)
 );
 
+-- Sticky roles: which roles are handed back when somebody rejoins. An empty
+-- list means the feature is off, unless the sticky_all preference is set, in
+-- which case every role a member could be given back is.
+CREATE TABLE IF NOT EXISTS sticky_roles (
+    guild_id INTEGER NOT NULL,
+    role_id  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, role_id)
+);
+
+-- What somebody had on the way out. Rows expire, because keeping a role list
+-- for everybody who ever left a server is a pile of personal data that grows
+-- and is never read again.
+CREATE TABLE IF NOT EXISTS sticky_members (
+    guild_id INTEGER NOT NULL,
+    user_id  INTEGER NOT NULL,
+    roles    TEXT NOT NULL,
+    left_at  INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+);
+
 -- kind is 'welcome' or 'goodbye'. channel 0 is off.
 CREATE TABLE IF NOT EXISTS greetings (
     guild_id   INTEGER NOT NULL,
@@ -1552,6 +1572,59 @@ class Database:
             self.conn.execute("DELETE FROM autoroles WHERE guild_id = ?", (guild_id,))
             self.conn.executemany("INSERT INTO autoroles (guild_id, role_id) VALUES (?, ?)",
                                   [(guild_id, r) for r in dict.fromkeys(role_ids)])
+
+    # ---------- sticky roles ----------
+
+    # How long a leaver's roles are worth keeping. Long enough to cover a
+    # falling-out and a change of heart; short enough that the table is not a
+    # record of everybody who has ever been in the server.
+    STICKY_DAYS = 30
+
+    def sticky_roles_of(self, guild_id: int) -> list:
+        return [r["role_id"] for r in self._select("sticky_roles", guild_id=guild_id)]
+
+    def replace_sticky_roles(self, guild_id: int, role_ids):
+        with self.conn:
+            self.conn.execute("DELETE FROM sticky_roles WHERE guild_id = ?",
+                              (guild_id,))
+            self.conn.executemany(
+                "INSERT INTO sticky_roles (guild_id, role_id) VALUES (?, ?)",
+                [(guild_id, r) for r in dict.fromkeys(role_ids)])
+
+    def remember_roles(self, guild_id: int, user_id: int, role_ids):
+        """Keep what somebody had on the way out, and sweep the old rows."""
+        cutoff = int(time.time()) - self.STICKY_DAYS * 86400
+        with self.conn:
+            self.conn.execute("DELETE FROM sticky_members WHERE left_at < ?",
+                              (cutoff,))
+            if not role_ids:
+                self.conn.execute(
+                    "DELETE FROM sticky_members WHERE guild_id = ? AND user_id = ?",
+                    (guild_id, user_id))
+                return
+            self.conn.execute(
+                "INSERT INTO sticky_members (guild_id, user_id, roles, left_at)"
+                " VALUES (?, ?, ?, ?) ON CONFLICT (guild_id, user_id)"
+                " DO UPDATE SET roles = excluded.roles, left_at = excluded.left_at",
+                (guild_id, user_id, ",".join(str(int(r)) for r in role_ids),
+                 int(time.time())))
+
+    def roles_left_with(self, guild_id: int, user_id: int) -> list:
+        """What they had when they left, or [] if it was too long ago."""
+        row = self.conn.execute(
+            "SELECT roles, left_at FROM sticky_members"
+            " WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)).fetchone()
+        if not row:
+            return []
+        if row["left_at"] < int(time.time()) - self.STICKY_DAYS * 86400:
+            return []
+        return [int(part) for part in row["roles"].split(",") if part]
+
+    def forget_roles(self, guild_id: int, user_id: int):
+        with self.conn:
+            self.conn.execute(
+                "DELETE FROM sticky_members WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id))
 
     def greeting(self, guild_id: int, kind: str) -> dict:
         rows = self._select("greetings", guild_id=guild_id, kind=kind)
