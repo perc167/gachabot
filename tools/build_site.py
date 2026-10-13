@@ -186,10 +186,12 @@ PAGE = r"""<title>__TITLE__</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 :root{
-  --ink:#080B0D; --panel:#10171A; --raise:#172126; --line:#24343A;
-  --text:#E6EEF0; --dim:#8FA4A9; --faint:#5E7177;
-  --accent:#93C2CC; --accent-soft:#B8DCE3; --gold:#E5C55A; --mist:#5E8A96;
-  --ok:#43B581;
+  --ink:#F4F9FF; --panel:#FFFFFF; --raise:#EAF4FE; --line:#D3E6F7;
+  --text:#1E3A57; --dim:#4F6F8F; --faint:#7F9AB5;
+  --accent:#8CCBF5; --accent-soft:#B6DFFA; --accent-ink:#2471B3; --on-accent:#0F2C48;
+  --gold:#F3C64F; --gold-ink:#93670A; --code:#3A64B8; --mist:#86A9D6;
+  --shadow:0 8px 22px -14px rgba(52,120,190,.45);
+  --ok:#2E9E6A;
   --display:"Sora","Segoe UI",system-ui,sans-serif;
   --body:"Zen Kaku Gothic New","Hiragino Sans","Segoe UI",system-ui,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
@@ -207,19 +209,19 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 
-/* ---- the sky: the glacier behind everything, snow on a canvas, and two
-   soft glows ---- */
+/* ---- the sky: soft baby-blue clouds behind everything, bubbles and little
+   hearts floating up on a canvas, and two soft glows ---- */
 .backdrop{position:fixed;inset:0;z-index:-3;pointer-events:none;
-  background:linear-gradient(180deg,rgba(8,11,13,.5),rgba(8,11,13,.82) 45%,var(--ink) 85%),
-    url(img/glacier.webp) center top/cover no-repeat}
+  background:linear-gradient(180deg,rgba(244,249,255,.15),rgba(244,249,255,.6) 50%,var(--ink) 90%),
+    url(img/sky.webp) center top/cover no-repeat}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;
-  filter:blur(90px);opacity:.28}
+  filter:blur(90px);opacity:.45}
 .glow.a{width:620px;height:620px;left:-180px;top:-160px;
   background:radial-gradient(circle,var(--accent),transparent 70%);
   animation:float 26s ease-in-out infinite alternate}
 .glow.b{width:560px;height:560px;right:-200px;top:38vh;
-  background:radial-gradient(circle,var(--mist),transparent 70%);opacity:.16;
+  background:radial-gradient(circle,var(--mist),transparent 70%);opacity:.3;
   animation:float 32s ease-in-out infinite alternate-reverse}
 @keyframes float{to{transform:translate(60px,40px) scale(1.08)}}
 
@@ -249,14 +251,14 @@ body{
   .feature:hover,.cmd:hover{transform:none}
 }
 .wrap{max-width:1120px;margin:0 auto;padding-inline:20px}
-a{color:var(--accent-soft);text-decoration:none}
+a{color:var(--accent-ink);text-decoration:none}
 a:hover{text-decoration:underline}
-:focus-visible{outline:2px solid var(--accent-soft);outline-offset:3px;border-radius:4px}
+:focus-visible{outline:2px solid var(--accent-ink);outline-offset:3px;border-radius:4px}
 
 /* ---- nav ---- */
 nav{
   position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
-  background:rgba(8,11,13,.86);backdrop-filter:blur(12px);
+  background:rgba(255,255,255,.82);backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
 }
 .nav-in{display:flex;align-items:center;gap:22px;height:58px}
@@ -265,7 +267,7 @@ nav{
   color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
 }
 .brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
-  box-shadow:0 0 0 1px rgba(184,220,227,.45)}
+  box-shadow:0 0 0 1px rgba(140,203,245,.7)}
 
 /* ---- the account chip, right of Dashboard ---- */
 .acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
@@ -281,7 +283,7 @@ nav{
 .hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
 .hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:1;
   max-height:520px;justify-self:end;
-  box-shadow:0 30px 80px -30px rgba(147,194,204,.7),0 0 0 1px rgba(184,220,227,.25);
+  box-shadow:0 30px 80px -30px rgba(80,160,230,.6),0 0 0 4px #fff,0 0 0 5px rgba(140,203,245,.6);
   -webkit-mask-image:linear-gradient(#000 78%,transparent);
   mask-image:linear-gradient(#000 78%,transparent)}
 .hero-art img{width:100%;height:100%;object-fit:cover;display:block;
@@ -297,23 +299,23 @@ nav{
 header{padding-block:64px 44px;border-bottom:1px solid var(--line)}
 .eyebrow{
   font-family:var(--mono);font-size:12px;letter-spacing:.14em;
-  text-transform:uppercase;color:var(--accent-soft);margin:0 0 14px;
+  text-transform:uppercase;color:var(--accent-ink);margin:0 0 14px;
 }
 h1{
   font-family:var(--display);font-weight:700;letter-spacing:-.03em;
   font-size:clamp(34px,6vw,58px);line-height:1.04;margin:0 0 18px;
   text-wrap:balance;
 }
-h1 em{font-style:normal;color:var(--accent-soft)}
+h1 em{font-style:normal;color:var(--accent-ink)}
 .lede{font-size:clamp(16px,2vw,19px);color:var(--dim);max-width:60ch;margin:0}
 .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
 .btn{
   font-family:var(--display);font-weight:600;font-size:15px;
   padding:11px 20px;border-radius:10px;border:1px solid transparent;
-  background:var(--accent);color:#06090B;display:inline-block;
+  background:var(--accent);color:var(--on-accent);display:inline-block;
 }
 .btn:hover{background:var(--accent-soft);text-decoration:none}
-.btn.ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn.ghost{background:#fff;border-color:var(--line);color:var(--text)}
 .btn.ghost:hover{border-color:var(--accent);background:var(--raise)}
 
 .stats{display:flex;flex-wrap:wrap;gap:34px;margin-top:40px}
@@ -337,10 +339,10 @@ h2{
 .step{
   display:grid;grid-template-columns:44px 1fr;gap:18px;align-items:start;
   background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:20px 22px;
+  padding:20px 22px;box-shadow:var(--shadow);
 }
 .step .num{
-  font-family:var(--mono);font-size:13px;color:var(--accent-soft);
+  font-family:var(--mono);font-size:13px;color:var(--accent-ink);
   background:var(--raise);border:1px solid var(--line);border-radius:9px;
   width:36px;height:36px;display:grid;place-items:center;
 }
@@ -353,11 +355,11 @@ h2{
 code,kbd{
   font-family:var(--mono);font-size:13.5px;
   background:var(--raise);border:1px solid var(--line);
-  padding:2px 7px;border-radius:6px;color:var(--gold);white-space:nowrap;
+  padding:2px 7px;border-radius:6px;color:var(--code);white-space:nowrap;
 }
 .cmdline{
-  display:block;background:#050809;border:1px solid var(--line);
-  border-radius:10px;padding:12px 15px;color:var(--gold);
+  display:block;background:#F0F7FF;border:1px solid var(--line);
+  border-radius:10px;padding:12px 15px;color:var(--code);
   font-family:var(--mono);font-size:14px;overflow-x:auto;white-space:pre;
 }
 .note{
@@ -379,7 +381,7 @@ code,kbd{
   padding:7px 12px;border-radius:999px;cursor:pointer;
 }
 .chip[aria-pressed="true"]{
-  background:var(--accent);border-color:var(--accent);color:#06090B;font-weight:600;
+  background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600;
 }
 .group{margin-bottom:34px}
 .group h3{
@@ -395,7 +397,7 @@ code,kbd{
   background:var(--panel);border:1px solid var(--line);border-radius:11px;
   padding:12px 14px;
 }
-.cmd .n{font-family:var(--mono);font-size:14px;color:var(--accent-soft);font-weight:500}
+.cmd .n{font-family:var(--mono);font-size:14px;color:var(--accent-ink);font-weight:500}
 .cmd .b{display:block;font-size:14px;color:var(--dim);margin-top:3px}
 .cmd .a{
   display:block;font-family:var(--mono);font-size:11.5px;color:var(--faint);
@@ -412,7 +414,7 @@ code,kbd{
 .feature{
   position:relative;cursor:pointer;
   background:var(--panel);border:1px solid var(--line);border-radius:14px;
-  padding:20px;display:flex;flex-direction:column;overflow:hidden;
+  padding:20px;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow);
   transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;
 }
 .feature::before{
@@ -421,20 +423,20 @@ code,kbd{
 }
 .feature:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px)}
 .feature.on{border-color:var(--accent);background:var(--raise);
-  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(147,194,204,.55)}
+  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(80,160,230,.5)}
 .feature.on::before{transform:scaleX(1)}
 /* The title is the button; this stretches it over the whole card, so the
    card clicks as one without a list and paragraph inside a <button>. */
 .feature .pick{all:unset;cursor:pointer;color:inherit}
 .feature .pick::after{content:"";position:absolute;inset:0;border-radius:14px}
-.feature .pick:focus-visible::after{outline:2px solid var(--accent-soft);outline-offset:2px}
+.feature .pick:focus-visible::after{outline:2px solid var(--accent-ink);outline-offset:2px}
 .feature .ic{font-size:22px;line-height:1;margin-bottom:12px}
 .feature h3{font-family:var(--display);font-weight:600;font-size:18px;margin:0 0 6px}
 .feature p{color:var(--dim);font-size:14.5px;margin:0 0 12px}
 .feature ul{margin:0 0 16px;padding-left:18px;color:var(--dim);font-size:14px}
 .feature li{margin-bottom:3px}
 .feature .go{margin-top:auto;font-family:var(--mono);font-size:12.5px;
-  color:var(--accent-soft)}
+  color:var(--accent-ink)}
 .feature.on .go{color:var(--text)}
 
 .segs{display:grid;gap:10px;grid-template-columns:repeat(5,1fr);margin-bottom:22px}
@@ -449,45 +451,45 @@ code,kbd{
 }
 .seg:hover{border-color:var(--accent);background:var(--raise);color:var(--text)}
 .seg[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);
-  color:#06090B}
+  color:var(--on-accent)}
 
 /* Setup steps read as a path: a faint line joins the numbers between cards. */
 .steps{position:relative}
 .steps::before{content:"";position:absolute;left:40px;top:30px;bottom:30px;width:2px;
-  background:linear-gradient(var(--accent),var(--mist));opacity:.3}
+  background:linear-gradient(var(--accent),var(--mist));opacity:.6}
 .step{position:relative}
 .cmdline{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:560px){
   .step{grid-template-columns:1fr;gap:10px;padding:18px}
   .steps::before{display:none}
 }
-.step .num{border-radius:50%;background:var(--ink);border-color:var(--accent);
+.step .num{border-radius:50%;background:var(--raise);border-color:var(--accent);
   color:var(--text);font-weight:600}
 
 .band{display:flex;flex-wrap:wrap;align-items:center;gap:22px 34px;
   justify-content:space-between;padding:30px 32px;border-radius:18px;
   border:1px solid var(--line);
-  background:linear-gradient(120deg,rgba(147,194,204,.18),rgba(94,138,150,.10))}
+  background:linear-gradient(120deg,rgba(140,203,245,.35),rgba(255,255,255,.75));box-shadow:var(--shadow)}
 .band h2{margin:0 0 6px}
 .band p{margin:0;color:var(--dim);max-width:52ch}
 .discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
   font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
   border-radius:11px;transition:background .15s,transform .15s}
 .discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
-.premium-band{border-color:rgba(229,197,90,.45);
-  background:linear-gradient(120deg,rgba(229,197,90,.16),rgba(147,194,204,.14) 60%,rgba(94,138,150,.10))}
-.btn.gold{background:var(--gold);color:#1a1405}
+.premium-band{border-color:rgba(243,198,79,.6);
+  background:linear-gradient(120deg,rgba(255,236,170,.4),rgba(255,255,255,.85) 35%,rgba(140,203,245,.4))}
+.btn.gold{background:var(--gold);color:#3A2A00}
 .pgroups{flex-basis:100%;display:grid;gap:12px;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.pgroup{background:rgba(6,10,12,.35);border:1px solid var(--line);border-radius:12px;
+.pgroup{background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:12px;
   padding:12px 14px 4px}
-.pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold)}
+.pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold-ink)}
 .pgroup ul{margin:0 0 8px;padding-left:17px;font-size:14px;color:var(--dim)}
 .pgroup li{margin-bottom:3px}
-.pgroup h3 .plus{font:600 11px var(--body);color:#1a1405;background:var(--gold);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
-.btn.gold:hover{background:#f0d27a}
+.pgroup h3 .plus{font:600 11px var(--body);color:#3A2A00;background:var(--gold);border-radius:99px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.btn.gold:hover{background:#F8D676}
 .nav-in .dash{font-family:var(--display);font-weight:600;font-size:13.5px;
-  padding:7px 14px;border-radius:9px;background:var(--accent);color:#06090B}
+  padding:7px 14px;border-radius:9px;background:var(--accent);color:var(--on-accent)}
 .nav-in .dash:hover{background:var(--accent-soft);text-decoration:none}
 .page-head{padding-block:48px 8px}
 .page-head h1{font-size:clamp(30px,5vw,44px);margin-bottom:10px}
@@ -531,7 +533,7 @@ code,kbd{
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(146px,1fr))}
 .card{
   background:var(--panel);border:1px solid var(--line);border-radius:12px;
-  overflow:hidden;display:flex;flex-direction:column;
+  overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow);
 }
 .card .art{
   aspect-ratio:3/4;max-width:100%;width:100%;object-fit:cover;
@@ -545,7 +547,7 @@ code,kbd{
 .card .sr{font-size:11.5px;color:var(--faint);display:block;margin-top:2px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .card .kr{
-  font-family:var(--mono);font-size:11.5px;color:var(--gold);margin-top:7px;
+  font-family:var(--mono);font-size:11.5px;color:var(--gold-ink);margin-top:7px;
   display:flex;justify-content:space-between;font-variant-numeric:tabular-nums;
 }
 .card .kr span{color:var(--faint)}
@@ -556,20 +558,20 @@ code,kbd{
 .secret-toggle{margin-top:4px;cursor:pointer;border-color:var(--mist);
   color:var(--mist);flex:none}
 .secret-toggle:hover{background:var(--raise);border-color:var(--mist)}
-.secret-toggle[aria-pressed="true"]{background:var(--mist);color:#06090B}
+.secret-toggle[aria-pressed="true"]{background:var(--mist);color:#fff}
 button.card{font:inherit;color:inherit;text-align:left;padding:0;
   cursor:pointer;width:100%}
 button.card:hover{border-color:var(--mist)}
 .card .kr.tag{color:var(--mist)}
-/* White behind secret art: transparent emotes drawn with black outlines
-   disappear into a dark card. */
+/* White behind secret art: transparent emotes are drawn for a white page,
+   and look washed out on the card's blue tint. */
 .secret-card .art,#album-img{background:#fff}
 .secret-card .art{object-fit:contain}
-.secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:#06090B}
+.secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:var(--raise)}
 
 #album{background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
-#album::backdrop{background:rgba(3,5,6,.84)}
+#album::backdrop{background:rgba(30,58,87,.55);backdrop-filter:blur(3px)}
 .album-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;
   font-family:var(--display);font-weight:600}
 #album-count{font-family:var(--mono);font-size:12px;color:var(--faint);
@@ -855,9 +857,9 @@ __BODY__<script>
 })();
 
 (function(){
-  // The sky: snow, a couple of hundred flakes falling slowly and swaying
-  // a little, like spray drifting off the glacier. It stops while the tab is
-  // hidden, and for reduced motion it's drawn once and left still.
+  // The sky: bubbles and a few little hearts, rising slowly and swaying a
+  // little, like the two over her head. It stops while the tab is hidden,
+  // and for reduced motion it's drawn once and left still.
   var canvas = document.getElementById("sky");
   if (!canvas || !canvas.getContext) return;
   var ctx = canvas.getContext("2d");
@@ -870,17 +872,17 @@ __BODY__<script>
     w = window.innerWidth; h = window.innerHeight;
     canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    var count = Math.min(200, Math.round(w * h / 9000));
+    var count = Math.min(70, Math.round(w * h / 24000));
     stars = [];
     for (var i = 0; i < count; i++) {
       stars.push({
         x: Math.random() * w, y: Math.random() * h,
-        r: Math.random() * 1.15 + 0.25,
-        a: Math.random() * 0.55 + 0.25,
+        r: Math.random() * 3.5 + 1.5,
+        a: Math.random() * 0.35 + 0.2,
         speed: Math.random() * 1.4 + 0.4,
         phase: Math.random() * Math.PI * 2,
-        drift: Math.random() * 0.28 + 0.06,
-        ice: Math.random() < 0.18
+        drift: Math.random() * 0.3 + 0.08,
+        heart: Math.random() < 0.3
       });
     }
   }
@@ -891,12 +893,33 @@ __BODY__<script>
       var s = stars[i];
       var twinkle = still ? 1 : 0.6 + 0.4 * Math.sin(t / 1000 * s.speed + s.phase);
       if (!still) {
-        s.y += s.drift;
-        s.x += Math.sin(t / 1000 * s.speed * 0.5 + s.phase) * 0.12;
-        if (s.y > h + 2) { s.y = -2; s.x = Math.random() * w; }
+        s.y -= s.drift;
+        s.x += Math.sin(t / 1000 * s.speed * 0.5 + s.phase) * 0.15;
+        if (s.y < -12) { s.y = h + 12; s.x = Math.random() * w; }
       }
-      ctx.fillStyle = (s.ice ? "rgba(205,232,238," : "rgba(255,255,255,") + (s.a * twinkle).toFixed(3) + ")";
-      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+      var a = (s.a * twinkle).toFixed(3);
+      ctx.beginPath();
+      if (s.heart) {
+        // Two arcs and a point: a heart about twice the bubble's size.
+        var k = s.r * 0.9;
+        ctx.moveTo(s.x, s.y + k * 1.6);
+        ctx.bezierCurveTo(s.x - k * 2.2, s.y + k * 0.2, s.x - k * 1.2, s.y - k * 1.6, s.x, s.y - k * 0.5);
+        ctx.bezierCurveTo(s.x + k * 1.2, s.y - k * 1.6, s.x + k * 2.2, s.y + k * 0.2, s.x, s.y + k * 1.6);
+        ctx.fillStyle = "rgba(110,185,240," + a + ")";
+        ctx.fill();
+      } else {
+        // A bubble: a pale fill, a brighter rim, and a glint.
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(170,215,248," + (a * 0.5).toFixed(3) + ")";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(110,180,235," + a + ")";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(s.x - s.r * 0.35, s.y - s.r * 0.35, s.r * 0.25, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255,255,255," + a + ")";
+        ctx.fill();
+      }
     }
   }
 
@@ -1081,10 +1104,10 @@ DOCUMENT = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Paper is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
-<meta name="color-scheme" content="dark">
+<meta name="color-scheme" content="light">
 <meta property="og:title" content="Paper">
 <meta property="og:image" content="__SITE_URL__/img/paper-512.png">
-<meta name="theme-color" content="#93C2CC">
+<meta name="theme-color" content="#8CCBF5">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/paper-180.png">
 <meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">

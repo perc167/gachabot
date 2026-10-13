@@ -59,8 +59,8 @@ from cogs.levels import (DEFAULT_MESSAGE, KARUDA_EVERY, MAX_LEVEL,
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PAGE = os.path.join(ROOT, "dashboard", "index.html")
 LOGO = os.path.join(ROOT, "dashboard", "paper.png")
-# The glacier behind the page, the same picture as the website's.
-BACKDROP = os.path.join(ROOT, "site", "img", "glacier.webp")
+# The sky behind the page, the same picture as the website's.
+BACKDROP = os.path.join(ROOT, "site", "img", "sky.webp")
 LINK_LIFETIME = 3600
 MAX_LEVEL_ROLES = 100
 SHOWCASE_CACHE = 300        # seconds the public server list is reused for
@@ -126,7 +126,7 @@ class Dashboard(commands.Cog):
         app.router.add_get("/", self.home)
         app.router.add_get("/dashboard", self.page)
         app.router.add_get("/paper.png", self.logo)
-        app.router.add_get("/glacier.webp", self.backdrop)
+        app.router.add_get("/sky.webp", self.backdrop)
         app.router.add_get("/login", self.login)
         app.router.add_get("/callback", self.callback)
         app.router.add_post("/logout", self.logout)

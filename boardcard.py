@@ -74,8 +74,8 @@ def _sky(size, accent) -> Image.Image:
         x0, y0, x1, y1 = box
         d.ellipse((x0 * fx, y0 * fy, x1 * fx, y1 * fy), fill=fill)
     oval((-40, -55, 130, 90), accent)
-    oval((155, 20, 275, 130), (94, 138, 150))
-    oval((-30, 110, 110, 240), (94, 138, 150))
+    oval((155, 20, 275, 130), (110, 175, 235))
+    oval((-30, 110, 110, 240), (110, 175, 235))
     oval((140, 100, 290, 250), accent)
     glow = small.filter(ImageFilter.GaussianBlur(26)).resize(size, Image.BICUBIC)
     base = Image.blend(base, glow, 0.33)

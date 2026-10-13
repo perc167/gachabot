@@ -69,7 +69,7 @@ def _default_background(accent) -> Image.Image:
     glow = Image.new("RGB", (WIDTH, HEIGHT), (8, 11, 13))
     draw = ImageDraw.Draw(glow)
     draw.ellipse((-160, -220, 520, 360), fill=accent)
-    draw.ellipse((620, 80, 1100, 520), fill=(94, 138, 150))
+    draw.ellipse((620, 80, 1100, 520), fill=(110, 175, 235))
     glow = glow.filter(ImageFilter.GaussianBlur(110))
     base = Image.blend(base, glow, 0.35)
     stars = ImageDraw.Draw(base)

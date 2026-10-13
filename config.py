@@ -133,7 +133,7 @@ CURRENCY_TITLE = "Karuda"
 
 # Card accent. One colour for every character - there are no rarity tiers,
 # a character's worth is its karuda value and its ranks.
-CARD_COLOUR = 0x93C2CC   # glacier: the pale teal of meltwater over ice
+CARD_COLOUR = 0x8CCBF5   # baby blue, the colour of her ribbon and hearts
 CLAIMED_COLOUR = 0x43B581
 
 # The eight kinds of shard a $dk can turn up.
