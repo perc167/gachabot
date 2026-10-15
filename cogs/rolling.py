@@ -1,9 +1,11 @@
 """Rolling and claiming — the core loop."""
+import asyncio
 import random
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 
+import artcache
 import config
 import perks
 import wishes
@@ -233,6 +235,30 @@ class Rolling(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.keep_art.start()
+
+    def cog_unload(self):
+        self.keep_art.cancel()
+
+    # A roll never waits for this. Showing a picture asks for a copy of it
+    # (utils.art_reference), and this fetches the ones that have been asked
+    # for since the last pass - so the roll that asked still links, and the
+    # next one to show that picture attaches it instead. Here rather than in
+    # a cog of its own because this is where the art gets shown.
+    @tasks.loop(seconds=20)
+    async def keep_art(self):
+        urls = artcache.waiting()
+        if not urls:
+            return
+        for url in urls:
+            data = await asyncio.to_thread(artcache.fetch, url)
+            if data:
+                artcache.store(url, data)
+        await asyncio.to_thread(artcache.sweep)
+
+    @keep_art.before_loop
+    async def before_keep_art(self):
+        await self.bot.wait_until_ready()
 
     @commands.command(name="roll", aliases=["m", "mx", "a", "mudae", "rolla"])
     @commands.guild_only()

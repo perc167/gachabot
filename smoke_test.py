@@ -1881,6 +1881,50 @@ async def main():
           not absent, str(len(absent)) + " missing: " + ", ".join(absent[:5]))
     check("bundled art is actually used", len(bundled) > 0, str(len(bundled)))
 
+    # Kept art: a linked picture the bot has sent before, so Discord stops
+    # fetching it and the picture arrives with the message instead of after.
+    import artcache
+    old_dir, artcache.CACHE_DIR = artcache.CACHE_DIR, tempfile.mkdtemp()
+    try:
+        one = "https://example.invalid/a/4.png"
+        two = "https://example.invalid/b/4.jpg"
+        check("two sites' 4.jpg are not the same picture",
+              artcache.name_for(one) != artcache.name_for(two))
+        check("an odd extension is kept as a jpeg",
+              artcache.name_for("https://x.invalid/a.bin").endswith(".jpg"))
+        check("bundled art is never cached twice",
+              artcache.cached("local:frame-x.jpg") is None)
+        # Cards built earlier in this run have already asked for their art,
+        # so start from an empty queue rather than from whatever they left.
+        artcache.waiting(10 ** 6)
+        artcache.want("local:frame-x.jpg")
+        artcache.want("ftp://nowhere/x.jpg")
+        check("only real links are queued", artcache.queued() == 0)
+        artcache.want(one)
+        artcache.want(one)
+        check("the same picture is only queued once", artcache.queued() == 1)
+        check("the queue drains", artcache.waiting() == [one]
+              and artcache.queued() == 0)
+        check("a picture too big to be worth it is refused",
+              artcache.store(one, b"z" * (artcache.BIGGEST + 1)) is False)
+        artcache.store(one, b"o" * 1000)
+        artcache.store(two, b"n" * 1000)
+        check("a kept picture is found again", artcache.cached(one) is not None)
+        check("an embed points at the attachment, not the link",
+              utils.art_reference(one).startswith("attachment://")
+              and utils.art_reference(
+                  "https://example.invalid/never-seen.jpg")
+              == "https://example.invalid/never-seen.jpg")
+        os.utime(artcache.path_for(one), (time.time() - 9999,
+                                          time.time() - 9999))
+        artcache.cached(two)
+        check("the sweep drops what was rolled longest ago",
+              artcache.sweep(cap=1500) == 1
+              and artcache.cached(one) is None
+              and artcache.cached(two) is not None)
+    finally:
+        artcache.CACHE_DIR = old_dir
+
     # The import path has its own opinion about what a usable image is, and
     # it silently skips characters it disagrees with.
     check("import accepts a bundled image",

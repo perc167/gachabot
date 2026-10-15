@@ -5,6 +5,7 @@ import time
 
 import discord
 
+import artcache
 import config
 import perks
 
@@ -105,24 +106,40 @@ def local_art_path(image_url):
     return path if name and os.path.exists(path) else None
 
 
+def art_on_disk(image_url):
+    """Where this picture is, if the bot has it: bundled or kept.
+
+    Bundled art ships with the bot. Kept art is a linked picture the bot has
+    sent before and holds a copy of, so Discord does not have to go and
+    fetch it again - see artcache.py.
+    """
+    return local_art_path(image_url) or artcache.cached(image_url)
+
+
 def art_file(image_url):
-    """A fresh discord.File for a bundled image, or None.
+    """A fresh discord.File for a picture the bot has, or None.
 
     Fresh every time on purpose: a File carries an open buffer that one send
     spends, so a paginator flipping back to a page it has already shown needs
     a new one rather than the old one again.
     """
-    path = local_art_path(image_url)
+    path = art_on_disk(image_url)
     if not path:
         return None
     return discord.File(path, filename=os.path.basename(path))
 
 
 def art_reference(image_url):
-    """What the embed should point at: an attachment, or the URL itself."""
-    path = local_art_path(image_url)
+    """What the embed should point at: an attachment, or the URL itself.
+
+    A picture the bot does not have yet is linked, the way it always was,
+    and asked for - so the roll is never held up waiting for a download, and
+    the next one that shows it arrives with its picture already on it.
+    """
+    path = art_on_disk(image_url)
     if path:
         return "attachment://" + os.path.basename(path)
+    artcache.want(image_url)
     return image_url
 
 
