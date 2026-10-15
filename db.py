@@ -452,6 +452,16 @@ CREATE TABLE IF NOT EXISTS reaction_roles (
     PRIMARY KEY (message_id, emoji)
 );
 
+-- A message whose reactions are capped. cap is how many each emoji may have;
+-- 0 means frozen, so no new reaction sticks at all.
+CREATE TABLE IF NOT EXISTS reaction_locks (
+    guild_id   INTEGER NOT NULL,
+    channel_id INTEGER NOT NULL,
+    message_id INTEGER NOT NULL,
+    cap        INTEGER NOT NULL,
+    PRIMARY KEY (message_id)
+);
+
 CREATE TABLE IF NOT EXISTS autoresponders (
     guild_id INTEGER NOT NULL,
     trigger  TEXT NOT NULL,
@@ -1654,6 +1664,22 @@ class Database:
             return self._delete("reaction_roles", guild_id=guild_id, message_id=message_id)
         return self._delete("reaction_roles", guild_id=guild_id, message_id=message_id,
                             emoji=emoji)
+
+    def reaction_locks_of(self, guild_id: int) -> list:
+        return self._select("reaction_locks", "message_id", guild_id=guild_id)
+
+    def reaction_lock(self, message_id: int):
+        rows = self._select("reaction_locks", message_id=message_id)
+        return rows[0] if rows else None
+
+    def set_reaction_lock(self, guild_id, channel_id, message_id, cap: int):
+        self._upsert("reaction_locks", {
+            "guild_id": guild_id, "channel_id": channel_id,
+            "message_id": message_id, "cap": max(0, int(cap))})
+
+    def remove_reaction_lock(self, guild_id: int, message_id: int) -> int:
+        return self._delete("reaction_locks", guild_id=guild_id,
+                            message_id=message_id)
 
     def autoresponders_of(self, guild_id: int) -> list:
         return self._select("autoresponders", "trigger", guild_id=guild_id)

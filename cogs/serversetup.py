@@ -8,6 +8,7 @@ Sticky roles    $stickyrole add @role, and it survives them leaving.
 Welcome         $welcome #channel turns it on with a friendly default;
 Goodbye         $welcome message <text> to change what it says.
 Reaction roles  $reactionrole add <message link> <emoji> @role
+Reaction locks  $reactionlock <message link> 20 caps a giveaway.
 Auto replies    $autoresponder add hello, hi there!
 Auto reactions  $autoreact add paper 📄
 
@@ -764,6 +765,99 @@ class ServerSetup(commands.Cog):
                 await member.remove_roles(role, reason="Reaction role")
             except discord.HTTPException:
                 pass
+
+    # ------------------------------------------------------ reaction locks
+
+    @commands.group(name="reactionlock", aliases=["rlock", "reactionlimit"],
+                    invoke_without_command=True)
+    @commands.guild_only()
+    @commands.has_permissions(manage_messages=True)
+    @commands.bot_has_permissions(manage_messages=True)
+    async def reactionlock(self, ctx, message: discord.Message, cap: int = 0):
+        """`$reactionlock <message link> 20`: only the first 20 reactions on
+        each emoji stick. Leave the number out to freeze it where it is."""
+        if message.guild != ctx.guild:
+            await ctx.send("That message isn't in this server.")
+            return
+        self.db.set_reaction_lock(ctx.guild.id, message.channel.id,
+                                  message.id, cap)
+        if cap:
+            await ctx.send(
+                f"Capped at {cap:,} per emoji. Anyone after that has their"
+                " reaction taken back off, so the first ones keep their place."
+                " Reactions already there are left alone.")
+        else:
+            await ctx.send("Frozen. What is on it stays, and nothing new"
+                           " sticks.")
+
+    @reactionlock.command(name="off", aliases=["unlock", "remove", "clear"])
+    @commands.has_permissions(manage_messages=True)
+    async def reactionlock_off(self, ctx, message: discord.Message):
+        """Let people react to it freely again."""
+        gone = self.db.remove_reaction_lock(ctx.guild.id, message.id)
+        await ctx.send("People can react to that freely again." if gone
+                       else "That message wasn't locked.")
+
+    @reactionlock.command(name="list", aliases=["show"])
+    @commands.has_permissions(manage_messages=True)
+    async def reactionlock_list(self, ctx):
+        """Every locked message here."""
+        rows = self.db.reaction_locks_of(ctx.guild.id)
+        lines = [("frozen" if not r["cap"] else f"{r['cap']:,} per emoji")
+                 + " on [this message](https://discord.com/channels/"
+                 f"{ctx.guild.id}/{r['channel_id']}/{r['message_id']})"
+                 for r in rows]
+        await ctx.send(embed=discord.Embed(
+            title="Reaction locks",
+            description="\n".join(lines)[:4000] or
+            f"None. `{ctx.prefix}reactionlock <message link> 20`",
+            colour=config.CARD_COLOUR))
+
+    @commands.Cog.listener("on_raw_reaction_add")
+    async def hold_reaction_lock(self, payload):
+        """Take back a reaction that arrived after the message filled up.
+
+        Discord has no cap of its own, so the reaction does land and this
+        takes it off again a moment later. Whoever got there first keeps
+        their place, which is the whole point when the reactions are slots.
+
+        A listener of its own rather than part of the reaction role one:
+        the two have nothing to do with each other, and a message can be
+        both a reaction role and full.
+        """
+        if not payload.guild_id:
+            return
+        row = self.db.reaction_lock(payload.message_id)
+        if not row:
+            return
+        if payload.user_id == self.bot.user.id:
+            return
+        if payload.member is not None and payload.member.bot:
+            return
+        guild = self.bot.get_guild(payload.guild_id)
+        channel = guild.get_channel_or_thread(payload.channel_id) if guild else None
+        if channel is None:
+            return
+        if not channel.permissions_for(guild.me).manage_messages:
+            return
+        try:
+            message = await channel.fetch_message(payload.message_id)
+        except discord.HTTPException:
+            return
+        cap = row["cap"]
+        if cap:
+            key = emoji_key(payload.emoji)
+            here = next((r.count for r in message.reactions
+                         if emoji_key(r.emoji) == key), 0)
+            # The one that just arrived is in that count already, so being
+            # level with the cap means they took the last place.
+            if here <= cap:
+                return
+        try:
+            await message.remove_reaction(payload.emoji,
+                                          discord.Object(payload.user_id))
+        except discord.HTTPException:
+            pass
 
     # -------------------------------------------------------- auto replies
 

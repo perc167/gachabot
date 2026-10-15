@@ -581,6 +581,21 @@ async def main():
     db.remember_roles(SG, ALICE, [])
     check("somebody with nothing worth keeping leaves no row",
           db.roles_left_with(SG, ALICE) == [])
+    # Reaction locks: a cap per emoji, or frozen at 0.
+    db.set_reaction_lock(SG, 1, 4242, 20)
+    check("a reaction cap saves", db.reaction_lock(4242)["cap"] == 20)
+    db.set_reaction_lock(SG, 1, 4242, 0)
+    check("freezing is a cap of nothing", db.reaction_lock(4242)["cap"] == 0)
+    db.set_reaction_lock(SG, 1, 4242, -5)
+    check("a negative cap can't freeze by accident",
+          db.reaction_lock(4242)["cap"] == 0)
+    check("locks are listed for the server",
+          [r["message_id"] for r in db.reaction_locks_of(SG)] == [4242])
+    check("a lock can be lifted", db.remove_reaction_lock(SG, 4242) == 1
+          and db.reaction_lock(4242) is None)
+    check("lifting one that was never locked does nothing",
+          db.remove_reaction_lock(SG, 4242) == 0)
+
     db.add_reaction_role(SG, 1, 99, ss.emoji_key("❤️"), 7)
     check("a reaction role is found by message and emoji",
           db.reaction_role(99, ss.emoji_key("❤"))["role_id"] == 7
