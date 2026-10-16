@@ -139,28 +139,33 @@ SHAPES = {
 
 
 def head_art(size: int):
-    """Her head, cropped square from the avatar. Cached per size."""
-    if not os.path.exists(AVATAR):
-        return None
+    """The mark that sits on every badge: the deck, small. Cached per size.
+
+    This used to crop a face out of the old avatar. Two reasons it no
+    longer does. The face belonged to somebody else's character and had no
+    business being stamped on a currency, and the bot does not look like
+    that any more - a badge still carrying the old face would be the one
+    place the rebrand had not reached.
+
+    The deck survives being shrunk to 32 pixels and tinted, which is the
+    whole job: three offset sheets still read as a stack when a face at
+    that size is only a smudge.
+    """
     if size in head_art.cache:
         return head_art.cache[size]
 
-    avatar = Image.open(AVATAR).convert("RGB")
-    width, height = avatar.size
-    half = width * FACE_WIDTH / 2
-    x, y = width * FACE_CENTRE[0], height * FACE_CENTRE[1]
-    # Clamped, so a differently framed avatar cannot crop off the edge.
-    x = min(max(x, half), width - half)
-    y = min(max(y, half), height - half)
-    head = avatar.crop((round(x - half), round(y - half),
-                        round(x + half), round(y + half)))
-    head = head.resize((size, size), Image.LANCZOS)
-    # A little more contrast and colour than the original: the picture ends
-    # up 32 pixels across, tinted, behind a rim.
-    head = ImageEnhance.Contrast(head).enhance(1.15)
-    head = ImageEnhance.Color(head).enhance(1.20)
-    head_art.cache[size] = head
-    return head
+    import make_brand
+
+    mark = make_brand.ground(size, size)
+    # Small enough to sit inside the narrowest silhouette: a star and a
+    # triangle pinch to nothing at their points, and the sheets were
+    # poking out through the gold arms.
+    make_brand.draw_deck(mark, (size / 2, size * 0.54), size * 0.44)
+    # A little more contrast than drawn: it ends up small, tinted and
+    # behind a rim, all of which eat the difference between the sheets.
+    mark = ImageEnhance.Contrast(mark).enhance(1.12)
+    head_art.cache[size] = mark
+    return mark
 
 
 head_art.cache = {}

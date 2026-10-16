@@ -133,7 +133,14 @@ CURRENCY_TITLE = "Karuda"
 
 # Card accent. One colour for every character - there are no rarity tiers,
 # a character's worth is its karuda value and its ranks.
-CARD_COLOUR = 0x8CCBF5   # baby blue, the colour of her ribbon and hearts
+# Paper, not baby blue. The stripe down a card is read against Discord's
+# dark theme almost always, so a bone white reads as a sheet of paper on
+# ink - which is the whole idea - where the old blue just read as "a bot".
+# Ink itself is no use here: a near-black stripe vanishes into the message.
+CARD_COLOUR = 0xE8E4DA   # paper
+PAPER = 0xE8E4DA
+INK = 0x121419
+THREAD = 0xC4564E        # one warm accent, used sparingly
 CLAIMED_COLOUR = 0x43B581
 
 # The eight kinds of shard a $dk can turn up.
