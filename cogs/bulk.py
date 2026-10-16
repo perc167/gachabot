@@ -18,6 +18,13 @@ class Bulk(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    def _paid(self, ctx, refund: int) -> str:
+        """Hand the refund over and say so, or say nothing."""
+        if not refund:
+            return ""
+        total = self.bot.db.add_karuda(ctx.guild.id, ctx.author.id, refund)
+        return f" +{refund:,} karuda (total: {total:,})."
+
     async def _confirm(self, ctx, question: str) -> bool:
         view = Confirm({ctx.author.id})
         view.message = await ctx.send(question, view=view)
@@ -78,15 +85,18 @@ class Bulk(commands.Cog):
         if not rows:
             await ctx.send("You have not claimed anyone.")
             return
+        refund = utils.divorce_refund(db, gid, rows)
+        worth = f" for **+{refund:,}** karuda" if refund else ""
         if not await self._confirm(
             ctx,
             f"{ctx.author.mention} this divorces **all {len(rows)}** of your"
-            " characters. There is no undo.",
+            f" characters{worth}. There is no undo.",
         ):
             await ctx.send("Nothing divorced.")
             return
         count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows])
-        await ctx.send(f"Divorced **{count}** characters.")
+        await ctx.send(f"Divorced **{count}** characters."
+                       + self._paid(ctx, refund))
 
     @commands.command(name="divorceseries", aliases=["dvs", "divorcesl", "dsl"])
     @commands.guild_only()
@@ -104,13 +114,17 @@ class Bulk(commands.Cog):
         listing = ", ".join(r["name"] for r in rows[:10])
         if len(rows) > 10:
             listing += f" and {len(rows) - 10} more"
+        refund = utils.divorce_refund(db, gid, rows)
+        worth = f" for **+{refund:,}** karuda" if refund else ""
         if not await self._confirm(
-            ctx, f"Divorce **{len(rows)}** from **{title}**?\n{listing}"
+            ctx,
+            f"Divorce **{len(rows)}** from **{title}**{worth}?\n{listing}"
         ):
             await ctx.send("Nothing divorced.")
             return
         count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows])
-        await ctx.send(f"Divorced **{count}** from **{title}**.")
+        await ctx.send(f"Divorced **{count}** from **{title}**."
+                       + self._paid(ctx, refund))
 
     @commands.command(name="divorceallbut", aliases=["dvab"])
     @commands.guild_only()
@@ -123,15 +137,18 @@ class Bulk(commands.Cog):
             await ctx.send(f"You only have {len(rows)}; nothing to trim.")
             return
         doomed = rows[keep:]
+        refund = utils.divorce_refund(db, gid, doomed)
+        worth = f" for **+{refund:,}** karuda" if refund else ""
         if not await self._confirm(
             ctx,
             f"Keep your top **{keep}** by value and divorce the other"
-            f" **{len(doomed)}**?",
+            f" **{len(doomed)}**{worth}?",
         ):
             await ctx.send("Nothing divorced.")
             return
         count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in doomed])
-        await ctx.send(f"Divorced **{count}**, kept your top {keep}.")
+        await ctx.send(f"Divorced **{count}**, kept your top {keep}."
+                       + self._paid(ctx, refund))
 
     @commands.command(name="wishseries", aliases=["wsr"])
     @commands.guild_only()

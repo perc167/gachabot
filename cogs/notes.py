@@ -180,13 +180,15 @@ class Notes(commands.Cog):
             await ctx.send(f"No note of yours mentions `{text}`.")
             return
 
+        refund = utils.divorce_refund(db, ctx.guild.id, rows)
+        worth = f" for **+{refund:,}** karuda" if refund else ""
         view = Confirm([ctx.author.id])
         preview = ", ".join(row["name"] for row in rows[:6])
         if len(rows) > 6:
             preview += f", and {len(rows) - 6} more"
         view.message = await ctx.send(
             f"Divorce **{len(rows)}** characters whose note mentions"
-            f" `{text}`?\n{preview}",
+            f" `{text}`{worth}?\n{preview}",
             view=view,
         )
         await view.wait()
@@ -195,7 +197,11 @@ class Notes(commands.Cog):
             return
         gone = db.divorce_many(ctx.guild.id, ctx.author.id,
                                [row["id"] for row in rows])
-        await ctx.send(f"Divorced **{gone}**.")
+        line = f"Divorced **{gone}**."
+        if refund:
+            total = db.add_karuda(ctx.guild.id, ctx.author.id, refund)
+            line += f" +{refund:,} karuda (total: {total:,})."
+        await ctx.send(line)
 
 
 async def setup(bot):

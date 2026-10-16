@@ -3137,6 +3137,38 @@ async def main():
     keyed = utils.value_with_keys(db, GUILD, someone, rate)
     check("keys count towards the refund", keyed > worth, f"{keyed} vs {worth}")
 
+    # Letting go of a whole harem has to pay the same as letting go of each
+    # of them one at a time. It paid nothing at all: every bulk command went
+    # straight to divorce_many, so $divorceall on forty-five characters worth
+    # nine thousand karuda handed back none of it.
+    many = db.search_characters("", limit=5)
+    one_at_a_time = sum(max(1, utils.value_with_keys(db, GUILD, row, rate)
+                            * percent // 100) for row in many)
+    check("letting go of several pays the same as one at a time",
+          utils.divorce_refund(db, GUILD, many) == one_at_a_time,
+          f"{utils.divorce_refund(db, GUILD, many)} vs {one_at_a_time}")
+    check("a harem worth something is worth something in bulk",
+          utils.divorce_refund(db, GUILD, many) > 0)
+    check("nobody divorced pays nothing",
+          utils.divorce_refund(db, GUILD, []) == 0)
+    # A server that has turned the refund off still gets no karuda.
+    db.set_setting(GUILD, "divorce_refund_percent", 0)
+    check("a server with refunds off pays nothing in bulk either",
+          utils.divorce_refund(db, GUILD, many) == 0)
+    db.set_setting(GUILD, "divorce_refund_percent", percent)
+
+    # Every command that lets a player go of their own characters pays them.
+    paying = open(os.path.join(PROJECT, "cogs", "bulk.py"),
+                  encoding="utf-8").read()
+    pages = open(os.path.join(PROJECT, "cogs", "haremextra.py"),
+                 encoding="utf-8").read()
+    noted = open(os.path.join(PROJECT, "cogs", "notes.py"),
+                 encoding="utf-8").read()
+    check("every bulk divorce pays the refund",
+          paying.count("divorce_refund") == 3
+          and "divorce_refund" in pages and "divorce_refund" in noted,
+          f"bulk {paying.count('divorce_refund')}")
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

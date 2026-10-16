@@ -143,6 +143,27 @@ def art_reference(image_url):
     return image_url
 
 
+def divorce_refund(db, guild_id: int, characters) -> int:
+    """What letting these characters go hands back.
+
+    The same sum a single divorce does, per character: the number on their
+    own card, keys included, at the server's refund rate - which is 100% out
+    of the box, so a harem is worth what it says it is worth.
+
+    It lives here because five commands need it and only one of them had it.
+    $divorceall, $divorceseries, $divorceallbut, $divorcepage and
+    $divorcenote all went straight to divorce_many and paid nothing, so
+    letting go of forty-five characters worth nine thousand karuda returned
+    exactly none of it.
+    """
+    percent = db.get_setting(guild_id, "divorce_refund_percent")
+    if not percent:
+        return 0
+    rate = db.get_setting(guild_id, "karuda_rate")
+    return sum(max(1, value_with_keys(db, guild_id, row, rate) * percent // 100)
+               for row in characters)
+
+
 def value_with_keys(db, guild_id: int, character, rate_percent: int) -> int:
     """A character's worth including any keys spent on them here."""
     level = db.key_level(guild_id, character["id"])

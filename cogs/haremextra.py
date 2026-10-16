@@ -132,10 +132,12 @@ class HaremExtra(commands.Cog):
 
         slice_ = rows[(page - 1) * PER_PAGE:page * PER_PAGE]
         names = ", ".join(row["name"] for row in slice_)
+        refund = utils.divorce_refund(db, gid, slice_)
+        worth = f" for **+{refund:,}** karuda" if refund else ""
         view = Confirm([ctx.author.id])
         view.message = await ctx.send(
             f"Divorce all **{len(slice_)}** on page {page} of {pages}"
-            f" (by {order})?\n{names}",
+            f" (by {order}){worth}?\n{names}",
             view=view,
         )
         await view.wait()
@@ -143,7 +145,11 @@ class HaremExtra(commands.Cog):
             await ctx.send("Nobody was divorced.")
             return
         gone = db.divorce_many(gid, ctx.author.id, [row["id"] for row in slice_])
-        await ctx.send(f"Divorced **{gone}**.")
+        line = f"Divorced **{gone}**."
+        if refund:
+            total = db.add_karuda(gid, ctx.author.id, refund)
+            line += f" +{refund:,} karuda (total: {total:,})."
+        await ctx.send(line)
 
     @commands.command(name="firstmarry", aliases=["fm", "showcase"])
     @commands.guild_only()
