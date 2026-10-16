@@ -266,6 +266,8 @@ CATEGORIES = [
     ("\u2696\ufe0f", "Moderation", [
         ("modclean", "wipe one player"),
         ("forcedivorce", "take one off somebody"),
+        ("divorceuser", "free everything someone owns"),
+        ("divorcelog", "who divorced what, and what they got"),
         ("kakeraadm", "give or take karuda"),
         ("kakerareward", "pay several people"),
         ("kakeraremoveall", "zero every balance"),
@@ -568,6 +570,7 @@ CATEGORIES = [
     ("\U0001f39a\ufe0f", "Switches \u2014 pool", [
         ("toggles", "every switch"),
         ("resettoggles", "back to defaults"),
+        ("togglefreeonleave", "free a leaver's harem"),
         ("togglewestern", "western cartoons"),
         ("togglegames", "game characters"),
         ("togglehentai", "adult characters"),

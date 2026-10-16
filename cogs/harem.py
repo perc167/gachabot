@@ -311,17 +311,14 @@ class Harem(commands.Cog):
         if not character:
             await ctx.send("Nothing divorced.")
             return
-        if not db.divorce(gid, character["id"], ctx.author.id):
+        # Worked out before the divorce, so the amount can be written into
+        # the log in the same breath as the divorce itself.
+        refund = utils.divorce_refund(db, gid, [character])
+        if not db.divorce(gid, character["id"], ctx.author.id,
+                          refunded=refund, reason="divorce"):
             await ctx.send(f"You do not own **{character['name']}**.")
             return
-        percent = db.get_setting(gid, "divorce_refund_percent")
-        if percent:
-            rate = db.get_setting(gid, "karuda_rate")
-            # value_with_keys, not karuda_value: what a divorce hands back
-            # should be the number on the character's own card, and that one
-            # counts the keys spent on them.
-            worth = utils.value_with_keys(db, gid, character, rate)
-            refund = max(1, worth * percent // 100)
+        if refund:
             total = db.add_karuda(gid, ctx.author.id, refund)
             await ctx.send(
                 f"{word(db, gid, ctx.author.id, 'divorce_word').title()}"

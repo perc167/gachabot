@@ -22,6 +22,8 @@ TOGGLES = {
     "horror": (1, "Pool", "Roll horror series", False),
     "disturbing": (1, "Pool", "Roll disturbing series", False),
     "irl": (0, "Pool", "Roll real people", True),
+    "freeonleave": (0, "Pool", "Free a leaver's characters back into the pool",
+                    True),
 
     # ---- what a card shows ---------------------------------------------
     "rank": (1, "Cards", "Show ranks on cards", True),

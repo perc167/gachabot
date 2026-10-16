@@ -3169,6 +3169,45 @@ async def main():
           and "divorce_refund" in pages and "divorce_refund" in noted,
           f"bulk {paying.count('divorce_refund')}")
 
+    # The divorce log. Written by the database rather than by the commands,
+    # so a command that forgets to pay still cannot forget to say so.
+    LG = GUILD + 404
+    cast = db.search_characters("", limit=3)
+    db.conn.executemany(
+        "INSERT INTO marriages (guild_id, user_id, character_id, claimed_at)"
+        " VALUES (?,?,?,0)", [(LG, ALICE, row["id"]) for row in cast])
+    db.conn.commit()
+    db.divorce(LG, cast[0]["id"], ALICE, refunded=900, reason="divorce")
+    db.divorce_many(LG, ALICE, [r["id"] for r in cast[1:]],
+                    refunded=1001, reason="divorceall")
+    logged = db.divorces_by(LG, ALICE)
+    check("every divorce is written down", len(logged) == 3, str(len(logged)))
+    check("the log keeps who and what", {r["name"] for r in logged}
+          == {r["name"] for r in cast})
+    check("a split payment adds up to what was handed over",
+          sum(r["refunded"] for r in logged) == 1901,
+          str(sum(r["refunded"] for r in logged)))
+    check("the log says which command did it",
+          {r["reason"] for r in logged} == {"divorce", "divorceall"})
+    totals = db.divorce_totals(LG)
+    check("totals per player add up",
+          len(totals) == 1 and totals[0]["gone"] == 3
+          and totals[0]["paid"] == 1901)
+    check("somebody else's divorces are not yours",
+          db.divorces_by(LG, BOB) == [])
+
+    # Paying nothing is the thing worth spotting, so it has to be recorded.
+    db.conn.execute("INSERT INTO marriages (guild_id, user_id, character_id,"
+                    " claimed_at) VALUES (?,?,?,0)", (LG, BOB, cast[0]["id"]))
+    db.conn.commit()
+    db.divorce_many(LG, BOB, [cast[0]["id"]], reason="forcedivorce")
+    unpaid = db.divorces_by(LG, BOB)
+    check("a divorce that paid nothing is still written down",
+          len(unpaid) == 1 and unpaid[0]["refunded"] == 0
+          and unpaid[0]["reason"] == "forcedivorce")
+    check("divorcing nobody writes nothing",
+          db.divorce_many(LG, BOB, []) == 0 and len(db.divorces_by(LG, BOB)) == 1)
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

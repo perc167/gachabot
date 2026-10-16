@@ -454,6 +454,22 @@ CREATE TABLE IF NOT EXISTS reaction_roles (
 
 -- A message whose reactions are capped. cap is how many each emoji may have;
 -- 0 means frozen, so no new reaction sticks at all.
+-- Every character let go of, and what the player was paid for it. Written
+-- by divorce() and divorce_many() rather than by the commands that call
+-- them, because the commands are what got this wrong: five of them paid
+-- nothing for months and said nothing about it.
+CREATE TABLE IF NOT EXISTS divorce_log (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id     INTEGER NOT NULL,
+    user_id      INTEGER NOT NULL,
+    character_id INTEGER NOT NULL,
+    name         TEXT NOT NULL DEFAULT '',
+    series       TEXT NOT NULL DEFAULT '',
+    refunded     INTEGER NOT NULL DEFAULT 0,
+    reason       TEXT NOT NULL DEFAULT '',
+    at           INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS reaction_locks (
     guild_id   INTEGER NOT NULL,
     channel_id INTEGER NOT NULL,
@@ -685,6 +701,10 @@ class DuplicateCharacter(Exception):
 # database reaches __init__ without a like_rank column at all, and indexing a
 # column that is about to be added fails the whole script.
 INDEXES = """
+CREATE INDEX IF NOT EXISTS idx_divorces_who
+    ON divorce_log (guild_id, user_id, at);
+CREATE INDEX IF NOT EXISTS idx_divorces_when
+    ON divorce_log (guild_id, at);
 CREATE INDEX IF NOT EXISTS idx_characters_rank
     ON characters (like_rank);
 -- Partial, so asking "is there a secret character to roll" on every single
@@ -2898,13 +2918,64 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
-    def divorce(self, guild_id: int, character_id: int, user_id: int) -> bool:
+    def _log_divorces(self, guild_id: int, user_id: int, character_ids,
+                      refunded: int = 0, reason: str = ""):
+        """Write down what was let go of, and what it paid.
+
+        The payment is split across them so the rows add up to what actually
+        changed hands, rather than each row claiming the whole sum.
+        """
+        ids = [int(i) for i in character_ids]
+        if not ids:
+            return
+        marks = ",".join("?" for _ in ids)
+        named = {
+            row["id"]: (row["name"], row["series"])
+            for row in self.conn.execute(
+                f"SELECT id, name, series FROM characters WHERE id IN ({marks})",
+                tuple(ids)).fetchall()
+        }
+        each, spare = divmod(int(refunded), len(ids))
+        when = int(time.time())
+        rows = []
+        for number, character_id in enumerate(ids):
+            name, series = named.get(character_id, ("", ""))
+            rows.append((guild_id, user_id, character_id, name, series,
+                         each + (1 if number < spare else 0), reason, when))
+        self.conn.executemany(
+            "INSERT INTO divorce_log (guild_id, user_id, character_id, name,"
+            " series, refunded, reason, at) VALUES (?,?,?,?,?,?,?,?)", rows)
+        self.conn.commit()
+
+    def divorces_by(self, guild_id: int, user_id: int = None,
+                    since: int = 0, limit: int = 200) -> list:
+        where = "guild_id = ? AND at >= ?"
+        args = [guild_id, since]
+        if user_id is not None:
+            where += " AND user_id = ?"
+            args.append(user_id)
+        return self.conn.execute(
+            f"SELECT * FROM divorce_log WHERE {where}"
+            " ORDER BY at DESC, id DESC LIMIT ?", (*args, limit)).fetchall()
+
+    def divorce_totals(self, guild_id: int, since: int = 0) -> list:
+        """Per player: how many they let go of and what they were paid."""
+        return self.conn.execute(
+            "SELECT user_id, COUNT(*) AS gone, SUM(refunded) AS paid"
+            " FROM divorce_log WHERE guild_id = ? AND at >= ?"
+            " GROUP BY user_id ORDER BY gone DESC", (guild_id, since)).fetchall()
+
+    def divorce(self, guild_id: int, character_id: int, user_id: int,
+                refunded: int = 0, reason: str = "") -> bool:
         cur = self.conn.execute(
             "DELETE FROM marriages"
             " WHERE guild_id = ? AND character_id = ? AND user_id = ?",
             (guild_id, character_id, user_id),
         )
         self.conn.commit()
+        if cur.rowcount > 0:
+            self._log_divorces(guild_id, user_id, [character_id], refunded,
+                               reason)
         return cur.rowcount > 0
 
     def transfer(self, guild_id: int, character_id: int, to_user: int):
@@ -3865,7 +3936,8 @@ class Database:
             (guild_id, user_id, f"%{series}%"),
         ).fetchall()
 
-    def divorce_many(self, guild_id: int, user_id: int, character_ids) -> int:
+    def divorce_many(self, guild_id: int, user_id: int, character_ids,
+                     refunded: int = 0, reason: str = "") -> int:
         ids = list(character_ids)
         if not ids:
             return 0
@@ -3876,6 +3948,8 @@ class Database:
                 f" AND character_id IN ({marks})",
                 (guild_id, user_id, *ids),
             )
+        if cur.rowcount:
+            self._log_divorces(guild_id, user_id, ids, refunded, reason)
         return cur.rowcount
 
     def search_series(self, query: str, limit: int = 25, guild_id=None) -> list:

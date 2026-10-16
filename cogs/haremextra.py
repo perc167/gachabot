@@ -144,7 +144,8 @@ class HaremExtra(commands.Cog):
         if view.declined_by or ctx.author.id not in view.accepted:
             await ctx.send("Nobody was divorced.")
             return
-        gone = db.divorce_many(gid, ctx.author.id, [row["id"] for row in slice_])
+        gone = db.divorce_many(gid, ctx.author.id, [row["id"] for row in slice_],
+                               refunded=refund, reason="divorcepage")
         line = f"Divorced **{gone}**."
         if refund:
             total = db.add_karuda(gid, ctx.author.id, refund)

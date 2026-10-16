@@ -222,10 +222,96 @@ class Moderation(commands.Cog):
         )
         if not character:
             return
-        db.divorce_many(gid, member.id, [character["id"]])
+        db.divorce_many(gid, member.id, [character["id"]],
+                        reason="forcedivorce")
         await ctx.send(
             f"**{character['name']}** is no longer {member.display_name}'s."
         )
+
+    # -------------------------------------------------------- divorces
+
+    @commands.command(name="divorcelog", aliases=["divorces", "dlog"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    async def divorcelog(self, ctx, member: discord.User = None,
+                         days: int = 30):
+        """Who let go of what, and what they were paid for it."""
+        db = self.bot.db
+        since = utils.now() - max(1, days) * 86400
+        rows = db.divorces_by(ctx.guild.id, member.id if member else None,
+                              since, limit=25)
+        if not rows:
+            who = f" by {member.display_name}" if member else ""
+            await ctx.send(f"No divorces{who} in the last {days} days.")
+            return
+        lines = []
+        for row in rows:
+            paid = f"+{row['refunded']:,}" if row["refunded"] else "**nothing**"
+            lines.append(
+                f"<t:{row['at']}:R> <@{row['user_id']}> — {row['name']}"
+                f" ({paid}){' · ' + row['reason'] if row['reason'] else ''}")
+        embed = discord.Embed(
+            title="Divorces", colour=config.CARD_COLOUR,
+            description="\n".join(lines)[:4000])
+        totals = db.divorce_totals(ctx.guild.id, since)
+        if not member and totals:
+            embed.add_field(
+                name=f"In {days} days",
+                value="\n".join(
+                    f"<@{t['user_id']}> — {t['gone']:,} let go,"
+                    f" {t['paid'] or 0:,} paid" for t in totals[:10]),
+                inline=False)
+        embed.set_footer(text="Paid nothing? $kakeraadm @them <amount> puts"
+                              " it right.")
+        await ctx.send(embed=embed,
+                       allowed_mentions=discord.AllowedMentions.none())
+
+    @commands.command(name="divorceuser", aliases=["divorceall@", "dvu"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    async def divorceuser(self, ctx, user: discord.User):
+        """Free everything somebody owns back into the pool.
+
+        Takes an ID as well as a mention, so it still works on somebody who
+        has already left - which is the usual reason to want it.
+        """
+        db = self.bot.db
+        gid = ctx.guild.id
+        rows = db.harem(gid, user.id)
+        if not rows:
+            await ctx.send(f"**{user.display_name}** owns nobody here.")
+            return
+        here = ctx.guild.get_member(user.id)
+        standing = "" if here else " They have left the server."
+        view = Confirm([ctx.author.id])
+        view.message = await ctx.send(
+            f"Free all **{len(rows)}** of **{user.display_name}**'s"
+            f" characters back into the pool?{standing}"
+            " They are paid nothing: this is not their divorce.",
+            view=view)
+        await view.wait()
+        if view.declined_by or ctx.author.id not in view.accepted:
+            await ctx.send("Nobody was freed.")
+            return
+        gone = db.divorce_many(gid, user.id, [r["id"] for r in rows],
+                               reason="divorceuser")
+        await ctx.send(f"Freed **{gone}** of **{user.display_name}**'s"
+                       " characters back into the pool.")
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member):
+        """Free a leaver's harem, for the servers that want that.
+
+        Off by default. People leave and come back, and coming back to an
+        empty harem is worse than a server having to run $divorceuser.
+        """
+        db = self.bot.db
+        if member.bot or not db.get_toggle(member.guild.id, "freeonleave", 0):
+            return
+        rows = db.harem(member.guild.id, member.id)
+        if rows:
+            db.divorce_many(member.guild.id, member.id,
+                            [r["id"] for r in rows], reason="left the server")
 
     # ------------------------------------------------------- karuda admin
 

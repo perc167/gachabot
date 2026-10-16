@@ -94,7 +94,8 @@ class Bulk(commands.Cog):
         ):
             await ctx.send("Nothing divorced.")
             return
-        count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows])
+        count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows],
+                                refunded=refund, reason="divorceall")
         await ctx.send(f"Divorced **{count}** characters."
                        + self._paid(ctx, refund))
 
@@ -122,7 +123,8 @@ class Bulk(commands.Cog):
         ):
             await ctx.send("Nothing divorced.")
             return
-        count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows])
+        count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in rows],
+                                refunded=refund, reason="divorceseries")
         await ctx.send(f"Divorced **{count}** from **{title}**."
                        + self._paid(ctx, refund))
 
@@ -146,7 +148,8 @@ class Bulk(commands.Cog):
         ):
             await ctx.send("Nothing divorced.")
             return
-        count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in doomed])
+        count = db.divorce_many(gid, ctx.author.id, [r["id"] for r in doomed],
+                                refunded=refund, reason="divorceallbut")
         await ctx.send(f"Divorced **{count}**, kept your top {keep}."
                        + self._paid(ctx, refund))
 

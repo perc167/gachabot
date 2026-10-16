@@ -196,7 +196,8 @@ class Notes(commands.Cog):
             await ctx.send("Nobody was divorced.")
             return
         gone = db.divorce_many(ctx.guild.id, ctx.author.id,
-                               [row["id"] for row in rows])
+                               [row["id"] for row in rows],
+                               refunded=refund, reason="divorcenote")
         line = f"Divorced **{gone}**."
         if refund:
             total = db.add_karuda(ctx.guild.id, ctx.author.id, refund)
