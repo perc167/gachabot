@@ -461,6 +461,7 @@ CATEGORIES = [
         ("firstmessage", "the channel's first message"),
         ("remind", "remind me later"),
         ("reminders", "my reminders"),
+        ("translate", "read it in another language"),
         ("steal", "copy an emoji here"),
         ("role", "give or take a role"),
     ]),

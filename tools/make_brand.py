@@ -1,133 +1,210 @@
-"""Cuts Paper's look out of her source picture.
+"""Paper's own face: the avatar and the profile banner.
 
     python tools/make_brand.py
 
-assets/brand/source-avatar.jpg is her, as drawn: a pink cat. Every pink in
-her is turned baby blue here, and the avatar, the favicons, the dashboard's
-logo and the website's hero art all come from the blue result. Discord's
-profile banner and the sky behind the website and the dashboard are drawn
-here: soft baby-blue clouds on near white, with a scatter of little hearts
-like the two over her head.
+The old one was baby blue with hearts on it, which said nothing about the
+name. These start from the name instead. Paper is not blue - it is a pale
+sheet with ink on it - so the ground is ink and the sheets are the light
+thing on top of it. That way round reads better on Discord, which most
+people look at in the dark, and it keeps the warm off-white from turning
+the whole thing into a stationery advert.
 
-Writes:
-  assets/brand/avatar.png      512x512, for the Developer Portal
-  assets/brand/banner.png      1360x480, Discord's banner shape (17:6)
-  site/img/favicon.png         64x64
-  site/img/paper-180.png       180x180 (the nav and the home-screen icon)
-  site/img/paper-512.png       512x512 (link previews)
-  site/img/paper-art.webp      the hero's artwork
-  site/img/sky.webp            the page background
-  dashboard/paper.png          256x256
+Three ideas, drawn the same way so they can be compared:
 
-The source is small (510 pixels across), so the bigger outputs are scaled
-up.
+  fold    one sheet with its corner turned down. The plainest thing that
+          can only be paper, and the only one that still reads at the 32
+          pixels Discord shows an avatar at in a member list.
+  crease  one sheet folded down the middle, the two halves catching
+          different light.
+  deck    three sheets offset. A gacha bot is a deck of cards, and a card
+          is a piece of paper, so this is the name and the game at once.
+
+No lettering on the avatar: at 32 pixels a word is a smudge.
 """
+import argparse
+import math
 import os
 
-import math
-import random
-
-import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BRAND = os.path.join(ROOT, "assets", "brand")
-SITE_IMG = os.path.join(ROOT, "site", "img")
+OUT = os.path.join(ROOT, "assets", "brand")
 
-# Where her face sits in the source, as fractions of its width and height,
-# and how much of the picture a square crop takes around it.
-FACE = (0.50, 0.50)
-FACE_SPAN = 1.0
+AVATAR = 1024
+BANNER_W, BANNER_H = 1360, 480          # twice what Discord shows, for crispness
 
-# Hues counted as pink, in degrees (it wraps through red), and the baby blue
-# they become. Each pink keeps half its distance from the middle of the
-# range, so the lighter and deeper pinks stay apart once they are blue.
-PINK_FROM, PINK_TO, PINK_MID = 280, 25, 340
-BLUE = 205
-# Greys and whites have a hue too, a meaningless one: below this saturation
-# (out of 255) a pixel is left alone.
-MIN_SATURATION = 12
+INK = (18, 20, 25)
+INK_SOFT = (26, 29, 35)
+SHEET = (242, 240, 235)
+SHEET_MID = (214, 211, 203)
+SHEET_DEEP = (176, 172, 163)
+THREAD = (196, 86, 78)                   # one warm line, used sparingly
+
+FONTS = "C:/Windows/Fonts/"
 
 
-def blue(img: Image.Image) -> Image.Image:
-    hsv = np.array(img.convert("HSV")).astype(np.float32)
-    deg = hsv[..., 0] * 360 / 255
-    pink = ((deg > PINK_FROM) | (deg < PINK_TO)) & (hsv[..., 1] > MIN_SATURATION)
-    off = ((deg - PINK_MID + 180) % 360) - 180
-    deg = np.where(pink, BLUE + off * 0.5, deg)
-    hsv[..., 0] = (deg % 360) * 255 / 360
-    return Image.fromarray(hsv.clip(0, 255).astype(np.uint8), "HSV").convert("RGB")
+def font(name: str, size: int):
+    from PIL import ImageFont
+
+    for candidate in (name, "segoeuil.ttf", "arial.ttf"):
+        try:
+            return ImageFont.truetype(FONTS + candidate, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
-def square(img: Image.Image, centre, span: float) -> Image.Image:
-    w, h = img.size
-    side = int(min(w, h) * span)
-    x = int(w * centre[0] - side / 2)
-    y = int(h * centre[1] - side / 2)
-    x = max(0, min(x, w - side))
-    y = max(0, min(y, h - side))
-    return img.crop((x, y, x + side, y + side))
+def ground(width: int, height: int):
+    """The ink background, with a breath of light in one corner."""
+    from PIL import Image, ImageDraw, ImageFilter
+
+    base = Image.new("RGB", (width, height), INK)
+    glow = Image.new("L", (width, height), 0)
+    ImageDraw.Draw(glow).ellipse(
+        (-width * 0.25, -height * 0.55, width * 0.75, height * 0.75), fill=70)
+    glow = glow.filter(ImageFilter.GaussianBlur(width * 0.18))
+    base.paste(Image.new("RGB", (width, height), INK_SOFT), (0, 0), glow)
+    return base
 
 
-def sized(img: Image.Image, size: int) -> Image.Image:
-    return img.resize((size, size), Image.LANCZOS)
+def shadow(size, polygon, blur, offset, strength=150):
+    """A soft shadow under a shape, so a flat sheet sits above the ink."""
+    from PIL import Image, ImageDraw, ImageFilter
+
+    layer = Image.new("L", size, 0)
+    ImageDraw.Draw(layer).polygon(
+        [(x + offset[0], y + offset[1]) for x, y in polygon], fill=strength)
+    return layer.filter(ImageFilter.GaussianBlur(blur))
 
 
-# The sky's colours: the paper it is drawn on, and the clouds.
-PAPER = (244, 249, 255)
-CLOUDS = ((176, 218, 248), (204, 230, 252), (160, 206, 244), (222, 236, 255))
-HEART = (140, 200, 245)
+def turned(centre, width, height, angle):
+    """The four corners of a sheet, rotated about its middle."""
+    radians = math.radians(angle)
+    cos, sin = math.cos(radians), math.sin(radians)
+    corners = [(-width / 2, -height / 2), (width / 2, -height / 2),
+               (width / 2, height / 2), (-width / 2, height / 2)]
+    return [(centre[0] + x * cos - y * sin, centre[1] + x * sin + y * cos)
+            for x, y in corners]
 
 
-def heart(draw: ImageDraw.ImageDraw, cx: float, cy: float, size: float, fill):
-    points = []
-    for i in range(48):
-        t = i / 48 * 2 * math.pi
-        x = 16 * math.sin(t) ** 3
-        y = 13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t)
-        points.append((cx + x * size / 32, cy - y * size / 32))
-    draw.polygon(points, fill=fill)
+def between(a, b, t):
+    return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
 
-def sky(width: int, height: int, seed: int, hearts: int) -> Image.Image:
-    """Soft blue clouds on near-white paper, and a few faint hearts."""
-    rng = random.Random(seed)
-    img = Image.new("RGB", (width, height), PAPER)
-    clouds = Image.new("RGB", (width, height), PAPER)
-    draw = ImageDraw.Draw(clouds)
-    for _ in range(9):
-        r = rng.uniform(0.18, 0.38) * width
-        x, y = rng.uniform(-0.1, 1.1) * width, rng.uniform(-0.2, 1.2) * height
-        draw.ellipse((x - r, y - r * 0.7, x + r, y + r * 0.7), fill=rng.choice(CLOUDS))
-    img = Image.blend(img, clouds.filter(ImageFilter.GaussianBlur(width / 14)), 0.85)
-    marks = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(marks)
-    for _ in range(hearts):
-        size = rng.uniform(0.012, 0.03) * width
-        heart(draw, rng.uniform(0, width), rng.uniform(0, height), size,
-              HEART + (rng.randint(50, 110),))
-    img.paste(marks, (0, 0), marks)
-    return img
+def draw_fold(image, centre, size, angle=-7, ear=0.3):
+    """A sheet with its top-right corner turned down."""
+    from PIL import Image, ImageDraw
+
+    width = size
+    height = size * 1.32
+    tl, tr, br, bl = turned(centre, width, height, angle)
+    cut_top = between(tl, tr, 1 - ear)
+    cut_side = between(tr, br, ear)
+
+    image.paste(Image.new("RGB", image.size, (0, 0, 0)), (0, 0),
+                shadow(image.size, [tl, cut_top, cut_side, br, bl],
+                       size * 0.06, (0, size * 0.035)))
+    draw = ImageDraw.Draw(image)
+    draw.polygon([tl, cut_top, cut_side, br, bl], fill=SHEET)
+    # The flap: the back of the corner, folded forward and down.
+    draw.polygon([cut_top, cut_side, between(cut_top, cut_side, 0.5)],
+                 fill=SHEET_MID)
+    draw.polygon([cut_top, cut_side,
+                  between(between(cut_top, cut_side, 0.5), tr, -0.85)],
+                 fill=SHEET_DEEP)
+    return image
+
+
+def draw_crease(image, centre, size, angle=-7):
+    """A sheet folded down its middle, each half taking its own light."""
+    from PIL import Image, ImageDraw
+
+    width = size
+    height = size * 1.32
+    tl, tr, br, bl = turned(centre, width, height, angle)
+    top = between(tl, tr, 0.5)
+    bottom = between(bl, br, 0.5)
+
+    image.paste(Image.new("RGB", image.size, (0, 0, 0)), (0, 0),
+                shadow(image.size, [tl, tr, br, bl], size * 0.06,
+                       (0, size * 0.035)))
+    draw = ImageDraw.Draw(image)
+    draw.polygon([tl, top, bottom, bl], fill=SHEET)
+    draw.polygon([top, tr, br, bottom], fill=SHEET_MID)
+    draw.line([top, bottom], fill=SHEET_DEEP, width=max(2, int(size // 150)))
+    return image
+
+
+def draw_deck(image, centre, size, angle=-7):
+    """Three sheets offset: a deck of cards, which is what the game is."""
+    from PIL import Image, ImageDraw
+
+    width = size * 0.84
+    height = size * 1.18
+    steps = ((-size * 0.17, size * 0.10, angle - 12, SHEET_DEEP),
+             (-size * 0.02, size * 0.02, angle - 5, SHEET_MID),
+             (size * 0.13, -size * 0.06, angle + 2, SHEET))
+    for dx, dy, turn, colour in steps:
+        spot = (centre[0] + dx, centre[1] + dy)
+        corners = turned(spot, width, height, turn)
+        image.paste(Image.new("RGB", image.size, (0, 0, 0)), (0, 0),
+                    shadow(image.size, corners, size * 0.045,
+                           (0, size * 0.028), 130))
+        ImageDraw.Draw(image).polygon(corners, fill=colour)
+    return image
+
+
+SHAPES = {"fold": draw_fold, "crease": draw_crease, "deck": draw_deck}
+
+
+def avatar(kind: str):
+    image = ground(AVATAR, AVATAR)
+    SHAPES[kind](image, (AVATAR / 2, AVATAR / 2), AVATAR * 0.46)
+    return image
+
+
+def banner(kind: str):
+    """The wordmark on the left, the mark on the right."""
+    from PIL import ImageDraw
+
+    image = ground(BANNER_W, BANNER_H)
+    SHAPES[kind](image, (BANNER_W * 0.78, BANNER_H * 0.52), BANNER_H * 0.52)
+    draw = ImageDraw.Draw(image)
+
+    name = font("segoeuil.ttf", 132)
+    word, spacing = "PAPER", 22
+    x = int(BANNER_W * 0.085)
+    middle = int(BANNER_H * 0.40)
+    for letter in word:
+        draw.text((x, middle), letter, font=name, fill=SHEET, anchor="lm")
+        x += int(draw.textlength(letter, font=name)) + spacing
+
+    line_y = int(BANNER_H * 0.655)
+    draw.line([(BANNER_W * 0.088, line_y), (x - spacing, line_y)],
+              fill=SHEET_DEEP, width=2)
+    draw.line([(BANNER_W * 0.088, line_y), (BANNER_W * 0.088 + 54, line_y)],
+              fill=THREAD, width=2)
+
+    small = font("segoeuisl.ttf", 31)
+    draw.text((BANNER_W * 0.088, line_y + 34),
+              "gacha · moderation · voice · levels", font=small,
+              fill=(150, 147, 140))
+    return image
 
 
 def main():
-    her = blue(Image.open(os.path.join(BRAND, "source-avatar.jpg")).convert("RGB"))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--kind", default="all", choices=[*SHAPES, "all"])
+    parser.add_argument("--out", default=OUT)
+    args = parser.parse_args()
 
-    face = square(her, FACE, FACE_SPAN)
-    sized(face, 512).save(os.path.join(BRAND, "avatar.png"), optimize=True)
-    sized(face, 64).save(os.path.join(SITE_IMG, "favicon.png"), optimize=True)
-    sized(face, 180).save(os.path.join(SITE_IMG, "paper-180.png"), optimize=True)
-    sized(face, 512).save(os.path.join(SITE_IMG, "paper-512.png"), optimize=True)
-    sized(face, 256).save(os.path.join(ROOT, "dashboard", "paper.png"), optimize=True)
-    her.resize((560, 560), Image.LANCZOS).save(
-        os.path.join(SITE_IMG, "paper-art.webp"), quality=90, method=6)
-
-    sky(1360, 480, 7, 14).save(os.path.join(BRAND, "banner.png"), optimize=True)
-    # The page's sky has no hearts: the website floats its own over it.
-    sky(1600, 1000, 3, 0).save(os.path.join(SITE_IMG, "sky.webp"), quality=80, method=6)
-
-    print("wrote the avatar, banner, favicons, hero art and background")
+    os.makedirs(args.out, exist_ok=True)
+    kinds = list(SHAPES) if args.kind == "all" else [args.kind]
+    for kind in kinds:
+        avatar(kind).save(os.path.join(args.out, f"avatar-{kind}.png"))
+        banner(kind).save(os.path.join(args.out, f"banner-{kind}.png"))
+        print(f"  {kind}: avatar-{kind}.png and banner-{kind}.png")
+    print(f"\nin {args.out}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

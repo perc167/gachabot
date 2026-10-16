@@ -6,9 +6,11 @@ AFK        $afk [reason]. Anyone who pings you is told; talking again ends it.
 Info       $userinfo, $serverinfo, $roleinfo, $banner, $servericon,
            $membercount, $firstmessage.
 Reminders  $remind 10m stretch, then $reminders to see or cancel them.
+Translate  Reply to somebody with $translate, or $translate es hello.
 Emoji      $steal <emoji>, or reply to a message with $steal.
 Roles      $role @someone @role gives it, or takes it if they have it.
 """
+import asyncio
 import re
 import time
 from collections import defaultdict, deque
@@ -18,6 +20,7 @@ import discord
 from discord.ext import commands, tasks
 
 import config
+import translator
 from converters import FuzzyRole
 from cogs.modtools import parse_duration
 
@@ -419,6 +422,64 @@ class Utility(commands.Cog):
         await self.bot.wait_until_ready()
 
     # --------------------------------------------------------------- emoji
+
+    @commands.command(name="translate", aliases=["trans", "translation", "tlate"])
+    @commands.guild_only()
+    async def translate(self, ctx, *, request: str = None):
+        """Put a message into another language.
+
+        Reply to somebody and say `$translate`, which is how it is wanted
+        nine times out of ten. Otherwise `$translate hola` works, and a
+        language in front of it picks where it is going: `$translate es how
+        are you` or `$translate spanish how are you`.
+        """
+        words = (request or "").split()
+        into = "en"
+        if words:
+            named = translator.code_for(words[0])
+            # Only treat the first word as a language when something follows
+            # it, or when it is a reply - otherwise "$translate es" would
+            # mean translating the Spanish word "es".
+            if named and (len(words) > 1 or ctx.message.reference):
+                into = named
+                words = words[1:]
+        text = " ".join(words)
+
+        if not text and ctx.message.reference:
+            reference = ctx.message.reference
+            quoted = reference.resolved
+            if quoted is None or isinstance(quoted, discord.DeletedReferencedMessage):
+                try:
+                    quoted = await ctx.channel.fetch_message(
+                        reference.message_id)
+                except discord.HTTPException:
+                    quoted = None
+            if quoted is not None:
+                text = quoted.content
+
+        if not text.strip():
+            await ctx.send(
+                f"Reply to a message with `{ctx.prefix}translate`, or give me"
+                f" something to translate: `{ctx.prefix}translate hola`.")
+            return
+
+        async with ctx.typing():
+            done, came_from, trouble = await asyncio.to_thread(
+                translator.translate, text, into)
+        if trouble:
+            await ctx.send(trouble[:1500])
+            return
+
+        embed = discord.Embed(colour=config.CARD_COLOUR, description=done[:2000])
+        embed.set_author(
+            name=f"{translator.name_of(came_from)} \u2192"
+                 f" {translator.name_of(into)}")
+        shown = text if len(text) <= 300 else text[:297] + "..."
+        embed.add_field(name="Original", value=shown, inline=False)
+        embed.set_footer(text="The language is a guess · "
+                              f"{ctx.prefix}translate <language> to pick one")
+        await ctx.send(embed=embed,
+                       allowed_mentions=discord.AllowedMentions.none())
 
     @commands.command(name="steal", aliases=["addemoji", "emojiadd", "stealemoji"])
     @commands.has_permissions(manage_expressions=True)

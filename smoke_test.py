@@ -3233,6 +3233,37 @@ async def main():
           boot_source.count("async def close") == 1,
           str(boot_source.count("async def close")))
 
+    # $translate. The translator will not guess the source language itself,
+    # so that part is ours. No network here: only the guessing is tested.
+    import translator
+    speech = [("سلام", "ar"), ("Привет, как дела", "ru"),
+              ("こんにちは、元気ですか", "ja"), ("안녕하세요", "ko"),
+              ("你好世界", "zh"), ("Γειά σου κόσμε", "el"),
+              ("Hola, ¿cómo estás hoy?", "es"),
+              ("Bonjour, comment allez-vous", "fr"),
+              ("Guten Tag, wie geht es dir", "de"),
+              ("Olá, tudo bem com você", "pt"),
+              ("Ciao, come stai oggi", "it"),
+              ("Merhaba nasılsın", "tr"),
+              ("hello how are you doing today", "en")]
+    wrong = [f"{t[:18]}={translator.detect(t)}≠{w}"
+             for t, w in speech if translator.detect(t) != w]
+    check("the language is guessed from the writing", not wrong,
+          ", ".join(wrong))
+    check("an alphabet we do not share settles it on its own",
+          translator.by_letters("سلام") == "ar"
+          and translator.by_letters("hello") is None)
+    check("kana mean Japanese even among kanji",
+          translator.detect("私はアニメが好きです") == "ja")
+    check("a language can be named by code or by name",
+          translator.code_for("es") == "es"
+          and translator.code_for("Spanish") == "es"
+          and translator.code_for("hola") is None)
+    check("translating into the language it is already in is refused",
+          translator.translate("hello there", "en")[2] != "")
+    check("nothing to translate says so",
+          translator.translate("   ", "es")[2] != "")
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 
