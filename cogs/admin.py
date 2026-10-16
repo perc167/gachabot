@@ -295,6 +295,27 @@ class Admin(commands.Cog):
                   f" players",
             inline=True,
         )
+        # How the last few runs ended. The only account of a crash that
+        # outlives the container it happened in, which is the whole reason
+        # "why did it go down" has been unanswerable.
+        boots = db.recent_boots(6)
+        if boots:
+            lines = []
+            for row in boots[1:]:
+                ended = ("stopped cleanly" if row["finished_at"]
+                         else "**killed — crash or out of memory**")
+                broke = (f" · {row['broken']} did not load"
+                         if row["broken"] else "")
+                lines.append(f"<t:{row['started_at']}:R> — {ended}{broke}")
+            running = boots[0]
+            here = f"<t:{running['started_at']}:R>"
+            if running["broken"]:
+                here += f" · **{running['broken']} did not load**"
+            embed.add_field(name="This run", value=here, inline=False)
+            if lines:
+                embed.add_field(name="Runs before it",
+                                value="\n".join(lines)[:1024], inline=False)
+
         if not safe:
             embed.set_footer(
                 text=f"{ctx.prefix}export saves the roster; claims and"

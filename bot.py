@@ -169,9 +169,32 @@ class GachaBot(commands.Bot):
         # Shard icons prefer custom emoji uploaded to the server.
         utils.use_emoji_from(self)
         self.add_check(self.check_allowed)
+
+        self.boot_id, last = self.db.start_boot()
+        if last is not None and not last["finished_at"]:
+            # Nothing else records this. The container the crash happened in
+            # is gone, and with it the log nobody read in time.
+            log.error("the last run started %s ago and never shut down: it"
+                      " was killed, not redeployed",
+                      utils.fmt_duration(utils.now() - last["started_at"]))
+
+        # One cog failing to load used to take the whole bot off Discord,
+        # because load_extension raises straight out of setup_hook. A bot
+        # that is online without its dashboard is worth a great deal more
+        # than a bot that is not online at all, so each is loaded on its own
+        # and what breaks is written down rather than thrown.
+        self.broken = []
         for cog in COGS:
-            await self.load_extension(cog)
-            log.info("loaded %s", cog)
+            try:
+                await self.load_extension(cog)
+                log.info("loaded %s", cog)
+            except Exception:  # noqa: BLE001 - one part, not the whole
+                log.exception("could not load %s - carrying on without it", cog)
+                self.broken.append(cog)
+        if self.broken:
+            self.db.note_broken(self.boot_id, ", ".join(self.broken))
+            log.error("%d of %d parts did not load: %s",
+                      len(self.broken), len(COGS), ", ".join(self.broken))
 
     async def on_ready(self):
         log.info("logged in as %s (%s guilds)", self.user, len(self.guilds))
@@ -444,6 +467,14 @@ class GachaBot(commands.Bot):
         await ctx.send("Something broke running that. Check the bot logs.")
 
     async def close(self):
+        # Written before the database is shut, so the next start can tell a
+        # redeploy from a kill: a run with no finish is one that was taken
+        # away rather than one that stopped.
+        try:
+            if getattr(self, "boot_id", None):
+                self.db.finish_boot(self.boot_id)
+        except Exception:  # noqa: BLE001 - never block a shutdown
+            log.exception("could not write the shutdown down")
         self.db.close()
         await super().close()
 

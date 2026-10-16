@@ -458,6 +458,17 @@ CREATE TABLE IF NOT EXISTS reaction_roles (
 -- by divorce() and divorce_many() rather than by the commands that call
 -- them, because the commands are what got this wrong: five of them paid
 -- nothing for months and said nothing about it.
+-- One row per start. finished_at stays 0 until the bot shuts down
+-- properly, so a row that never got one is a run that was killed: a crash,
+-- or the host taking the container away. It is the only account of why the
+-- bot went quiet that survives the container it happened in.
+CREATE TABLE IF NOT EXISTS boot_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at  INTEGER NOT NULL,
+    finished_at INTEGER NOT NULL DEFAULT 0,
+    broken      TEXT NOT NULL DEFAULT ''
+);
+
 CREATE TABLE IF NOT EXISTS divorce_log (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     guild_id     INTEGER NOT NULL,
@@ -2946,6 +2957,38 @@ class Database:
             "INSERT INTO divorce_log (guild_id, user_id, character_id, name,"
             " series, refunded, reason, at) VALUES (?,?,?,?,?,?,?,?)", rows)
         self.conn.commit()
+
+    def start_boot(self) -> tuple:
+        """Note that the bot is starting. Returns (this id, the last run).
+
+        The last run is handed back so whoever is starting can say out loud
+        that the one before it never finished - which is the difference
+        between a redeploy and a crash, and is not otherwise knowable once
+        the container is gone.
+        """
+        last = self.conn.execute(
+            "SELECT * FROM boot_log ORDER BY id DESC LIMIT 1").fetchone()
+        cur = self.conn.execute(
+            "INSERT INTO boot_log (started_at) VALUES (?)",
+            (int(time.time()),))
+        self.conn.commit()
+        return cur.lastrowid, last
+
+    def finish_boot(self, boot_id: int):
+        """Shutting down on purpose, so the next start knows it was clean."""
+        self.conn.execute("UPDATE boot_log SET finished_at = ? WHERE id = ?",
+                          (int(time.time()), boot_id))
+        self.conn.commit()
+
+    def note_broken(self, boot_id: int, broken: str):
+        self.conn.execute("UPDATE boot_log SET broken = ? WHERE id = ?",
+                          (broken[:500], boot_id))
+        self.conn.commit()
+
+    def recent_boots(self, limit: int = 10) -> list:
+        return self.conn.execute(
+            "SELECT * FROM boot_log ORDER BY id DESC LIMIT ?",
+            (limit,)).fetchall()
 
     def divorces_by(self, guild_id: int, user_id: int = None,
                     since: int = 0, limit: int = 200) -> list:

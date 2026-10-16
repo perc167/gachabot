@@ -3208,6 +3208,31 @@ async def main():
     check("divorcing nobody writes nothing",
           db.divorce_many(LG, BOB, []) == 0 and len(db.divorces_by(LG, BOB)) == 1)
 
+    # How a run ended. The container a crash happened in is gone by the time
+    # anybody asks, so this is the only account of it that survives.
+    first, before_first = db.start_boot()
+    check("the very first start has nothing behind it", before_first is None)
+    db.finish_boot(first)
+    second, prior = db.start_boot()
+    check("a run that stopped on purpose says so", bool(prior["finished_at"]))
+    # second is never finished: that is a kill
+    third, killed = db.start_boot()
+    check("a run that was killed is told apart from one that stopped",
+          not killed["finished_at"])
+    db.note_broken(third, "cogs.dashboard")
+    check("what failed to load is kept with the run",
+          db.recent_boots(1)[0]["broken"] == "cogs.dashboard")
+    check("the last few runs are kept", len(db.recent_boots()) >= 3)
+
+    # The bug that took it offline twice: one cog raising out of setup_hook.
+    boot_source = open(os.path.join(PROJECT, "bot.py"), encoding="utf-8").read()
+    loading = boot_source.split("for cog in COGS:")[1][:400]
+    check("a cog that will not load no longer takes the bot offline",
+          "try:" in loading and "self.broken.append" in loading)
+    check("the bot has one close, not two",
+          boot_source.count("async def close") == 1,
+          str(boot_source.count("async def close")))
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 
