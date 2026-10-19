@@ -574,7 +574,7 @@ CATEGORIES = [
         ("togglefreeonleave", "free a leaver's harem"),
         ("togglewestern", "western cartoons"),
         ("togglegames", "game characters"),
-        ("togglehentai", "adult characters"),
+        ("togglehentai", "18+ series (none are imported)"),
         ("togglehorror", "horror series"),
         ("toggledisturbing", "disturbing series"),
         ("toggleirl", "real people"),

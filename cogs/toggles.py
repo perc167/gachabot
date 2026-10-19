@@ -18,7 +18,15 @@ TOGGLES = {
     # ---- what can roll -------------------------------------------------
     "western": (1, "Pool", "Roll Western cartoons and comics", True),
     "games": (1, "Pool", "Roll characters from video games", True),
-    "hentai": (0, "Pool", "Roll adult characters", True),
+    # "Adult" here has never meant grown-up characters - the key is the
+    # giveaway - and two people in a server spent a while arguing about
+    # which it was, which is the label's fault. It is also not wired to
+    # anything: nothing filters on it at roll time, and nothing could,
+    # because adult series are dropped at import (anilist.py) and so are
+    # not in the roster to be switched off. Marked honestly rather than
+    # left claiming to work.
+    "hentai": (0, "Pool", "Roll characters from 18+ series (none are"
+                          " imported, so this changes nothing)", False),
     "horror": (1, "Pool", "Roll horror series", False),
     "disturbing": (1, "Pool", "Roll disturbing series", False),
     "irl": (0, "Pool", "Roll real people", True),
