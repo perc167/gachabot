@@ -716,6 +716,11 @@ CREATE INDEX IF NOT EXISTS idx_divorces_who
     ON divorce_log (guild_id, user_id, at);
 CREATE INDEX IF NOT EXISTS idx_divorces_when
     ON divorce_log (guild_id, at);
+-- Partial: only the characters a server might be told to leave out, so
+-- asking "is this one a child" reads a few thousand rows rather than a
+-- hundred thousand.
+CREATE INDEX IF NOT EXISTS idx_characters_young
+    ON characters (min_age) WHERE min_age > 0 AND min_age < 18;
 CREATE INDEX IF NOT EXISTS idx_characters_rank
     ON characters (like_rank);
 -- Partial, so asking "is there a secret character to roll" on every single
@@ -832,6 +837,9 @@ class Database:
             # character who rolls one time in this many and never through
             # the pool. Below 0, a secret character who no longer rolls.
             ("characters", "secret_odds", "INTEGER NOT NULL DEFAULT 0"),
+            # The youngest age AniList gives for them, or 0 for the 84% it
+            # gives none for. 0 is "nobody knows", never "a baby".
+            ("characters", "min_age", "INTEGER NOT NULL DEFAULT 0"),
             # Badges used to be owned or not; now each is climbed to a level.
             ("badges", "level", "INTEGER NOT NULL DEFAULT 1"),
             ("marriages", "note_image", "TEXT"),
@@ -2172,6 +2180,41 @@ class Database:
             (*whole_args, self.PREFIX_HANDICAP, *begins_args, *scope_args, limit),
         ).fetchall()
 
+    # Under this, a character is somebody a server can choose not to roll.
+    GROWN_UP = 18
+
+    def set_ages(self, ages) -> int:
+        """Record ages, as (name, series, age). Returns how many landed."""
+        rows = [(int(age), name, series) for name, series, age in ages
+                if age and int(age) > 0]
+        if not rows:
+            return 0
+        before = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters WHERE min_age > 0"
+        ).fetchone()["c"]
+        with self.conn:
+            self.conn.executemany(
+                "UPDATE characters SET min_age = ?"
+                " WHERE name = ? AND series = ? AND guild_id = 0", rows)
+        after = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters WHERE min_age > 0"
+        ).fetchone()["c"]
+        return after - before
+
+    def age_counts(self) -> tuple:
+        """(confirmed grown up, confirmed under age, nobody knows)."""
+        grown = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters WHERE min_age >= ?",
+            (self.GROWN_UP,)).fetchone()["c"]
+        young = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters"
+            " WHERE min_age > 0 AND min_age < ?", (self.GROWN_UP,)
+        ).fetchone()["c"]
+        unknown = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM characters WHERE min_age = 0"
+        ).fetchone()["c"]
+        return (grown, young, unknown)
+
     def excluded_sources(self, guild_id: int) -> list:
         """Which sources this server has switched off.
 
@@ -2204,6 +2247,16 @@ class Database:
         # are their own, decided in _secret_roll.
         clause = " AND c.secret_odds = 0"
         extra = ()
+        # A server can switch off the characters AniList says are children.
+        # Only the ones it says so about: the 84% with no age recorded stay,
+        # because "we do not know" is not "we know they are a child", and a
+        # switch that threw those out would empty the pool rather than
+        # clean it.
+        from cogs import toggles as toggle_table
+
+        if not toggle_table.state(self, guild_id, "minors"):
+            clause += (" AND NOT (c.min_age > 0 AND c.min_age < ?)")
+            extra = (*extra, self.GROWN_UP)
         # $limroul: the server can shut off everyone past a claim rank, which
         # is how a big roster is made to feel like a small one. Characters
         # with no rank at all - a server's own, a secret - are never cut,

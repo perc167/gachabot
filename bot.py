@@ -211,6 +211,7 @@ class GachaBot(commands.Bot):
         # Outside _seed_pool on purpose: that returns early once the pool has
         # anything in it, and art arrives in batches long after the roster.
         await self._seed_art()
+        await self._seed_ages()
         await self._seed_secrets()
         await self._sync_emojis()
         log.info("%s characters in the pool", self.db.character_count())
@@ -299,6 +300,49 @@ class GachaBot(commands.Bot):
                          f"{added:,}", f"{characters:,}")
         except Exception:  # noqa: BLE001 - art is a nicety, not a reason to die
             log.exception("could not load the extra art")
+
+    async def _seed_ages(self):
+        """Load how old each character is, for $toggleminors.
+
+        Same shape as the art: it runs on every boot and gives up early
+        when the file has not changed, because the ages arrive in one
+        batch long after the roster and nobody should have to re-import a
+        hundred thousand characters to get them.
+        """
+        folder = os.path.dirname(os.path.abspath(__file__))
+        ages_path = os.path.join(folder, "data", "character_ages.json")
+        roster_path = os.path.join(folder, "data", "characters.json")
+        if not (os.path.exists(ages_path) and os.path.exists(roster_path)):
+            return
+        info = os.stat(ages_path)
+        stamp = (int(info.st_mtime) * 1000003) ^ info.st_size
+        if self.db.get_pref(0, "age_stamp", 0) == stamp:
+            return
+
+        try:
+            def apply():
+                with open(ages_path, encoding="utf-8") as handle:
+                    raw = json.load(handle)
+                with open(roster_path, encoding="utf-8") as handle:
+                    roster = json.load(handle)
+                rows = []
+                for record in roster:
+                    anilist_id = record.get("anilist_id")
+                    if not anilist_id:
+                        continue
+                    age = utils.youngest_age(raw.get(str(anilist_id), ""))
+                    if age:
+                        rows.append((record["name"], record.get("series") or "",
+                                     age))
+                return self.db.set_ages(rows), len(rows)
+
+            changed, had = await asyncio.to_thread(apply)
+            self.db.set_pref(0, "age_stamp", stamp)
+            grown, young, unknown = self.db.age_counts()
+            log.info("ages: %s known, %s grown up, %s under 18, %s unrecorded",
+                     f"{had:,}", f"{grown:,}", f"{young:,}", f"{unknown:,}")
+        except Exception:  # noqa: BLE001 - an age is a nicety, not a reason to die
+            log.exception("could not load the character ages")
 
     # The series every secret character is filed under. It is what $im
     # shows beneath the name, and a real series could never be called this.

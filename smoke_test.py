@@ -3264,6 +3264,70 @@ async def main():
     check("nothing to translate says so",
           translator.translate("   ", "es")[2] != "")
 
+    # $toggleminors. AniList's age is free text and absent for most of the
+    # roster, so the rule is: leave out the ones it says are children, keep
+    # the ones it says nothing about.
+    check("an age is read at its lowest",
+          utils.youngest_age("17") == 17
+          and utils.youngest_age("14 (I), 17 (II)") == 14
+          and utils.youngest_age("16-18") == 16)
+    check("a string with no age in it is not an age",
+          utils.youngest_age("Unknown") is None
+          and utils.youngest_age("") is None
+          and utils.youngest_age(None) is None)
+    check("a stray year is not an age either",
+          utils.youngest_age("born 1998") is None,
+          "otherwise nobody's recorded age reads as an adult")
+    check("a very old character is still an adult",
+          utils.youngest_age("Over 1000") == 1000)
+
+    AG = GUILD + 808
+    aged = []
+    for number in range(60):
+        name = f"Aged{number}"
+        age = 0 if number % 3 == 0 else (15 if number % 3 == 1 else 25)
+        db.conn.execute(
+            "INSERT INTO characters (name, series, guild_id, like_rank,"
+            " claim_rank, image_url, source, secret_odds, min_age)"
+            " VALUES (?,?,0,?,?,'','AniList',0,?)",
+            (name, "Aged Series", number + 1, number + 1, age))
+        aged.append(name)
+    db.conn.commit()
+    grown, young, unknown = db.age_counts()
+    check("ages are counted three ways", grown and young and unknown,
+          f"{grown} grown, {young} young, {unknown} unknown")
+    check("an age can be set by name and series",
+          db.set_ages([(aged[0], "Aged Series", 30)]) == 1)
+
+    # Counted off the pool the roll actually draws from, not sampled from
+    # it: twenty children among thousands of characters would sometimes not
+    # turn up in any number of rolls, and a test that passes most of the
+    # time is worse than no test.
+    def eligible(guild):
+        source, where, args = db._roll_scope(guild, True, None, None)
+        return db.conn.execute(
+            f"SELECT COUNT(*) AS c {source} {where}", args).fetchone()["c"]
+
+    def eligible_children(guild):
+        source, where, args = db._roll_scope(guild, True, None, None)
+        return db.conn.execute(
+            f"SELECT COUNT(*) AS c {source} {where}"
+            " AND c.min_age > 0 AND c.min_age < 18", args).fetchone()["c"]
+
+    db.set_toggle(AG, "minors", 1)
+    on_total, on_children = eligible(AG), eligible_children(AG)
+    db.set_toggle(AG, "minors", 0)
+    off_total, off_children = eligible(AG), eligible_children(AG)
+    check("children can roll while the switch is on", on_children > 0,
+          str(on_children))
+    check("no child can roll once it is off", off_children == 0,
+          str(off_children))
+    check("turning it off removes exactly the children",
+          on_total - off_total == on_children,
+          f"{on_total} -> {off_total}, {on_children} children")
+    check("the ones with no age on record still roll", off_total > 0,
+          "otherwise the switch empties the pool rather than cleaning it")
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

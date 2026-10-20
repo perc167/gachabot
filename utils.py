@@ -1,6 +1,7 @@
 """Shared helpers: cooldown bookkeeping, karuda math, embed building."""
 import json
 import os
+import re
 import time
 
 import discord
@@ -316,6 +317,30 @@ def rerank_roster(rows) -> list:
         row["claim_rank"] = position
         row["base_karuda"] = value_for_rank(position, total)
     return rows
+
+
+AGE_NUMBER = re.compile(r"\d+")
+
+
+def youngest_age(age: str):
+    """The lowest age a string mentions, or None if it names none.
+
+    AniList's age is free text, written by whoever edited the entry: "17",
+    "14 (I), 17 (II)", "Over 1000", "Unknown". Read conservatively, because
+    what it is used for is leaving children out: "14 (I), 17 (II)" is a
+    character who is fourteen for part of their story, and the lowest
+    number is the one that matters.
+
+    A string with no number in it is not an age, and neither is a stray
+    year - "born 1998" would otherwise read as 1998 years old and let
+    somebody whose age nobody recorded through as an adult.
+    """
+    found = [int(n) for n in AGE_NUMBER.findall(age or "")]
+    # Drop anything shaped like a year. A cap on size would do it too, but
+    # it also throws away "Over 1000", and an immortal is an adult by any
+    # reading - there are a lot of them in this roster.
+    sensible = [n for n in found if not 1900 <= n <= 2100]
+    return min(sensible) if sensible else None
 
 
 def karuda_value(character, rate_percent: int) -> int:

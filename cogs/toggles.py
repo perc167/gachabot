@@ -30,6 +30,11 @@ TOGGLES = {
     "horror": (1, "Pool", "Roll horror series", False),
     "disturbing": (1, "Pool", "Roll disturbing series", False),
     "irl": (0, "Pool", "Roll real people", True),
+    # On by default, so no existing server's pool changes under it. Turning
+    # it off drops the characters AniList records as under 18 - about seven
+    # thousand - and leaves the ones it records no age for, which is most of
+    # them.
+    "minors": (1, "Pool", "Roll characters recorded as under 18", True),
     "freeonleave": (0, "Pool", "Free a leaver's characters back into the pool",
                     True),
 
