@@ -44,9 +44,9 @@ body{
 }
 
 /* ---- the sky: soft baby-blue clouds behind everything, bubbles and little
-   hearts floating up on a canvas, and two soft glows ---- */
+   scraps of paper drifting up on a canvas, and two soft glows ---- */
 .backdrop{position:fixed;inset:0;z-index:-3;pointer-events:none;
-  background:linear-gradient(180deg,rgba(244,249,255,.15),rgba(244,249,255,.6) 50%,var(--ink) 90%),
+  background:linear-gradient(180deg,rgba(245,243,238,.15),rgba(245,243,238,.6) 50%,var(--ink) 90%),
     url(img/sky.webp) center top/cover no-repeat}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;
@@ -101,7 +101,7 @@ nav{
   color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
 }
 .brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
-  box-shadow:0 0 0 1px rgba(140,203,245,.7)}
+  box-shadow:0 0 0 1px rgba(196,86,78,.5)}
 
 /* ---- the account chip, right of Dashboard ---- */
 .acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
@@ -117,7 +117,7 @@ nav{
 .hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
 .hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:1;
   max-height:520px;justify-self:end;
-  box-shadow:0 30px 80px -30px rgba(80,160,230,.6),0 0 0 4px #fff,0 0 0 5px rgba(140,203,245,.6);
+  box-shadow:0 30px 80px -30px rgba(27,29,34,.28),0 0 0 4px #fff,0 0 0 5px rgba(196,86,78,.45);
   -webkit-mask-image:linear-gradient(#000 78%,transparent);
   mask-image:linear-gradient(#000 78%,transparent)}
 .hero-art img{width:100%;height:100%;object-fit:cover;display:block;
@@ -257,7 +257,7 @@ code,kbd{
 }
 .feature:hover{border-color:var(--accent);background:var(--raise);transform:translateY(-2px)}
 .feature.on{border-color:var(--accent);background:var(--raise);
-  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(80,160,230,.5)}
+  box-shadow:0 0 0 1px var(--accent),0 10px 30px -12px rgba(27,29,34,.22)}
 .feature.on::before{transform:scaleX(1)}
 /* The title is the button; this stretches it over the whole card, so the
    card clicks as one without a list and paragraph inside a <button>. */
@@ -303,15 +303,15 @@ code,kbd{
 .band{display:flex;flex-wrap:wrap;align-items:center;gap:22px 34px;
   justify-content:space-between;padding:30px 32px;border-radius:18px;
   border:1px solid var(--line);
-  background:linear-gradient(120deg,rgba(140,203,245,.35),rgba(255,255,255,.75));box-shadow:var(--shadow)}
+  background:linear-gradient(120deg,rgba(231,183,178,.4),rgba(255,255,255,.75));box-shadow:var(--shadow)}
 .band h2{margin:0 0 6px}
 .band p{margin:0;color:var(--dim);max-width:52ch}
 .discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
   font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
   border-radius:11px;transition:background .15s,transform .15s}
 .discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
-.premium-band{border-color:rgba(243,198,79,.6);
-  background:linear-gradient(120deg,rgba(255,236,170,.4),rgba(255,255,255,.85) 35%,rgba(140,203,245,.4))}
+.premium-band{border-color:rgba(201,162,39,.6);
+  background:linear-gradient(120deg,rgba(233,214,150,.4),rgba(255,255,255,.85) 35%,rgba(231,183,178,.45))}
 .btn.gold{background:var(--gold);color:#3A2A00}
 .pgroups{flex-basis:100%;display:grid;gap:12px;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
@@ -405,7 +405,7 @@ button.card:hover{border-color:var(--mist)}
 
 #album{background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
-#album::backdrop{background:rgba(30,58,87,.55);backdrop-filter:blur(3px)}
+#album::backdrop{background:rgba(27,29,34,.55);backdrop-filter:blur(3px)}
 .album-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;
   font-family:var(--display);font-weight:600}
 #album-count{font-family:var(--mono);font-size:12px;color:var(--faint);
@@ -766,7 +766,7 @@ be removed from anyone who breaks these terms.</p>
 })();
 
 (function(){
-  // The sky: bubbles and a few little hearts, rising slowly and swaying a
+  // The air: scraps of paper, rising slowly and swaying a
   // little, like the two over her head. It stops while the tab is hidden,
   // and for reduced motion it's drawn once and left still.
   var canvas = document.getElementById("sky");
@@ -791,7 +791,8 @@ be removed from anyone who breaks these terms.</p>
         speed: Math.random() * 1.4 + 0.4,
         phase: Math.random() * Math.PI * 2,
         drift: Math.random() * 0.3 + 0.08,
-        heart: Math.random() < 0.3
+        turn: Math.random() * Math.PI,
+        spin: (Math.random() - 0.5) * 0.0009
       });
     }
   }
@@ -807,28 +808,20 @@ be removed from anyone who breaks these terms.</p>
         if (s.y < -12) { s.y = h + 12; s.x = Math.random() * w; }
       }
       var a = (s.a * twinkle).toFixed(3);
+      // Scraps of paper, turning as they go. The hearts and bubbles that
+      // used to drift here were the last of the baby blue, and they were
+      // hardcoded in here rather than taken from the palette, which is how
+      // they survived the rebrand the stylesheet got.
+      var k = s.r * 1.15;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.turn + (still ? 0 : t * s.spin));
+      ctx.fillStyle = "rgba(150,142,128," + a + ")";
+      ctx.fillRect(-k, -k * 1.3, k * 2, k * 2.6);
+      ctx.fillStyle = "rgba(255,253,248," + (a * 0.8).toFixed(3) + ")";
+      ctx.fillRect(-k, -k * 1.3, k * 2, k * 0.5);
+      ctx.restore();
       ctx.beginPath();
-      if (s.heart) {
-        // Two arcs and a point: a heart about twice the bubble's size.
-        var k = s.r * 0.9;
-        ctx.moveTo(s.x, s.y + k * 1.6);
-        ctx.bezierCurveTo(s.x - k * 2.2, s.y + k * 0.2, s.x - k * 1.2, s.y - k * 1.6, s.x, s.y - k * 0.5);
-        ctx.bezierCurveTo(s.x + k * 1.2, s.y - k * 1.6, s.x + k * 2.2, s.y + k * 0.2, s.x, s.y + k * 1.6);
-        ctx.fillStyle = "rgba(110,185,240," + a + ")";
-        ctx.fill();
-      } else {
-        // A bubble: a pale fill, a brighter rim, and a glint.
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(170,215,248," + (a * 0.5).toFixed(3) + ")";
-        ctx.fill();
-        ctx.strokeStyle = "rgba(110,180,235," + a + ")";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(s.x - s.r * 0.35, s.y - s.r * 0.35, s.r * 0.25, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255,255,255," + a + ")";
-        ctx.fill();
-      }
     }
   }
 
