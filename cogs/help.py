@@ -572,7 +572,7 @@ CATEGORIES = [
         ("toggles", "every switch"),
         ("resettoggles", "back to defaults"),
         ("togglefreeonleave", "free a leaver's harem"),
-        ("toggleminors", "characters under 18"),
+        ("toggleonlyadults", "leave out under-18 characters"),
         ("togglewestern", "western cartoons"),
         ("togglegames", "game characters"),
         ("togglehentai", "18+ series (none are imported)"),

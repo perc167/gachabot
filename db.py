@@ -2254,7 +2254,7 @@ class Database:
         # clean it.
         from cogs import toggles as toggle_table
 
-        if not toggle_table.state(self, guild_id, "minors"):
+        if toggle_table.state(self, guild_id, "onlyadults"):
             clause += (" AND NOT (c.min_age > 0 AND c.min_age < ?)")
             extra = (*extra, self.GROWN_UP)
         # $limroul: the server can shut off everyone past a claim rank, which

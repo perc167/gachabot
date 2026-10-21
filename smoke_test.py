@@ -3264,7 +3264,7 @@ async def main():
     check("nothing to translate says so",
           translator.translate("   ", "es")[2] != "")
 
-    # $toggleminors. AniList's age is free text and absent for most of the
+    # $toggleonlyadults. AniList's age is free text and absent for most of
     # roster, so the rule is: leave out the ones it says are children, keep
     # the ones it says nothing about.
     check("an age is read at its lowest",
@@ -3314,19 +3314,22 @@ async def main():
             f"SELECT COUNT(*) AS c {source} {where}"
             " AND c.min_age > 0 AND c.min_age < 18", args).fetchone()["c"]
 
-    db.set_toggle(AG, "minors", 1)
-    on_total, on_children = eligible(AG), eligible_children(AG)
-    db.set_toggle(AG, "minors", 0)
+    db.set_toggle(AG, "onlyadults", 0)
     off_total, off_children = eligible(AG), eligible_children(AG)
-    check("children can roll while the switch is on", on_children > 0,
-          str(on_children))
-    check("no child can roll once it is off", off_children == 0,
+    db.set_toggle(AG, "onlyadults", 1)
+    on_total, on_children = eligible(AG), eligible_children(AG)
+    check("children roll while the switch is off", off_children > 0,
           str(off_children))
-    check("turning it off removes exactly the children",
-          on_total - off_total == on_children,
-          f"{on_total} -> {off_total}, {on_children} children")
-    check("the ones with no age on record still roll", off_total > 0,
+    check("no child can roll once it is on", on_children == 0,
+          str(on_children))
+    check("turning it on removes exactly the children",
+          off_total - on_total == off_children,
+          f"{off_total} -> {on_total}, {off_children} children")
+    check("the ones with no age on record still roll", on_total > 0,
           "otherwise the switch empties the pool rather than cleaning it")
+    check("the switch is off until a server asks for it",
+          __import__("cogs.toggles", fromlist=["x"]).TOGGLES["onlyadults"][0]
+          == 0)
 
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod

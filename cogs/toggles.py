@@ -30,11 +30,15 @@ TOGGLES = {
     "horror": (1, "Pool", "Roll horror series", False),
     "disturbing": (1, "Pool", "Roll disturbing series", False),
     "irl": (0, "Pool", "Roll real people", True),
-    # On by default, so no existing server's pool changes under it. Turning
-    # it off drops the characters AniList records as under 18 - about seven
-    # thousand - and leaves the ones it records no age for, which is most of
-    # them.
-    "minors": (1, "Pool", "Roll characters recorded as under 18", True),
+    # Off by default, so no existing server's pool changes under it.
+    # Turning it on drops the characters AniList records as under 18 - about
+    # seven thousand - and leaves the ones it records no age for, which is
+    # most of them. The description is what the command prints when you flip
+    # it, so it says what actually happens rather than repeating the name:
+    # the name is a shorthand and this is not quite "only adults", since
+    # most of the roster has no age on record either way.
+    "onlyadults": (0, "Pool", "Leaving out characters recorded as under 18",
+                   True),
     "freeonleave": (0, "Pool", "Free a leaver's characters back into the pool",
                     True),
 

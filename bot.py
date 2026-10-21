@@ -302,7 +302,7 @@ class GachaBot(commands.Bot):
             log.exception("could not load the extra art")
 
     async def _seed_ages(self):
-        """Load how old each character is, for $toggleminors.
+        """Load how old each character is, for $toggleonlyadults.
 
         Same shape as the art: it runs on every boot and gives up early
         when the file has not changed, because the ages arrive in one
