@@ -1,8 +1,18 @@
-# Gacha bot
+# Paper
 
-A Mudae-style Discord gacha bot: roll random characters, claim them with a
-button, collect karuda, keep a wishlist, trade with other players. Rates and
-cooldowns are configurable per server.
+A Discord bot that combines a character-collecting gacha game with
+moderation, voice rooms, leveling, and server tools. Live at
+**https://getpaperbot.com**.
+
+- **Gacha:** roll, claim, and trade from a roster of 100,000+ characters,
+  with wishlists, a karuda currency, shop, badges, and a tower
+- **Moderation:** jail, timeouts, warnings with automatic punishments,
+  and numbered cases
+- **Voice and levels:** join-to-create rooms, voice hours, and XP with role rewards
+- **Dashboard:** manage settings on the web with Discord login
+- Built with Python and discord.py, SQLite storage, hosted on Railway
+
+Mudae-style at heart, but everything is configurable per server.
 
 ## Setup
 
