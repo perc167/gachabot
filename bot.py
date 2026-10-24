@@ -211,6 +211,7 @@ class GachaBot(commands.Bot):
         # Outside _seed_pool on purpose: that returns early once the pool has
         # anything in it, and art arrives in batches long after the roster.
         await self._seed_art()
+        await self._seed_values()
         await self._seed_ages()
         await self._seed_secrets()
         await self._sync_emojis()
@@ -300,6 +301,37 @@ class GachaBot(commands.Bot):
                          f"{added:,}", f"{characters:,}")
         except Exception:  # noqa: BLE001 - art is a nicety, not a reason to die
             log.exception("could not load the extra art")
+
+    async def _seed_values(self):
+        """Re-price the roster when what a character is worth has changed.
+
+        Stamped like the art: it reads the file on every boot and gives up
+        when it has not moved, because the alternative is rewriting a
+        hundred thousand rows to change thirty-seven of them.
+        """
+        folder = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(folder, "data", "characters.json")
+        if not os.path.exists(path):
+            return
+        info = os.stat(path)
+        stamp = (int(info.st_mtime) * 1000003) ^ info.st_size
+        if self.db.get_pref(0, "value_stamp", 0) == stamp:
+            return
+        try:
+            def apply():
+                with open(path, encoding="utf-8") as handle:
+                    roster = json.load(handle)
+                return self.db.set_values(
+                    [(record.get("base_karuda"), record["name"],
+                      record.get("series") or "") for record in roster
+                     if record.get("base_karuda")])
+
+            moved = await asyncio.to_thread(apply)
+            self.db.set_pref(0, "value_stamp", stamp)
+            if moved:
+                log.info("re-priced %s characters", f"{moved:,}")
+        except Exception:  # noqa: BLE001 - a price is not a reason to die
+            log.exception("could not re-price the roster")
 
     async def _seed_ages(self):
         """Load how old each character is, for $toggleonlyadults.

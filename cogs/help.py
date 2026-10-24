@@ -267,6 +267,7 @@ CATEGORIES = [
         ("modclean", "wipe one player"),
         ("forcedivorce", "take one off somebody"),
         ("divorceuser", "free everything someone owns"),
+        ("wipeharems", "free every claim on the server"),
         ("divorcelog", "who divorced what, and what they got"),
         ("kakeraadm", "give or take karuda"),
         ("kakerareward", "pay several people"),

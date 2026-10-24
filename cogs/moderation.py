@@ -228,6 +228,48 @@ class Moderation(commands.Cog):
             f"**{character['name']}** is no longer {member.display_name}'s."
         )
 
+    @commands.command(name="wipeharems", aliases=["resetharems",
+                                                  "wipeclaims"])
+    @commands.guild_only()
+    @commands.has_permissions(manage_guild=True)
+    async def wipeharems(self, ctx):
+        """Free every character on this server back into the pool.
+
+        For starting a season over. Everybody keeps their karuda, badges,
+        wishes and notes - this is only the claims.
+        """
+        db = self.bot.db
+        gid = ctx.guild.id
+        claims = db.claims_in(gid)
+        if not claims:
+            await ctx.send("Nobody on this server has claimed anyone.")
+            return
+        people = len({row["user_id"] for row in claims})
+        view = Confirm([ctx.author.id])
+        view.message = await ctx.send(
+            f"**Free all {len(claims):,} claims in {ctx.guild.name}?**\n"
+            f"That is every character {people:,}"
+            f" {'person has' if people == 1 else 'people have'} claimed,"
+            " back into the pool. Nobody is paid for them: this is a reset,"
+            " not everybody divorcing at once. Karuda, badges, wishes and"
+            " notes are untouched. There is no undo.",
+            view=view)
+        await view.wait()
+        if view.declined_by or ctx.author.id not in view.accepted:
+            await ctx.send("Nothing was wiped.")
+            return
+
+        by_person = {}
+        for row in claims:
+            by_person.setdefault(row["user_id"], []).append(row["character_id"])
+        freed = 0
+        for user_id, ids in by_person.items():
+            freed += db.divorce_many(gid, user_id, ids, reason="wipeharems")
+        await ctx.send(
+            f"Freed **{freed:,}** characters from **{people:,}**"
+            f" {'harem' if people == 1 else 'harems'}."
+            f" `{ctx.prefix}divorcelog` has the record of it.")
+
     # -------------------------------------------------------- divorces
 
     @commands.command(name="divorcelog", aliases=["divorces", "dlog"])

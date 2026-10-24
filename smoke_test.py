@@ -3331,6 +3331,51 @@ async def main():
           __import__("cogs.toggles", fromlist=["x"]).TOGGLES["onlyadults"][0]
           == 0)
 
+    # Re-pricing. _seed_pool gives up once the pool has anybody in it, so
+    # without this, editing what a character is worth in the roster never
+    # reaches a bot that is already running.
+    PR = GUILD + 909
+    db.conn.executemany(
+        "INSERT INTO characters (name, series, guild_id, image_url,"
+        " base_karuda) VALUES (?,?,0,'',?)",
+        [("Priced A", "Priced Series", 100), ("Priced B", "Priced Series", 60)])
+    db.conn.commit()
+    moved = db.set_values([(900, "Priced A", "Priced Series"),
+                           (60, "Priced B", "Priced Series")])
+    check("only the characters whose price moved are written",
+          moved == 1, f"{moved} rows")
+    check("the new price is what the card reads",
+          db.conn.execute("SELECT base_karuda AS v FROM characters"
+                          " WHERE name = 'Priced A'").fetchone()["v"] == 900)
+    check("re-pricing the same values again does nothing",
+          db.set_values([(900, "Priced A", "Priced Series")]) == 0)
+    check("a character from another series is left alone",
+          db.set_values([(5, "Priced A", "Some Other Series")]) == 0)
+
+    # $wipeharems: every claim on one server freed at once.
+    db.conn.executemany(
+        "INSERT INTO marriages (guild_id, user_id, character_id, claimed_at)"
+        " VALUES (?,?,?,0)",
+        [(PR, ALICE, cast[0]["id"]), (PR, ALICE, cast[1]["id"]),
+         (PR, BOB, cast[2]["id"])])
+    db.conn.commit()
+    claims = db.claims_in(PR)
+    check("every claim on the server is found",
+          len(claims) == 3 and len({r["user_id"] for r in claims}) == 2)
+    held = {}
+    for row in claims:
+        held.setdefault(row["user_id"], []).append(row["character_id"])
+    freed = sum(db.divorce_many(PR, who, ids, reason="wipeharems")
+                for who, ids in held.items())
+    check("wiping frees every one of them",
+          freed == 3 and db.claims_in(PR) == [])
+    wiped = [r for r in db.divorces_by(PR) if r["reason"] == "wipeharems"]
+    check("and every one is in the divorce log", len(wiped) == 3)
+    check("a wipe pays nobody, and the log says so",
+          all(r["refunded"] == 0 for r in wiped))
+    check("another server's claims are untouched",
+          db.claims_in(PR + 1) == [])
+
     # 20k. Badges and the tower, and the perks they actually apply.
     import perks as perksmod
 

@@ -2215,6 +2215,36 @@ class Database:
         ).fetchone()["c"]
         return (grown, young, unknown)
 
+    def set_values(self, rows) -> int:
+        """Re-price characters from the roster, as (worth, name, series).
+
+        Needed because _seed_pool gives up the moment the pool has anybody
+        in it - which is right, nobody wants a hundred thousand rows
+        rewritten every boot - but it also means editing what a character is
+        worth in data/characters.json never reached a bot that was already
+        running. The values just sat in the file.
+
+        Returns how many actually moved, so a boot that changes nothing
+        says nothing.
+        """
+        rows = [(int(worth), name, series) for worth, name, series in rows
+                if worth and int(worth) > 0]
+        if not rows:
+            return 0
+        with self.conn:
+            cur = self.conn.executemany(
+                "UPDATE characters SET base_karuda = ?"
+                " WHERE name = ? AND series = ? AND guild_id = 0"
+                "   AND base_karuda != ?",
+                [(worth, name, series, worth) for worth, name, series in rows])
+        return cur.rowcount if cur.rowcount and cur.rowcount > 0 else 0
+
+    def claims_in(self, guild_id: int) -> list:
+        """Every claim on this server, as (user_id, character_id)."""
+        return self.conn.execute(
+            "SELECT user_id, character_id FROM marriages WHERE guild_id = ?",
+            (guild_id,)).fetchall()
+
     def excluded_sources(self, guild_id: int) -> list:
         """Which sources this server has switched off.
 
