@@ -4,10 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Paper is a Discord gacha bot: roll for characters, claim them, keep them. Every command, and how to set it up in your server.">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="dark">
 <meta property="og:title" content="Paper">
-<meta property="og:image" content="https://gachabot.perc-1fc.workers.dev/img/paper-512.png">
-<meta name="theme-color" content="#F5F3EE">
+<meta property="og:image" content="https://gachabot.perc-1fc.workers.dev/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#14161B">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/paper-180.png">
 <meta property="og:description" content="Roll for characters, claim them, keep them. Every command, and how to set the bot up in your server.">
@@ -15,17 +18,20 @@
 <title>Terms of Service · Paper</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@200;300;500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=JetBrains+Mono:wght@500&display=swap">
 <style>
 :root{
-  /* Paper: a warm sheet, ink to read it by, and one warm thread. The blue
-     it replaces was the only thing on the page that was not the name. */
-  --ink:#F5F3EE; --panel:#FFFFFF; --raise:#EDEAE2; --line:#DCD7CC;
-  --text:#1B1D22; --dim:#5B5750; --faint:#8D887F;
-  --accent:#C4564E; --accent-soft:#E7B7B2; --accent-ink:#8E332C; --on-accent:#FFF7F5;
-  --gold:#C9A227; --gold-ink:#7A6113; --code:#5B5750; --mist:#B6B0A5;
-  --shadow:0 8px 22px -14px rgba(27,29,34,.32);
-  --ok:#2E9E6A;
+  /* Paper, the way the avatar and banner draw it: an ink ground, pale sheets
+     on top, and one warm thread. Ink rather than a pale page, because the
+     people reading this come from Discord, which they read in the dark, and
+     a site the colour of the bot's picture is plainly the same thing. */
+  --ink:#14161B; --panel:#1A1D23; --raise:#22252C; --line:#2D3139;
+  --text:#F2F0EB; --dim:#B0ACA3; --faint:#7D7970;
+  --accent:#C4564E; --accent-soft:#D9766E; --accent-ink:#E58C82; --on-accent:#FFF7F5;
+  --gold:#C9A227; --gold-ink:#E2C15A; --code:#D6D3CB; --mist:#8D887F;
+  --sheet:#F2F0EB; --sheet-mid:#D6D3CB; --sheet-deep:#B0ACA3;
+  --shadow:0 14px 34px -18px rgba(0,0,0,.75);
+  --ok:#3FB47E;
   --display:"Sora","Segoe UI",system-ui,sans-serif;
   --body:"Zen Kaku Gothic New","Hiragino Sans","Segoe UI",system-ui,sans-serif;
   --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
@@ -43,19 +49,19 @@ body{
   -webkit-font-smoothing:antialiased;
 }
 
-/* ---- the sky: soft baby-blue clouds behind everything, bubbles and little
-   scraps of paper drifting up on a canvas, and two soft glows ---- */
+/* ---- the ground: ink, a little lighter where the light falls, as on the
+   banner, with scraps of paper drifting up on a canvas ---- */
 .backdrop{position:fixed;inset:0;z-index:-3;pointer-events:none;
-  background:linear-gradient(180deg,rgba(245,243,238,.15),rgba(245,243,238,.6) 50%,var(--ink) 90%),
-    url(img/sky.webp) center top/cover no-repeat}
+  background:radial-gradient(ellipse 70% 55% at 62% 18%,rgba(242,240,235,.045),transparent 70%),
+    var(--ink)}
 #sky{position:fixed;inset:0;width:100%;height:100%;z-index:-1;pointer-events:none}
 .glow{position:fixed;z-index:-2;pointer-events:none;border-radius:50%;
-  filter:blur(90px);opacity:.45}
-.glow.a{width:620px;height:620px;left:-180px;top:-160px;
+  filter:blur(110px);opacity:.1}
+.glow.a{width:620px;height:620px;left:-260px;top:-220px;
   background:radial-gradient(circle,var(--accent),transparent 70%);
   animation:float 26s ease-in-out infinite alternate}
-.glow.b{width:560px;height:560px;right:-200px;top:38vh;
-  background:radial-gradient(circle,var(--mist),transparent 70%);opacity:.3;
+.glow.b{width:560px;height:560px;right:-220px;top:42vh;
+  background:radial-gradient(circle,var(--sheet),transparent 70%);opacity:.05;
   animation:float 32s ease-in-out infinite alternate-reverse}
 @keyframes float{to{transform:translate(60px,40px) scale(1.08)}}
 
@@ -92,16 +98,19 @@ a:hover{text-decoration:underline}
 /* ---- nav ---- */
 nav{
   position:sticky;top:env(safe-area-inset-top,0px);z-index:50;
-  background:rgba(255,255,255,.82);backdrop-filter:blur(12px);
+  background:rgba(20,22,27,.8);backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
 }
 .nav-in{display:flex;align-items:center;gap:22px;height:58px}
+/* The wordmark as the banner sets it: thin capitals, spaced wide. */
 .brand{
-  font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.01em;
-  color:var(--text);display:flex;align-items:center;gap:9px;margin-right:auto;
+  font-family:var(--display);font-weight:300;font-size:16px;letter-spacing:.32em;
+  text-transform:uppercase;color:var(--text);display:flex;align-items:center;
+  gap:12px;margin-right:auto;
 }
-.brand img{width:26px;height:26px;border-radius:8px;object-fit:cover;
-  box-shadow:0 0 0 1px rgba(196,86,78,.5)}
+.brand:hover{text-decoration:none}
+.brand img{width:28px;height:28px;border-radius:7px;object-fit:cover;
+  box-shadow:0 0 0 1px var(--line)}
 
 /* ---- the account chip, right of Dashboard ---- */
 .acct{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--text);
@@ -113,18 +122,28 @@ nav{
 .acct.out{padding:6px 14px;font-family:var(--display);font-weight:600}
 @media(max-width:700px){.acct .nm{display:none}.acct{padding:3px}}
 
-/* ---- the hero's artwork ---- */
-.hero{display:grid;grid-template-columns:1fr 290px;gap:40px;align-items:center}
-.hero-art{position:relative;border-radius:26px;overflow:hidden;aspect-ratio:1;
-  max-height:520px;justify-self:end;
-  box-shadow:0 30px 80px -30px rgba(27,29,34,.28),0 0 0 4px #fff,0 0 0 5px rgba(196,86,78,.45);
-  -webkit-mask-image:linear-gradient(#000 78%,transparent);
-  mask-image:linear-gradient(#000 78%,transparent)}
-.hero-art img{width:100%;height:100%;object-fit:cover;display:block;
-  animation:drift-art 14s ease-in-out infinite alternate}
-@keyframes drift-art{to{transform:scale(1.04) translateY(-6px)}}
-@media(max-width:880px){.hero{grid-template-columns:1fr}.hero-art{display:none}}
-@media(prefers-reduced-motion:reduce){.hero-art img{animation:none}}
+/* ---- the hero's deck: the avatar's three sheets, drawn rather than
+   pictured so they stay sharp at any size and can fan out. They arrive
+   stacked and spread to where the avatar has them; a hover spreads them a
+   little further, like a hand of cards being looked at. ---- */
+.hero{display:grid;grid-template-columns:1fr 380px;gap:48px;align-items:center}
+.deck{position:relative;width:100%;aspect-ratio:1;justify-self:end;max-width:380px}
+/* Placed as in the avatar: each sheet behind sits lower and further left,
+   turned a little more. */
+.deck i{position:absolute;left:36%;top:20%;width:39%;height:54%;border-radius:2px;
+  box-shadow:0 26px 40px -18px rgba(0,0,0,.85),0 2px 6px rgba(0,0,0,.35);
+  transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.deck i:nth-child(1){background:linear-gradient(100deg,var(--sheet-deep),#9C988F);
+  transform:translate(-33%,26%) rotate(-21deg);animation:fan-in 1.1s cubic-bezier(.2,.8,.2,1) both}
+.deck i:nth-child(2){background:linear-gradient(100deg,var(--sheet-mid),#C4C0B8);
+  transform:translate(-18%,15%) rotate(-12deg);animation:fan-in 1.1s cubic-bezier(.2,.8,.2,1) both}
+.deck i:nth-child(3){background:var(--sheet);transform:rotate(-5deg)}
+@keyframes fan-in{from{transform:rotate(-5deg)}}
+.deck:hover i:nth-child(1){transform:translate(-42%,30%) rotate(-26deg)}
+.deck:hover i:nth-child(2){transform:translate(-23%,17%) rotate(-15deg)}
+.deck:hover i:nth-child(3){transform:translate(3%,-3%) rotate(-3deg)}
+@media(max-width:880px){.hero{grid-template-columns:1fr}.deck{display:none}}
+@media(prefers-reduced-motion:reduce){.deck i{animation:none;transition:none}}
 .nav-in a.link{color:var(--dim);font-size:14px;font-weight:500}
 .nav-in a.link:hover{color:var(--text);text-decoration:none}
 @media(max-width:700px){.nav-in a.link{display:none}}
@@ -141,7 +160,19 @@ h1{
   text-wrap:balance;
 }
 h1 em{font-style:normal;color:var(--accent-ink)}
-.lede{font-size:clamp(16px,2vw,19px);color:var(--dim);max-width:60ch;margin:0}
+/* The home page opens on the banner itself: the name in thin spaced
+   capitals, the rule with its short red end, and the four parts. */
+header.hero{padding-block:84px 56px}
+.mark{font-weight:200;letter-spacing:.42em;text-transform:uppercase;
+  font-size:clamp(46px,9vw,104px);line-height:1;margin:0 -.42em 0 0}
+.rule{height:1px;max-width:450px;margin:30px 0 22px;
+  background:linear-gradient(90deg,var(--accent) 0 12%,var(--sheet-deep) 12%)}
+.tagline{font-family:var(--display);font-weight:300;color:var(--dim);
+  font-size:clamp(17px,2.2vw,22px);letter-spacing:.01em;margin:0 0 34px}
+.pitch{font-family:var(--display);font-weight:600;letter-spacing:-.02em;
+  font-size:clamp(24px,3.4vw,34px);line-height:1.15;margin:0 0 12px;text-wrap:balance}
+.pitch em{font-style:normal;color:var(--accent-ink)}
+.lede{font-size:clamp(16px,2vw,18px);color:var(--dim);max-width:60ch;margin:0}
 .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
 .btn{
   font-family:var(--display);font-weight:600;font-size:15px;
@@ -149,8 +180,8 @@ h1 em{font-style:normal;color:var(--accent-ink)}
   background:var(--accent);color:var(--on-accent);display:inline-block;
 }
 .btn:hover{background:var(--accent-soft);text-decoration:none}
-.btn.ghost{background:#fff;border-color:var(--line);color:var(--text)}
-.btn.ghost:hover{border-color:var(--accent);background:var(--raise)}
+.btn.ghost{background:transparent;border-color:var(--line);color:var(--text)}
+.btn.ghost:hover{border-color:var(--sheet-deep);background:var(--raise)}
 
 .stats{display:flex;flex-wrap:wrap;gap:34px;margin-top:40px}
 .stat b{
@@ -166,6 +197,9 @@ h2{
   font-family:var(--display);font-weight:600;letter-spacing:-.02em;
   font-size:clamp(23px,3vw,30px);margin:0 0 8px;text-wrap:balance;
 }
+/* Each section's title carries a short length of the hero's rule. */
+section>h2::after,.sec-row h2::after{content:"";display:block;width:64px;height:1px;
+  margin-top:14px;background:linear-gradient(90deg,var(--accent) 0 30%,var(--line) 30%)}
 .sub{color:var(--dim);margin:0 0 30px;max-width:62ch}
 
 /* ---- setup: a real sequence, so it is numbered ---- */
@@ -192,7 +226,7 @@ code,kbd{
   padding:2px 7px;border-radius:6px;color:var(--code);white-space:nowrap;
 }
 .cmdline{
-  display:block;background:#F0F7FF;border:1px solid var(--line);
+  display:block;background:#0F1115;border:1px solid var(--line);
   border-radius:10px;padding:12px 15px;color:var(--code);
   font-family:var(--mono);font-size:14px;overflow-x:auto;white-space:pre;
 }
@@ -303,19 +337,19 @@ code,kbd{
 .band{display:flex;flex-wrap:wrap;align-items:center;gap:22px 34px;
   justify-content:space-between;padding:30px 32px;border-radius:18px;
   border:1px solid var(--line);
-  background:linear-gradient(120deg,rgba(231,183,178,.4),rgba(255,255,255,.75));box-shadow:var(--shadow)}
+  background:linear-gradient(120deg,rgba(196,86,78,.14),rgba(242,240,235,.03) 60%);box-shadow:var(--shadow)}
 .band h2{margin:0 0 6px}
 .band p{margin:0;color:var(--dim);max-width:52ch}
 .discord{display:inline-flex;align-items:center;gap:10px;background:#5865F2;color:#fff;
   font-family:var(--display);font-weight:600;font-size:15px;padding:12px 22px;
   border-radius:11px;transition:background .15s,transform .15s}
 .discord:hover{background:#4752C4;transform:translateY(-1px);text-decoration:none}
-.premium-band{border-color:rgba(201,162,39,.6);
-  background:linear-gradient(120deg,rgba(233,214,150,.4),rgba(255,255,255,.85) 35%,rgba(231,183,178,.45))}
-.btn.gold{background:var(--gold);color:#3A2A00}
+.premium-band{border-color:rgba(201,162,39,.45);
+  background:linear-gradient(120deg,rgba(201,162,39,.16),rgba(242,240,235,.02) 45%,rgba(196,86,78,.1))}
+.btn.gold{background:var(--gold);color:#2A1F00}
 .pgroups{flex-basis:100%;display:grid;gap:12px;
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-.pgroup{background:rgba(255,255,255,.75);border:1px solid var(--line);border-radius:12px;
+.pgroup{background:rgba(20,22,27,.55);border:1px solid var(--line);border-radius:12px;
   padding:12px 14px 4px}
 .pgroup h3{margin:0 0 6px;font-family:var(--display);font-size:15px;color:var(--gold-ink)}
 .pgroup ul{margin:0 0 8px;padding-left:17px;font-size:14px;color:var(--dim)}
@@ -392,20 +426,20 @@ code,kbd{
 .secret-toggle{margin-top:4px;cursor:pointer;border-color:var(--mist);
   color:var(--mist);flex:none}
 .secret-toggle:hover{background:var(--raise);border-color:var(--mist)}
-.secret-toggle[aria-pressed="true"]{background:var(--mist);color:#fff}
+.secret-toggle[aria-pressed="true"]{background:var(--mist);color:var(--ink)}
 button.card{font:inherit;color:inherit;text-align:left;padding:0;
   cursor:pointer;width:100%}
 button.card:hover{border-color:var(--mist)}
 .card .kr.tag{color:var(--mist)}
-/* White behind secret art: transparent emotes are drawn for a white page,
-   and look washed out on the card's blue tint. */
-.secret-card .art,#album-img{background:#fff}
+/* A sheet behind secret art: transparent emotes are drawn for a white page,
+   and their dark outlines vanish into ink. */
+.secret-card .art,#album-img{background:var(--sheet)}
 .secret-card .art{object-fit:contain}
 .secret-card.fill .art{object-fit:cover;object-position:50% 20%;background:var(--raise)}
 
 #album{background:var(--panel);color:var(--text);border:1px solid var(--line);
   border-radius:14px;padding:14px;width:min(92vw,760px);max-width:92vw}
-#album::backdrop{background:rgba(27,29,34,.55);backdrop-filter:blur(3px)}
+#album::backdrop{background:rgba(8,9,12,.72);backdrop-filter:blur(3px)}
 .album-top{display:flex;align-items:center;gap:12px;margin-bottom:10px;
   font-family:var(--display);font-weight:600}
 #album-count{font-family:var(--mono);font-size:12px;color:var(--faint);
@@ -767,7 +801,7 @@ be removed from anyone who breaks these terms.</p>
 
 (function(){
   // The air: scraps of paper, rising slowly and swaying a
-  // little, like the two over her head. It stops while the tab is hidden,
+  // little. It stops while the tab is hidden,
   // and for reduced motion it's drawn once and left still.
   var canvas = document.getElementById("sky");
   if (!canvas || !canvas.getContext) return;
@@ -816,10 +850,11 @@ be removed from anyone who breaks these terms.</p>
       ctx.save();
       ctx.translate(s.x, s.y);
       ctx.rotate(s.turn + (still ? 0 : t * s.spin));
-      ctx.fillStyle = "rgba(150,142,128," + a + ")";
+      // Pale on ink now, so fainter than they were on the light page.
+      ctx.fillStyle = "rgba(242,240,235," + (a * 0.32).toFixed(3) + ")";
       ctx.fillRect(-k, -k * 1.3, k * 2, k * 2.6);
-      ctx.fillStyle = "rgba(255,253,248," + (a * 0.8).toFixed(3) + ")";
-      ctx.fillRect(-k, -k * 1.3, k * 2, k * 0.5);
+      ctx.fillStyle = "rgba(176,172,163," + (a * 0.22).toFixed(3) + ")";
+      ctx.fillRect(-k, k * 0.8, k * 2, k * 0.5);
       ctx.restore();
       ctx.beginPath();
     }

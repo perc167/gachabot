@@ -190,12 +190,51 @@ def banner(kind: str):
     return image
 
 
+def site_icons():
+    """The website's and dashboard's copies of the chosen avatar and banner.
+
+    They used to be cut by hand from the old picture, which is how the site
+    kept showing the baby-blue one for a week after the rebrand. Now they
+    come from assets/brand/avatar.png and banner.png, whatever those are.
+    """
+    from PIL import Image
+
+    face = Image.open(os.path.join(OUT, "avatar.png")).convert("RGB")
+    wide = Image.open(os.path.join(OUT, "banner.png")).convert("RGB")
+    site = os.path.join(ROOT, "site", "img")
+
+    face.resize((512, 512), Image.LANCZOS).save(os.path.join(site, "paper-512.png"))
+    face.resize((180, 180), Image.LANCZOS).save(os.path.join(site, "paper-180.png"))
+    face.resize((256, 256), Image.LANCZOS).save(
+        os.path.join(ROOT, "dashboard", "paper.png"))
+    # A tab is 16 pixels wide, so the favicon is cropped in to the sheets
+    # rather than spending a third of itself on ink.
+    side = round(face.width * 0.74)
+    left = (face.width - side) // 2
+    top = round(face.height * 0.53) - side // 2
+    face.crop((left, top, left + side, top + side)).resize(
+        (64, 64), Image.LANCZOS).save(os.path.join(site, "favicon.png"))
+
+    # Link previews want 1.91:1; the banner is wider, so it sits on more ink.
+    card = Image.new("RGB", (1200, 630), INK)
+    height = round(wide.height * 1200 / wide.width)
+    card.paste(wide.resize((1200, height), Image.LANCZOS), (0, (630 - height) // 2))
+    card.save(os.path.join(site, "og.png"))
+    print("  site/img: paper-512, paper-180, favicon, og; dashboard/paper.png")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", default="all", choices=[*SHAPES, "all"])
     parser.add_argument("--out", default=OUT)
+    parser.add_argument("--site", action="store_true",
+                        help="only redo the site's and dashboard's icons from"
+                             " assets/brand/avatar.png and banner.png")
     args = parser.parse_args()
 
+    if args.site:
+        site_icons()
+        return 0
     os.makedirs(args.out, exist_ok=True)
     kinds = list(SHAPES) if args.kind == "all" else [args.kind]
     for kind in kinds:
