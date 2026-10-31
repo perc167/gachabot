@@ -192,10 +192,32 @@ def options_of(command) -> list:
     return out[:OPTION_LIMIT]
 
 
+BLANK_LINE = re.compile(r"\n\s*\n")
+
+
 def describe(command) -> str:
-    text = (command.short_doc or command.help or "").strip().replace("`", "")
-    text = re.sub(r"\s+", " ", text) or f"{config.PREFIX}{command.qualified_name}"
-    return text if len(text) <= 100 else text[:99] + "…"
+    """The one line Discord shows under a slash command.
+
+    short_doc is only the FIRST LINE of a docstring, so any docstring that
+    wrapped showed as half a sentence in the command picker - "takes it
+    away if", "where you rank,". Take the first paragraph instead, and when
+    it is too long for Discord's 100 characters, cut it at the end of a
+    sentence, or failing that at a word with an ellipsis. Either way what
+    a person reads is something that finished.
+    """
+    source = (command.help or command.short_doc or "").strip().replace("`", "")
+    paragraph = re.split(BLANK_LINE, source)[0]
+    text = re.sub(r"\s+", " ", paragraph).strip()
+    if not text:
+        return f"{config.PREFIX}{command.qualified_name}"
+    if len(text) <= 100:
+        return text
+    clipped = text[:99]
+    stop = max(clipped.rfind(". "), clipped.rfind("! "), clipped.rfind("? "))
+    if stop >= 40:                      # a whole sentence is better than a cut
+        return clipped[:stop + 1]
+    space = clipped.rfind(" ")
+    return (clipped[:space] if space >= 40 else clipped) + "…"
 
 
 # ---------------------------------------------- options back into words
