@@ -406,7 +406,11 @@ class Dashboard(commands.Cog):
     # ---------------------------------------------------------- showcase
 
     def shown(self, guild) -> bool:
-        return bool(self.bot.db.get_pref(guild.id, "showcase", 1))
+        # Off unless a server asks to be listed. A server's name, icon and
+        # member count go on a public page that any site may read, and that
+        # is not something to take from people who were never asked. Servers
+        # that ran `$sitelist on` have their own 1 stored and stay listed.
+        return bool(self.bot.db.get_pref(guild.id, "showcase", 0))
 
     @commands.command(name="sitelist", aliases=["website"])
     @commands.guild_only()
@@ -414,10 +418,13 @@ class Dashboard(commands.Cog):
     async def sitelist(self, ctx, state: str = None):
         """Whether this server appears in the list on the bot's website."""
         if state is None:
-            await ctx.send("This server is "
-                           + ("shown" if self.shown(ctx.guild) else "hidden")
-                           + f" on the bot's website. `{ctx.prefix}sitelist off`"
-                           f" hides it, `{ctx.prefix}sitelist on` shows it.")
+            await ctx.send(
+                "This server is "
+                + ("shown" if self.shown(ctx.guild) else "not shown")
+                + " on the bot's website. Servers are left off unless they ask"
+                  f" to be on it: `{ctx.prefix}sitelist on` adds this one"
+                  f" (its name, icon and member count), `{ctx.prefix}sitelist"
+                  " off` takes it back off.")
             return
         state = state.lower()
         if state not in ("on", "off"):
@@ -425,7 +432,7 @@ class Dashboard(commands.Cog):
             return
         self.bot.db.set_pref(ctx.guild.id, "showcase", 1 if state == "on" else 0)
         self.showcase_cache = (0, None)
-        await ctx.send("This server is " + ("back on" if state == "on" else "off")
+        await ctx.send("This server is " + ("on" if state == "on" else "off")
                        + " the bot's website. It updates within a few minutes.")
 
     def showcase_body(self) -> dict:

@@ -377,7 +377,7 @@ CATEGORIES = [
         ("levels message", "level-up wording"),
         ("levels levelcard", "card with level-ups"),
         ("dashboard", "settings on the web"),
-        ("sitelist", "show on the website"),
+        ("sitelist", "add this server to the website"),
         ("levels reset", "back to level 0"),
     ]),
     ("\U0001f50a", "Voice rooms", [

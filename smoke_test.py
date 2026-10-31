@@ -539,6 +539,17 @@ async def main():
     db.replace_autoroles(SG, [5, 6, 5])
     check("autoroles save without repeats", db.autoroles_of(SG) == [5, 6])
 
+    # The website list is opt-in: a server's name, icon and member count
+    # only go on a public page if someone asked for it.
+    dash = __import__("cogs.dashboard", fromlist=["x"])
+    off = NS(id=SG)
+    shown = dash.Dashboard.shown.__get__(NS(bot=NS(db=db)), dash.Dashboard)
+    check("a server is left off the website", not shown(off))
+    db.set_pref(SG, "showcase", 1)
+    check("asking to be listed works", shown(off))
+    db.set_pref(SG, "showcase", 0)
+    check("and it can be taken back off", not shown(off))
+
     # The server tag role.
     db.set_pref(SG, "tag_role", 42)
     saved = db.get_pref(SG, "tag_role", 0)
