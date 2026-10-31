@@ -52,7 +52,7 @@ INVITE_PERMISSIONS = discord.Permissions(
     move_members=True,
 )
 
-SITE_URL = "https://gachabot.perc-1fc.workers.dev"
+SITE_URL = "https://getpaperbot.com"
 
 
 def invite_url(bot) -> str:

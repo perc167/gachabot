@@ -959,9 +959,18 @@ async def main():
           and "Moderation" in promo.description)
     old_url = os.environ.get("PUBLIC_URL")
     os.environ["PUBLIC_URL"] = "https://paper.example"
+    paid = {"STRIPE_SECRET_KEY": "sk_test_x", "STRIPE_PRICE_ID": "price_x",
+            "STRIPE_WEBHOOK_SECRET": "whsec_x"}
+    had = {k: os.environ.get(k) for k in paid}
     try:
+        os.environ.update(paid)
         links = [item.url for item in dash.promo_buttons().children]
+        for key, was in had.items():          # back to no Stripe at all
+            os.environ.pop(key, None) if was is None else os.environ.__setitem__(key, was)
+        unsold = [item.url for item in dash.promo_buttons().children]
     finally:
+        for key, was in had.items():
+            os.environ.pop(key, None) if was is None else os.environ.__setitem__(key, was)
         if old_url is None:
             os.environ.pop("PUBLIC_URL", None)
         else:
@@ -970,6 +979,12 @@ async def main():
           [u.split("plan=")[-1] for u in links if "plan=" in u] == ["premium", "plus", "lifetime"]
           and all(u.startswith("https://paper.example/dashboard?premium=1") for u in links
                   if "plan=" in u), str(links))
+    # With nothing on sale the panel names no price, rather than offering one
+    # that leads to a page with nothing on it. (The free invite button needs a
+    # logged-in bot user, which this harness has no reason to give it, so it is
+    # the plan buttons that are counted here.)
+    check("no prices on the panel when nothing is for sale",
+          not [u for u in unsold if "plan=" in u], str(unsold))
 
     # Utility: snipes expire, reminders come due.
     from cogs import utility as ut

@@ -68,7 +68,7 @@ STATE_COOKIE = "yuri_state"
 NEXT_COOKIE = "paper_next"
 SESSION_DAYS = 7
 # Where the dashboard's Home link goes: the public website.
-SITE_URL = os.getenv("SITE_URL", "https://gachabot.perc-1fc.workers.dev").rstrip("/")
+SITE_URL = os.getenv("SITE_URL", "https://getpaperbot.com").rstrip("/")
 log = logging.getLogger("dashboard")
 
 HEADERS = {
@@ -376,7 +376,10 @@ class Dashboard(commands.Cog):
                 url=discord.utils.oauth_url(self.bot.user.id, permissions=INVITE_PERMISSIONS,
                                             scopes=SCOPES)))
         base = public_url()
-        if base:
+        # Only offer the paid plans when they can actually be bought. With
+        # Stripe unset the buttons led to a page with nothing on it, which
+        # is a worse first impression than not mentioning a price at all.
+        if base and billing.configured():
             for plan, fallback in (("premium", "$3.50/mo"), ("plus", "$10.50/mo"),
                                    ("lifetime", "$35 once")):
                 price = (billing.plan_label(plan).replace(" a month", "/mo")

@@ -130,7 +130,7 @@ class About(commands.Cog):
     async def support(self, ctx):
         """Getting help, what's free, and Paper's policies."""
         prefix = ctx.prefix or config.PREFIX
-        site = "https://gachabot.perc-1fc.workers.dev"
+        site = "https://getpaperbot.com"
         await ctx.send(
             embed=discord.Embed(
                 title="Help with Paper",

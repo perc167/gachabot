@@ -48,7 +48,7 @@ SERVERS_API = BOT_URL + "/api/servers"
 DASHBOARD_URL = BOT_URL + "/dashboard"
 COMMANDS_OUT = os.path.join(ROOT, "site", "commands.html")
 # The site's own address, for link previews, which need a full URL.
-SITE_URL = os.getenv("SITE_URL", "https://gachabot.perc-1fc.workers.dev").rstrip("/")
+SITE_URL = os.getenv("SITE_URL", "https://getpaperbot.com").rstrip("/")
 
 # The three parts of the bot, each with its own tab on the page. Sections
 # are named as they are in cogs/help.py; anything not listed is the gacha.
