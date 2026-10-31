@@ -28,6 +28,8 @@ INVITE_PERMISSIONS = discord.Permissions(
     attach_files=True,
     read_message_history=True,
     use_external_emojis=True,
+    # Reaction roles and $reactionlock put the reactions on themselves.
+    add_reactions=True,
     # Moderation: jail and mute roles, kicks, bans, timeouts, purge, lockdown.
     manage_roles=True,
     manage_channels=True,
