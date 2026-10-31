@@ -190,6 +190,48 @@ def banner(kind: str):
     return image
 
 
+def favicon_mark(size: int = 64, supersample: int = 8):
+    """The deck alone, on nothing, for the browser tab.
+
+    Cropping it out of the avatar always brought the ink ground with it,
+    which in a tab reads as a black tile with something pale inside rather
+    than as a piece of paper. So the mark is drawn again here on a
+    transparent ground instead, large and then shrunk, which is what gives
+    the edges their smoothness.
+
+    The sheets keep a dark outline. Without one a white mark on a
+    transparent ground vanishes into a light browser theme, which is the
+    same failure as the black tile, only the other way up.
+    """
+    from PIL import Image, ImageDraw
+
+    big = size * supersample
+    image = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    base = big * 0.46
+    centre = (big / 2, big / 2)
+    width, height = base * 0.84, base * 1.18
+    angle = -7
+    steps = ((-base * 0.17, base * 0.10, angle - 12, SHEET_DEEP),
+             (-base * 0.02, base * 0.02, angle - 5, SHEET_MID),
+             (base * 0.13, -base * 0.06, angle + 2, SHEET))
+    edge = max(1, round(big * 0.013))
+    for dx, dy, turn, colour in steps:
+        spot = (centre[0] + dx, centre[1] + dy)
+        draw.polygon(turned(spot, width, height, turn),
+                     fill=colour + (255,), outline=INK + (255,), width=edge)
+
+    # Shrink the transparent margin to a hair so the paper fills the tab,
+    # keeping the mark square so it isn't stretched on the way down.
+    bounds = image.getbbox()
+    side = max(bounds[2] - bounds[0], bounds[3] - bounds[1]) + edge * 2
+    middle = ((bounds[0] + bounds[2]) // 2, (bounds[1] + bounds[3]) // 2)
+    image = image.crop((middle[0] - side // 2, middle[1] - side // 2,
+                        middle[0] + side // 2, middle[1] + side // 2))
+    return image.resize((size, size), Image.LANCZOS)
+
+
 def site_icons():
     """The website's and dashboard's copies of the chosen avatar and banner.
 
@@ -207,21 +249,11 @@ def site_icons():
     face.resize((180, 180), Image.LANCZOS).save(os.path.join(site, "paper-180.png"))
     face.resize((256, 256), Image.LANCZOS).save(
         os.path.join(ROOT, "dashboard", "paper.png"))
-    # A tab is 16 pixels wide, so the favicon is cropped in to the sheets
-    # rather than spending a third of itself on ink. The crop is measured
-    # off the sheets themselves instead of a fraction of the canvas, so it
-    # stays right if the mark is ever redrawn at a different size: find the
-    # light pixels, then take a square a little tighter than their bounding
-    # box so the paper fills the frame. A little tighter and not flush,
-    # because the thin ring of ink left over is what keeps a white-on-white
-    # icon visible in a light browser theme.
-    sheets = face.convert("L").point(lambda v: 255 if v > 110 else 0).getbbox()
-    middle = ((sheets[0] + sheets[2]) // 2, (sheets[1] + sheets[3]) // 2)
-    side = round(max(sheets[2] - sheets[0], sheets[3] - sheets[1]) * 0.93)
-    box = (middle[0] - side // 2, middle[1] - side // 2,
-           middle[0] + side // 2, middle[1] + side // 2)
-    face.crop(box).resize((64, 64), Image.LANCZOS).save(
-        os.path.join(site, "favicon.png"))
+    # A tab is 16 pixels wide and sits on the browser's own colour, so the
+    # favicon is the mark on a transparent ground rather than a crop of the
+    # avatar, which would bring the ink tile with it. paper-180 above keeps
+    # its ink, because an apple-touch icon is composited onto black.
+    favicon_mark(64).save(os.path.join(site, "favicon.png"))
 
     # Link previews want 1.91:1; the banner is wider, so it sits on more ink.
     card = Image.new("RGB", (1200, 630), INK)
