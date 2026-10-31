@@ -19,6 +19,12 @@ RPS_ICON = {"rock": "\U0001faa8", "paper": "\U0001f4c4", "scissors": "✂️"}
 # What the invite link asks for, here and on the website (tools/build_site.py
 # reads it), so the two can't drift apart. A server owner can untick whatever
 # part of the bot they won't use.
+# Both scopes, always. "bot" alone adds Paper to the server but Discord
+# then registers none of its slash commands there, so a server that used
+# the website button got the $ commands and nothing under /. The two are
+# asked for together so that can't happen again.
+SCOPES = ("bot", "applications.commands")
+
 INVITE_PERMISSIONS = discord.Permissions(
     # The gacha. view_channel because the setup guide tells servers to give
     # the bot its own channel, and a locked one is invisible without it.
@@ -54,7 +60,8 @@ def invite_url(bot) -> str:
     client_id = bot.application_id or (bot.user.id if bot.user else None)
     if not client_id:
         return ""
-    return discord.utils.oauth_url(client_id, permissions=INVITE_PERMISSIONS, scopes=("bot",))
+    return discord.utils.oauth_url(client_id, permissions=INVITE_PERMISSIONS,
+                               scopes=SCOPES)
 
 
 def links_view(bot, vote: bool = True) -> discord.ui.View:

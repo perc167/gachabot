@@ -100,7 +100,7 @@ async def collect():
     for cog in botmod.COGS:
         await client.load_extension(cog)
 
-    from cogs.profile import INVITE_PERMISSIONS
+    from cogs.profile import INVITE_PERMISSIONS, SCOPES
 
     names = {name for _icon, name, _entries in helpmod.CATEGORIES}
     stale = sorted(set(AREA_OF) - names)
@@ -108,7 +108,7 @@ async def collect():
         raise SystemExit("AREA_OF names help sections that no longer exist: "
                          + ", ".join(stale))
     invite = discord.utils.oauth_url(CLIENT_ID, permissions=INVITE_PERMISSIONS,
-                                     scopes=("bot",))
+                                     scopes=SCOPES)
 
     sections = []
     for icon, name, entries in helpmod.CATEGORIES:

@@ -368,13 +368,13 @@ class Dashboard(commands.Cog):
 
     def promo_buttons(self) -> discord.ui.View:
         """Link buttons: Free is the invite, the rest open the Premium page."""
-        from cogs.profile import INVITE_PERMISSIONS
+        from cogs.profile import INVITE_PERMISSIONS, SCOPES
         view = discord.ui.View(timeout=None)
         if self.bot.user:
             view.add_item(discord.ui.Button(
                 label="Free", emoji="\u2728", style=discord.ButtonStyle.link,
                 url=discord.utils.oauth_url(self.bot.user.id, permissions=INVITE_PERMISSIONS,
-                                            scopes=("bot",))))
+                                            scopes=SCOPES)))
         base = public_url()
         if base:
             for plan, fallback in (("premium", "$3.50/mo"), ("plus", "$10.50/mo"),
@@ -553,7 +553,8 @@ class Dashboard(commands.Cog):
                             "premium": bool(guild) and self.bot.db.is_premium(guild.id),
                             "trial": bool(guild) and self.bot.db.trial_available(guild.id)})
         servers.sort(key=lambda s: (not s["has_bot"], s["name"].lower()))
-        invite = discord.utils.oauth_url(self.client_id(), scopes=("bot",),
+        from cogs.profile import SCOPES
+        invite = discord.utils.oauth_url(self.client_id(), scopes=SCOPES,
                                          permissions=self.invite_permissions())
         return web.json_response({
             "user": {"name": session["name"], "avatar": session["avatar"]},
