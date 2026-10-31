@@ -460,8 +460,7 @@ STEPS = [
                 "text": "Type `{p}togglegames` to stop game characters"
                         " rolling, or `{p}togglewestern` for cartoons.\nIt is"
                         " a toggle — type it again to put it back.",
-                "commands": {"togglegames", "togglewestern", "toggleirl",
-                             "togglehentai"},
+                "commands": {"togglegames", "togglewestern", "toggleirl"},
             },
             {
                 "key": "disablelist",

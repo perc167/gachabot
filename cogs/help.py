@@ -576,7 +576,6 @@ CATEGORIES = [
         ("toggleonlyadults", "leave out under-18 characters"),
         ("togglewestern", "western cartoons"),
         ("togglegames", "game characters"),
-        ("togglehentai", "18+ series (none are imported)"),
         ("togglehorror", "horror series"),
         ("toggledisturbing", "disturbing series"),
         ("toggleirl", "real people"),
