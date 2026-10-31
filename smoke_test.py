@@ -1634,7 +1634,7 @@ async def main():
 
     # A server that switches sources off keeps the secret and $limroul rules.
     real = db.excluded_sources
-    db.excluded_sources = lambda gid: ["Hentai"]
+    db.excluded_sources = lambda gid: ["Western"]
     _src, where, _args = db._roll_scope(WG, True)
     db.excluded_sources = real
     check("switching sources off keeps secrets out of the pool",
