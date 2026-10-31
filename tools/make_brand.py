@@ -208,12 +208,20 @@ def site_icons():
     face.resize((256, 256), Image.LANCZOS).save(
         os.path.join(ROOT, "dashboard", "paper.png"))
     # A tab is 16 pixels wide, so the favicon is cropped in to the sheets
-    # rather than spending a third of itself on ink.
-    side = round(face.width * 0.74)
-    left = (face.width - side) // 2
-    top = round(face.height * 0.53) - side // 2
-    face.crop((left, top, left + side, top + side)).resize(
-        (64, 64), Image.LANCZOS).save(os.path.join(site, "favicon.png"))
+    # rather than spending a third of itself on ink. The crop is measured
+    # off the sheets themselves instead of a fraction of the canvas, so it
+    # stays right if the mark is ever redrawn at a different size: find the
+    # light pixels, then take a square a little tighter than their bounding
+    # box so the paper fills the frame. A little tighter and not flush,
+    # because the thin ring of ink left over is what keeps a white-on-white
+    # icon visible in a light browser theme.
+    sheets = face.convert("L").point(lambda v: 255 if v > 110 else 0).getbbox()
+    middle = ((sheets[0] + sheets[2]) // 2, (sheets[1] + sheets[3]) // 2)
+    side = round(max(sheets[2] - sheets[0], sheets[3] - sheets[1]) * 0.93)
+    box = (middle[0] - side // 2, middle[1] - side // 2,
+           middle[0] + side // 2, middle[1] + side // 2)
+    face.crop(box).resize((64, 64), Image.LANCZOS).save(
+        os.path.join(site, "favicon.png"))
 
     # Link previews want 1.91:1; the banner is wider, so it sits on more ink.
     card = Image.new("RGB", (1200, 630), INK)
