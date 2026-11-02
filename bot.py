@@ -73,6 +73,7 @@ COGS = [
     "cogs.find",
     "cogs.help",
     "cogs.votes",
+    "cogs.language",
     "cogs.slash",  # last: it builds a slash command for every command above
 ]
 
