@@ -718,7 +718,10 @@ __BODY__<script>
   if (!section || !window.fetch) return;
   fetch("__SERVERS_API__").then(function(r){ return r.ok ? r.json() : null; })
     .then(function(data){
-      if (!data || !data.list || !data.list.length) return;
+      if (!data || !data.servers) return;
+      // The totals always show; the scrolling list only holds servers that
+      // asked to be on it ($sitelist on), so it may be empty.
+      section.hidden = false;
       document.getElementById("srv-users").textContent = data.users.toLocaleString("en");
       document.getElementById("srv-count").textContent = data.servers.toLocaleString("en");
       if (data.servers === 1) document.getElementById("srv-word").textContent = "community";
@@ -740,9 +743,9 @@ __BODY__<script>
         text.append(name, count); el.append(pic, text);
         return el;
       }
-      data.list.forEach(function(s){ track.appendChild(item(s)); });
-      section.hidden = false;
       var marquee = track.parentNode;
+      if (!data.list || !data.list.length) { marquee.hidden = true; return; }
+      data.list.forEach(function(s){ track.appendChild(item(s)); });
       // Only scroll when there's more than fits; a copy of the list follows
       // the first so the loop has no seam.
       if (track.scrollWidth > marquee.clientWidth) {
