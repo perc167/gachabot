@@ -1,12 +1,18 @@
 """Bring harems over from Mudae.
 
 Mudae has no API and no export file, but it will print a harem as text:
-`$mmasi-` lists every character under its series, one per line, the way the
-community harem sorters read it. A server admin gets that list into Paper one
-of three ways - attach it as a text file, paste it after the command, or just
-run the command in the channel (or thread) where Mudae posted it, and Paper
-reads Mudae's messages there itself. Paper only ever reads what Mudae, a bot,
-posted; nobody's account is automated.
+`$mmasi- <user ID>` lists every character under its series, one per line,
+the way the community harem sorters read it. The flags matter: `a` groups by
+series, `s` sends the list to whoever asked by DM, `i-` leaves the images out
+of that DM. Mudae takes a user ID in place of a mention (its own tutorial
+says so, "because it's better to not mention someone"), so an admin can pull
+everyone's list without pinging anybody - it lands in the admin's DMs.
+
+From there the admin gets it into Paper one of three ways: forward Mudae's
+DM messages into a channel and run the command there (Paper reads the
+forwards, and any list Mudae posted in the channel itself), attach the list
+as a text file, or paste it after the command. Paper only ever reads what
+Mudae, a bot, wrote; nobody's account is automated.
 
 Matching is the hard part. Mudae and Paper name the same people differently:
 Mudae says "Monkey D. Luffy" from "One Piece", Paper (from AniList) says
@@ -36,7 +42,8 @@ from discord.ext import commands
 from cogs.levels import shown_names
 
 MUDAE_IDS = {432610292342587392}
-EXPORT_COMMAND = "$mmasi-"
+EXPORT_COMMAND = "$mmasi-"   # a: by series, s: by DM, i-: no images in the DM
+QUIET = discord.AllowedMentions.none()   # an import never pings anyone
 HISTORY_LIMIT = 200          # messages read back looking for Mudae's list
 COMMON_TOKEN = 3000          # a word on more characters than this is no clue
 
@@ -62,7 +69,8 @@ def is_mudae(user) -> bool:
 
 
 def message_text(message) -> str:
-    """What Mudae wrote in a message, whether as text or in an embed."""
+    """What Mudae wrote in a message, whether as text or in an embed. Works
+    on a forwarded message's snapshot too: it has the same two parts."""
     parts = [message.content or ""]
     for embed in message.embeds:
         parts.append(embed.description or "")
@@ -265,6 +273,29 @@ class ImportChoice(discord.ui.View):
                 pass
 
 
+async def collect_mudae(history) -> str:
+    """Mudae's most recent run of messages, from newest-first history.
+
+    Skip anything until Mudae's first message, then collect until a person
+    spoke - that's whoever asked Mudae for the list. Other bots' replies in
+    between don't count. A forwarded message counts as Mudae's: `$mmasi-`
+    sends the list by DM, so it reaches a channel as forwards, under the
+    name of whoever forwarded it. Forwards carry no original author, but
+    the admin sees every match before anything changes.
+    """
+    chunks = []
+    async for message in history:
+        forwarded = getattr(message, "message_snapshots", None) or []
+        if is_mudae(message.author):
+            chunks.append(message_text(message))
+        elif forwarded:
+            # Newest first, like the history: the whole list is flipped at the end.
+            chunks.extend(message_text(s) for s in reversed(forwarded))
+        elif not message.author.bot and chunks:
+            break
+    return "\n".join(reversed(chunks))
+
+
 def plan_import(db, guild_id: int, assigned: list, cap: int) -> dict:
     """Decide what an import would do, changing nothing.
 
@@ -309,34 +340,25 @@ class HaremImport(commands.Cog):
         self.bot = bot
 
     async def read_mudae(self, ctx) -> str:
-        """Mudae's most recent run of messages in this channel or thread.
-
-        Walking back from the command: skip anything until Mudae's first
-        message, then collect Mudae's messages (other bots' replies in
-        between don't count) until a person spoke - that's whoever asked
-        Mudae for the list.
-        """
-        chunks = []
+        """Mudae's list as posted (or forwarded) in this channel or thread,
+        walking back from the command."""
         before = discord.Object(id=ctx.message.id) if getattr(ctx.message, "id", None) else None
         try:
-            async for message in ctx.channel.history(limit=HISTORY_LIMIT, before=before):
-                if is_mudae(message.author):
-                    chunks.append(message_text(message))
-                elif not message.author.bot and chunks:
-                    break
+            return await collect_mudae(
+                ctx.channel.history(limit=HISTORY_LIMIT, before=before))
         except discord.HTTPException:
             return ""
-        return "\n".join(reversed(chunks))
 
     @commands.command(name="haremimport", aliases=["importharem", "mudaeimport"])
     @commands.guild_only()
     @commands.has_permissions(manage_guild=True)
     async def haremimport(self, ctx, member: typing.Optional[discord.Member] = None,
                           *, text: str = ""):
-        """Bring someone's Mudae harem over. Have Mudae print it with
-        `$mmasi- @member`, then run this with them named: attach Mudae's
-        list as a text file, paste it after, or just run it where Mudae
-        posted it. Shows every match before it changes anything."""
+        """Bring someone's Mudae harem over without pinging them. Run
+        `$mmasi- <their user ID>` and Mudae DMs you their list. Forward
+        those DMs here (or attach them as a text file), then run this with
+        their user ID, username or @mention. Shows every match before it
+        changes anything."""
         db = self.bot.db
         gid = ctx.guild.id
         source = "your file"
@@ -349,15 +371,27 @@ class HaremImport(commands.Cog):
             source = "what you pasted"
 
         entries = parse_mudae(text)
+        how_to_id = ("To copy a user ID: turn on Developer Mode (User Settings,"
+                     " Advanced), then right-click them and pick Copy User ID.")
+        word = text.strip()
+        if not entries and member is None and word and "\n" not in word and len(word) <= 40:
+            # One short word that isn't a list: a name or ID that matched
+            # nobody here, which the member lookup handed on as text.
+            await ctx.send(
+                f"I couldn't find `{word[:40]}` in this server. Name them by user ID"
+                " (it never pings), @mention or username - a name with spaces goes"
+                f" in quotes.\n{how_to_id}", allowed_mentions=QUIET)
+            return
         if not entries:
             await ctx.send(
                 f"I couldn't find a Mudae harem list in {source}.\n"
-                f"1. Have Mudae print it: `{EXPORT_COMMAND} @member` (they can run"
-                f" `{EXPORT_COMMAND}` themselves).\n"
-                f"2. Then, in the same channel or thread, run `{ctx.prefix}haremimport"
-                " @member`. If Mudae's list runs over several pages, copy all of it"
-                " into a text file and attach that instead.",
-                allowed_mentions=discord.AllowedMentions.none())
+                f"1. Get their list without pinging anyone: `{EXPORT_COMMAND} <their"
+                " user ID>`. Mudae sends it to your DMs (the `s` in"
+                f" `{EXPORT_COMMAND}` means DM).\n"
+                "2. Forward Mudae's DM messages into this channel, then run"
+                f" `{ctx.prefix}haremimport <their user ID>` here. Or copy the whole"
+                " list into a text file and attach it to the command.\n" + how_to_id,
+                allowed_mentions=QUIET)
             return
 
         # Whose harem is whose: the member named, or the owner Mudae printed
@@ -378,14 +412,14 @@ class HaremImport(commands.Cog):
             owned.append((who, entry))
         if not owned:
             await ctx.send(
-                f"Say whose harem this is: `{ctx.prefix}haremimport @member`."
+                f"Say whose harem this is: `{ctx.prefix}haremimport <their user ID>`."
                 + (f" I couldn't find {', '.join(f'`{n}`' for n in sorted(unowned) if n)}"
                    " here." if any(unowned) else ""),
-                allowed_mentions=discord.AllowedMentions.none())
+                allowed_mentions=QUIET)
             return
 
         working = await ctx.send(f"Matching {len(owned):,} characters against"
-                                 " Paper's roster...")
+                                 " Paper's roster...", allowed_mentions=QUIET)
         rows = db.roster_for_matching(gid)
         matched = await asyncio.to_thread(match_all, [e for _m, e in owned], rows)
         assigned = [(who, entry, row, sure)
@@ -439,14 +473,14 @@ class HaremImport(commands.Cog):
                               description="\n".join(lines)[:4000],
                               colour=discord.Colour.blurple())
         if not sure and not guess:
-            await ctx.send(embed=embed, allowed_mentions=discord.AllowedMentions.none())
+            await ctx.send(embed=embed, allowed_mentions=QUIET)
             return
         view = ImportChoice(ctx.author.id, len(sure) + len(guess), len(sure))
         view.message = await ctx.send(embed=embed, view=view,
-                                      allowed_mentions=discord.AllowedMentions.none())
+                                      allowed_mentions=QUIET)
         await view.wait()
         if view.choice is None:
-            await ctx.send("Left alone. Nothing was imported.")
+            await ctx.send("Left alone. Nothing was imported.", allowed_mentions=QUIET)
             return
         chosen = sure + (guess if view.choice == "all" else [])
         added = db.import_marriages(gid, [(who.id, row["id"]) for who, _e, row in chosen])
@@ -454,7 +488,7 @@ class HaremImport(commands.Cog):
         await ctx.send(
             f"\U0001f48d Imported **{added:,}** characters into {whose}'s harem."
             + (f" {skipped:,} were claimed by someone in the meantime." if skipped else ""),
-            allowed_mentions=discord.AllowedMentions.none())
+            allowed_mentions=QUIET)
 
 
 async def setup(bot):

@@ -4322,6 +4322,38 @@ async def main():
           and not hi.is_mudae(SimpleNamespace(id=2, bot=False, name="Mudae"))
           and not hi.is_mudae(SimpleNamespace(id=3, bot=True, name="Paper")))
 
+    # $mmasi- sends the list by DM; the admin forwards those DMs into a channel.
+    admin = SimpleNamespace(id=ALICE, bot=False, name="admin")
+    mudae_bot = SimpleNamespace(id=432610292342587392, bot=True, name="Mudae")
+    def forward(text):
+        return SimpleNamespace(author=admin, content="", embeds=[], message_snapshots=[
+            SimpleNamespace(content=text, embeds=[])])
+    async def newest_first(messages):
+        for m in messages:
+            yield m
+    history = [forward("Rem - https://mudae.net/uploads/2/b.png"),
+               forward("Re:Zero - 2/80\nEmilia - https://mudae.net/uploads/3/c.png"),
+               SimpleNamespace(author=admin, content="$mmasi- 123", embeds=[],
+                               message_snapshots=[]),
+               SimpleNamespace(author=mudae_bot, content="Old Show - 1/1\nOld Person",
+                               embeds=[], message_snapshots=[])]
+    forwarded = hi.parse_mudae(await hi.collect_mudae(newest_first(history)))
+    check("Mudae's DMs forwarded into a channel read in order, stopping at the ask",
+          [e[0] for e in forwarded] == ["Emilia", "Rem"], str(forwarded))
+
+    sent = []
+    async def capture(content=None, **kwargs):
+        sent.append((content, kwargs.get("allowed_mentions")))
+    import_ctx = SimpleNamespace(message=SimpleNamespace(attachments=[]), prefix="$",
+                                 guild=SimpleNamespace(id=GUILD), send=capture)
+    hcog = b.get_cog("HaremImport")
+    await hcog.haremimport.callback(hcog, import_ctx, None, text="nobodyhere")
+    check("a name or ID that matches nobody says so, without pinging",
+          sent and "couldn't find `nobodyhere`" in sent[0][0]
+          and sent[0][1] is hi.QUIET, str(sent))
+    check("the import's no-ping setting pings nobody",
+          not (hi.QUIET.everyone or hi.QUIET.users or hi.QUIET.roles))
+
     await b.close()
 
 
