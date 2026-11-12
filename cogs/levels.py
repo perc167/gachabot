@@ -138,23 +138,57 @@ def month_name(month: int) -> str:
 
 IMPORT_LINE = re.compile(r"^\s*(?:#?\d+[.)]?\s+)?@?(\S+?)[\s,;:|]+(?:level\s*)?(\d+)\b",
                          re.IGNORECASE)
+# Arcane's web leaderboard (arcane.bot/lb/<server id>) only shows to someone
+# logged in with Discord, and its API turns bots away, so the way across is
+# select-all, copy, paste. Each row then comes out one cell per line: the
+# rank as "12.", the name, the level, then XP, messages, reactions and voice
+# time. The rank's dot is what tells it apart from a stat like "310".
+RANK_ONLY = re.compile(r"^#?(\d{1,6})[.)]$")
+RANK_AND_NAME = re.compile(r"^#?\d{1,6}[.)]\s+@?(.+)$")
+LEVEL_ONLY = re.compile(r"^(?:level|lvl|lv)?\s*(\d{1,4})$", re.IGNORECASE)
 
 
 def parse_import(text: str) -> list:
-    """[(username, level), ...] from lines like `1. @name 32` or `name,32`.
+    """[(name, level), ...] from lines like `1. @name 32` or `name,32`, or
+    from a copy of Arcane's web leaderboard, where one row spans lines.
 
     Order is kept: it's the old bot's ranking, best first.
     """
+    lines = [line.strip() for line in (text or "").splitlines()]
+    lines = [line for line in lines if line]
     rows, seen = [], set()
-    for line in (text or "").splitlines():
+
+    def keep(name: str, level: int):
+        name = name.strip().lstrip("@").lower()
+        if name and name not in seen and 0 <= level <= MAX_LEVEL:
+            seen.add(name)
+            rows.append((name, level))
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Arcane's page: "12." / name / level.
+        if RANK_ONLY.match(line) and i + 2 < len(lines):
+            level = LEVEL_ONLY.match(lines[i + 2])
+            if level:
+                keep(lines[i + 1], int(level.group(1)))
+                i += 3
+                continue
         match = IMPORT_LINE.match(line)
-        if not match:
+        if match:
+            keep(match.group(1), int(match.group(2)))
+            i += 1
             continue
-        name, level = match.group(1).lower(), int(match.group(2))
-        if name in seen or not 0 <= level <= MAX_LEVEL:
-            continue
-        seen.add(name)
-        rows.append((name, level))
+        # "12. Display Name" with the level on the next line - names with
+        # spaces in them can't be told from the level on one line.
+        both = RANK_AND_NAME.match(line)
+        if both and i + 1 < len(lines):
+            level = LEVEL_ONLY.match(lines[i + 1])
+            if level:
+                keep(both.group(1), int(level.group(1)))
+                i += 2
+                continue
+        i += 1
     return rows
 
 
@@ -162,29 +196,52 @@ def rows_index(rows: list, name: str) -> int:
     return next(i for i, (n, _level) in enumerate(rows) if n == name)
 
 
+def shown_names(members) -> dict:
+    """Display names and nicknames, lowercased, that belong to one member only.
+
+    The other bot may list people by the name they show rather than their
+    username; a name two members share can't say which of them it means.
+    """
+    owners = {}
+    for m in members:
+        for name in {getattr(m, "global_name", None), getattr(m, "nick", None),
+                     m.display_name}:
+            if name:
+                owners.setdefault(name.lower(), set()).add(m.id)
+    by_id = {m.id: m for m in members}
+    return {name: by_id[next(iter(ids))] for name, ids in owners.items()
+            if len(ids) == 1}
+
+
 def match_members(rows: list, members) -> tuple:
-    """Pair imported usernames with members.
+    """Pair imported names with members.
 
     Returns (exact, guessed, missing): exact and guessed are lists of
-    (name, member, level). A guess is a close spelling that points at one
-    member only, for names read off a screenshot a letter wrong; they're
-    shown to whoever is importing before anything changes.
+    (name, member, level). Usernames are tried first, then display names
+    and nicknames. A guess is a close spelling that points at one member
+    only, for names read off a screenshot a letter wrong; they're shown to
+    whoever is importing before anything changes.
     """
     people = [m for m in members if not m.bot]
     by_name = {m.name.lower(): m for m in people}
+    by_shown = shown_names(people)
     exact, guessed, missing, taken = [], [], [], set()
+    done = set()
+    for lookup in (by_name, by_shown):
+        for name, level in rows:
+            member = lookup.get(name)
+            if name not in done and member and member.id not in taken:
+                exact.append((name, member, level))
+                taken.add(member.id)
+                done.add(name)
+    every = {**by_shown, **by_name}
     for name, level in rows:
-        member = by_name.get(name)
-        if member and member.id not in taken:
-            exact.append((name, member, level))
-            taken.add(member.id)
-    for name, level in rows:
-        if name in by_name:
+        if name in done:
             continue
-        free = [n for n, m in by_name.items() if m.id not in taken]
+        free = [n for n, m in every.items() if m.id not in taken]
         close = difflib.get_close_matches(name, free, n=2, cutoff=0.85)
-        if len(close) == 1:
-            member = by_name[close[0]]
+        if close and len({every[n].id for n in close}) == 1:
+            member = every[close[0]]
             guessed.append((name, member, level))
             taken.add(member.id)
         else:
@@ -1254,15 +1311,20 @@ class Levels(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     async def levels_import(self, ctx, *, text: str = ""):
         """Carry levels over from another bot. Attach a text file with one
-        `username level` per line, best first. Shows who matched before it
-        changes anything, and pays no karuda."""
+        `username level` per line, best first, or everything copied off
+        Arcane's web leaderboard. Shows who matched before it changes
+        anything, and pays no karuda."""
         if ctx.message.attachments:
             raw = await ctx.message.attachments[0].read()
-            text = raw.decode("utf-8", errors="replace")
+            text = raw.decode("utf-8-sig", errors="replace")
         rows = parse_import(text)
         if not rows:
-            await ctx.send("Attach a text file with one `username level` per"
-                           " line, e.g. `kingnoaglazer 32`.")
+            await ctx.send(
+                "Attach a text file with one `username level` per line, e.g."
+                " `kingnoaglazer 32`.\n**From Arcane:** open"
+                f" `https://arcane.bot/lb/{ctx.guild.id}` and log in, scroll to the"
+                " bottom so everyone loads, press Ctrl+A then Ctrl+C, paste it"
+                " into a text file and attach that here.")
             return
 
         exact, guessed, missing = match_members(rows, ctx.guild.members)

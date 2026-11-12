@@ -62,6 +62,7 @@ CATEGORIES = [
         ("haremcopy", "as plain text"),
         ("divorcepage", "let a page go"),
         ("haremlimit", "cap harem size"),
+        ("haremimport", "bring a Mudae harem over"),
     ]),
     ("\U0001f9f9", "Clearing out", [
         ("divorceall", "let everyone go"),

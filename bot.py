@@ -68,6 +68,7 @@ COGS = [
     "cogs.leaderboards",
     "cogs.about",
     "cogs.haremextra",
+    "cogs.haremimport",
     "cogs.tutorial",
     "cogs.personalise",
     "cogs.find",

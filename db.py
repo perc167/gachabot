@@ -3012,6 +3012,28 @@ class Database:
         except sqlite3.IntegrityError:
             return False
 
+    def import_marriages(self, guild_id: int, pairs) -> int:
+        """Claim many characters at once for a harem brought over from
+        another bot: [(user_id, character_id), ...]. One transaction, and a
+        character someone here already holds is left with them, so running
+        the same import twice adds nothing the second time. Returns how many
+        were new."""
+        now = int(time.time())
+        before = self.conn.total_changes
+        with self.conn:
+            self.conn.executemany(
+                "INSERT OR IGNORE INTO marriages"
+                " (guild_id, character_id, user_id, claimed_at) VALUES (?, ?, ?, ?)",
+                [(guild_id, int(cid), int(uid), now) for uid, cid in pairs])
+        return self.conn.total_changes - before
+
+    def roster_for_matching(self, guild_id: int) -> list:
+        """Every character this server can hold, lean, for matching names
+        brought over from another bot."""
+        return self.conn.execute(
+            "SELECT id, name, series, favourites FROM characters"
+            " WHERE guild_id = 0 OR guild_id = ?", (guild_id,)).fetchall()
+
     def _log_divorces(self, guild_id: int, user_id: int, character_ids,
                       refunded: int = 0, reason: str = ""):
         """Write down what was let go of, and what it paid.

@@ -1156,7 +1156,9 @@ async def main():
     routes = {}
     for item in tree_items:
         for cmd in (item.commands if isinstance(item, _ac.Group) else [item]):
-            routes[cmd.extras["prefix_command"]] = cmd.qualified_name
+            # Hand-written slash commands (/language) have no $ twin to route to.
+            if "prefix_command" in cmd.extras:
+                routes[cmd.extras["prefix_command"]] = cmd.qualified_name
     check("slash commands fit Discord's limits",
           len(tree_items) <= sl.TOP_LIMIT
           and all(len(g.commands) <= sl.GROUP_LIMIT for g in slash_groups),
@@ -1227,6 +1229,8 @@ async def main():
     wrong_command = []
     for item in tree_items:
         for cmd in (item.commands if isinstance(item, _ac.Group) else [item]):
+            if "prefix_command" not in cmd.extras:
+                continue
             space = cmd.callback.__globals__
             real_run, got = space["RUN"], []
             async def record(interaction, command, options, values, got=got):
@@ -4230,6 +4234,93 @@ async def main():
     check("an allowed user is remembered", alt.allowed(GUILD) == [BOB]
           and adb.antinuke_people(GUILD, "trusted") == [])
     adb.close()
+
+    # 24. Bringing levels and harems over from Arcane and Mudae.
+    from cogs import levels as lv
+    from cogs import haremimport as hi
+    arcane_copy = ("Test Server\n1.\n\nkingnoaglazer\n\n42\n\n165.3K\n\n12.1K\n\n-\n\n3h\n\n"
+                   "2.\n\nSleepy Cat\n\n7\n\n4.2K\n\n310\n\n2\n\n-\n\n10.\n\nx_x.v2\n\n0\n\n45")
+    check("a copy of Arcane's web leaderboard reads as name and level, best first",
+          lv.parse_import(arcane_copy) == [("kingnoaglazer", 42), ("sleepy cat", 7),
+                                           ("x_x.v2", 0)])
+    check("the one-line formats still read",
+          lv.parse_import("1. @alice 32\nbob,12\n#3 carol level 9\n4. Big Name\n5")
+          == [("alice", 32), ("bob", 12), ("carol", 9), ("big name", 5)])
+    folk = [SimpleNamespace(id=1, name="kingnoaglazer", global_name="King", nick=None,
+                            display_name="King", bot=False),
+            SimpleNamespace(id=2, name="cat_1234", global_name="Sleepy Cat", nick=None,
+                            display_name="Sleepy Cat", bot=False),
+            SimpleNamespace(id=3, name="twin_a", global_name="Twin", nick=None,
+                            display_name="Twin", bot=False),
+            SimpleNamespace(id=4, name="twin_b", global_name="Twin", nick=None,
+                            display_name="Twin", bot=False)]
+    exact, guessed, missing = lv.match_members(
+        [("kingnoaglazer", 42), ("sleepy cat", 7), ("twin", 3)], folk)
+    check("imported names match a username, then a display name",
+          [(n, m.id) for n, m, _l in exact] == [("kingnoaglazer", 1), ("sleepy cat", 2)])
+    check("a display name two members share matches neither",
+          missing == ["twin"] and not guessed)
+
+    mudae_list = (
+        "arczeus's harem\nTotal value: 12,345 ka\n"
+        "One Piece - 302/524\n"
+        "#27 - Monkey D. Luffy  \U0001f49e => arczeus | One Peak · ($ha) ·"
+        " :silverkey:  (5) (#000000) 5,138 ka - https://mudae.net/uploads/1/a.gif\n"
+        "**Re:Zero kara Hajimeru Isekai Seikatsu** - 2/80\n"
+        "Rem 812 ka - <https://mudae.net/uploads/2/b.png>\n"
+        "Emilia | best girl - https://mudae.net/uploads/3/c.png\n"
+        "Shingeki no Kyojin - 1/50\nLevi\nNobody At All\n")
+    entries = hi.parse_mudae(mudae_list)
+    check("Mudae's list reads as name, series and owner, skipping its title",
+          entries[:3] == [("Monkey D. Luffy", "One Piece", "arczeus"),
+                          ("Rem", "Re:Zero kara Hajimeru Isekai Seikatsu", ""),
+                          ("Emilia", "Re:Zero kara Hajimeru Isekai Seikatsu", "")]
+          and len(entries) == 5, str(entries))
+    roster_rows = [
+        {"id": 1, "name": "Luffy Monkey", "series": "ONE PIECE", "favourites": 30000},
+        {"id": 2, "name": "Rem", "series": "Re:ZERO -Starting Life in Another World-",
+         "favourites": 20000},
+        {"id": 3, "name": "Rem", "series": "Some Other Show", "favourites": 5},
+        {"id": 4, "name": "Emilia", "series": "Re:ZERO -Starting Life in Another World-",
+         "favourites": 9000},
+        {"id": 5, "name": "Levi", "series": "Attack on Titan", "favourites": 38000},
+        {"id": 6, "name": "Satoru Gojou", "series": "JUJUTSU KAISEN", "favourites": 39000},
+    ]
+    found = {e[0]: (row and row["id"], sure) for e, row, sure in hi.match_all(entries, roster_rows)}
+    check("names match in any order, without the D., and the series picks the Rem",
+          found["Monkey D. Luffy"] == (1, True) and found["Rem"] == (2, True), str(found))
+    check("a series named differently makes it a guess, and a stranger matches nobody",
+          found["Levi"] == (5, False) and found["Nobody At All"] == (None, False))
+    check("long vowels fold: Gojo is Gojou",
+          hi.match_all([("Gojo Satoru", "Jujutsu Kaisen", "")], roster_rows)[0][1:]
+          == (roster_rows[5], True))
+
+    import db as harem_dbmod
+    hdb = harem_dbmod.Database(os.path.join(tempfile.mkdtemp(), "harem.db"))
+    ids = [hdb.add_character(f"Person {n}", "Show", "https://x/y.png", 0, 50)
+           for n in range(4)]
+    hdb.claim(GUILD, ids[0], BOB)
+    check("an import adds only what's new and never takes from anyone",
+          hdb.import_marriages(GUILD, [(ALICE, ids[0]), (ALICE, ids[1]), (ALICE, ids[2])]) == 2
+          and hdb.owner_of(GUILD, ids[0]) == BOB
+          and hdb.import_marriages(GUILD, [(ALICE, ids[1]), (ALICE, ids[2])]) == 0)
+    alice_m = SimpleNamespace(id=ALICE, display_name="Alice")
+    rows_by_id = {r["id"]: r for r in hdb.roster_for_matching(GUILD)}
+    plan = hi.plan_import(hdb, GUILD, [
+        (alice_m, ("Person 0", "Show", ""), rows_by_id[ids[0]], True),
+        (alice_m, ("Person 1", "Show", ""), rows_by_id[ids[1]], True),
+        (alice_m, ("Person 3", "Show", ""), rows_by_id[ids[3]], False),
+        (alice_m, ("Ghost", "Show", ""), None, False)], cap=2)
+    check("the preview sorts out held, theirs, over the cap and missing",
+          len(plan["taken"]) == 1 and len(plan["already"]) == 1
+          and len(plan["full"]) == 1 and len(plan["missing"]) == 1
+          and not plan["sure"] and not plan["guess"], str({k: len(v) for k, v in plan.items()}))
+    hdb.close()
+    check("only Mudae's own bots are read",
+          hi.is_mudae(SimpleNamespace(id=1, bot=True, name="Mudamaid 12"))
+          and hi.is_mudae(SimpleNamespace(id=432610292342587392, bot=True, name="x"))
+          and not hi.is_mudae(SimpleNamespace(id=2, bot=False, name="Mudae"))
+          and not hi.is_mudae(SimpleNamespace(id=3, bot=True, name="Paper")))
 
     await b.close()
 
