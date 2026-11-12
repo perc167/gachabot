@@ -4269,7 +4269,8 @@ async def main():
         "**Re:Zero kara Hajimeru Isekai Seikatsu** - 2/80\n"
         "Rem 812 ka - <https://mudae.net/uploads/2/b.png>\n"
         "Emilia | best girl - https://mudae.net/uploads/3/c.png\n"
-        "Shingeki no Kyojin - 1/50\nLevi\nNobody At All\n")
+        "Shingeki no Kyojin - 1/50\nLevi - https://mudae.net/uploads/4/d.png\n"
+        "Nobody At All - https://mudae.net/uploads/5/e.png\n")
     entries = hi.parse_mudae(mudae_list)
     check("Mudae's list reads as name, series and owner, skipping its title",
           entries[:3] == [("Monkey D. Luffy", "One Piece", "arczeus"),
@@ -4353,6 +4354,42 @@ async def main():
           and sent[0][1] is hi.QUIET, str(sent))
     check("the import's no-ping setting pings nobody",
           not (hi.QUIET.everyone or hi.QUIET.users or hi.QUIET.roles))
+    sent.clear()
+    await hcog.haremimport.callback(hcog, import_ctx, None, text="<@&555>")
+    check("naming a role says it takes one person, or `all`",
+          sent and "That's a role" in sent[0][0] and "haremimport all" in sent[0][0])
+
+    # `$haremimport all`: everyone's lists forwarded here, each line names its owner.
+    paper_bot = SimpleNamespace(id=999, bot=True, name="Paper")
+    def owned(owner, name, n):
+        return (f"{name} \U0001f49e => {owner} - https://mudae.net/uploads/{n}/x.png")
+    server_history = [
+        forward("bob_b's harem\nTotal value: 9 ka\nOne Piece - 1/524\n"
+                + owned("bob_b", "Roronoa Zoro", 7)),
+        SimpleNamespace(author=admin, content="$mmasi-o 222", embeds=[], message_snapshots=[]),
+        forward("Re:Zero - 2/80\n" + owned("alice_a", "Rem", 2) + "\n"
+                + owned("alice_a", "Emilia", 3)),
+        SimpleNamespace(author=admin, content="$mmasi-o 111", embeds=[], message_snapshots=[]),
+        SimpleNamespace(author=paper_bot, content=hi.DONE_MARK + " **3** characters",
+                        embeds=[], message_snapshots=[]),
+        forward("Old Show - 1/1\n" + owned("alice_a", "Old Person", 9)),
+    ]
+    everyone = hi.parse_mudae(await hi.collect_mudae(
+        newest_first(server_history), everything=True,
+        stop=lambda m: m.author.id == 999 and m.content.startswith(hi.DONE_MARK)))
+    check("`all` reads every list back to the last finished import, owner on each line,"
+          " and a second list's title isn't a character",
+          [(e[0], e[2]) for e in everyone] == [("Rem", "alice_a"), ("Emilia", "alice_a"),
+                                                ("Roronoa Zoro", "bob_b")], str(everyone))
+    two = {1: SimpleNamespace(id=1, display_name="Alice"),
+           2: SimpleNamespace(id=2, display_name="Bob")}
+    split = hi.person_lines(two, {"sure": [(two[2], None, None)] * 3,
+                                  "guess": [(two[1], None, None)],
+                                  "already": [], "taken": [], "full": [],
+                                  "missing": [(two[1], None)]})
+    check("the preview counts each person, most to add first",
+          split == ["　**Bob**: 3 to add",
+                    "　**Alice**: 1 to add (1 guesses, 1 not in roster)"], str(split))
 
     await b.close()
 

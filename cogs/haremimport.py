@@ -14,6 +14,13 @@ forwards, and any list Mudae posted in the channel itself), attach the list
 as a text file, or paste it after the command. Paper only ever reads what
 Mudae, a bot, wrote; nobody's account is automated.
 
+A whole server at once: Mudae only prints one harem per command (a role
+mention finds nothing) and ignores other bots, so Paper can't ask it for
+everyone. But the `o` flag (`$mmasi-o`) writes the owner on every line
+("\U0001f49e => name"), so the admin can pull everyone's list, forward or
+paste them all into one place, and a single `$haremimport all` sorts each
+character to its owner. No need to know how Mudae titles a list.
+
 Matching is the hard part. Mudae and Paper name the same people differently:
 Mudae says "Monkey D. Luffy" from "One Piece", Paper (from AniList) says
 "Luffy Monkey" from "ONE PIECE", and Mudae's "Dungeon Meshi" is Paper's
@@ -42,9 +49,13 @@ from discord.ext import commands
 from cogs.levels import shown_names
 
 MUDAE_IDS = {432610292342587392}
-EXPORT_COMMAND = "$mmasi-"   # a: by series, s: by DM, i-: no images in the DM
+# a: by series, s: by DM, i-: no images in the DM, o: owner on every line
+EXPORT_COMMAND = "$mmasi-o"
 QUIET = discord.AllowedMentions.none()   # an import never pings anyone
 HISTORY_LIMIT = 200          # messages read back looking for Mudae's list
+BULK_HISTORY = 1500          # ...and for everyone's lists at once
+BULK_WORDS = {"all", "everyone", "server"}
+DONE_MARK = "\U0001f48d Imported"   # starts Paper's "import finished" reply
 COMMON_TOKEN = 3000          # a word on more characters than this is no clue
 
 SERIES_HEADER = re.compile(r"^(.+?)\s+-\s+\d[\d,]*\s*/\s*\d[\d,]*$")
@@ -101,10 +112,13 @@ def parse_mudae(text: str) -> list:
 
     Series headers look like "One Piece - 302/524". A line is a character if
     it sits under a header or carries an image link; the harem's title and
-    total above the first header are neither. Owner is the name after
-    \U0001f49e => when Mudae shows one, else "".
+    total above the first header are neither. When the list has image links
+    at all, only lines with one count: several people's lists pasted one
+    after another put the next title and total under the last header. Owner
+    is the name after \U0001f49e => when Mudae shows one, else "".
     """
     out, seen, series = [], set(), None
+    linked = bool(URL.search(text or ""))
     for raw in (text or "").splitlines():
         line = MARKDOWN.sub("", raw).replace("​", "").strip()
         if not line:
@@ -113,7 +127,7 @@ def parse_mudae(text: str) -> list:
         if header and not URL.search(line):
             series = header.group(1).strip()
             continue
-        if series is None and not URL.search(line):
+        if (series is None or linked) and not URL.search(line):
             continue
         owner = OWNER.search(line)
         name = _clean_name(line)
@@ -273,7 +287,31 @@ class ImportChoice(discord.ui.View):
                 pass
 
 
-async def collect_mudae(history) -> str:
+def person_lines(members: dict, plan: dict) -> list:
+    """One preview line per person, most characters to add first."""
+    counts = {mid: defaultdict(int) for mid in members}
+    for kind in ("sure", "guess", "already", "taken", "full"):
+        for who, _entry, _row in plan[kind]:
+            counts[who.id][kind] += 1
+    for who, _entry in plan["missing"]:
+        counts[who.id]["missing"] += 1
+
+    def adding(mid):
+        return counts[mid]["sure"] + counts[mid]["guess"]
+
+    out = []
+    for mid in sorted(members, key=lambda m: (-adding(m), members[m].display_name)):
+        c = counts[mid]
+        extra = [f"{c[k]:,} {label}" for k, label in (
+            ("guess", "guesses"), ("already", "already theirs"),
+            ("taken", "held by others"), ("full", "over the cap"),
+            ("missing", "not in roster")) if c[k]]
+        out.append(f"\u3000**{members[mid].display_name}**: {adding(mid):,} to add"
+                   + (f" ({', '.join(extra)})" if extra else ""))
+    return out
+
+
+async def collect_mudae(history, everything: bool = False, stop=None) -> str:
     """Mudae's most recent run of messages, from newest-first history.
 
     Skip anything until Mudae's first message, then collect until a person
@@ -282,16 +320,23 @@ async def collect_mudae(history) -> str:
     sends the list by DM, so it reaches a channel as forwards, under the
     name of whoever forwarded it. Forwards carry no original author, but
     the admin sees every match before anything changes.
+
+    With `everything`, people talking in between doesn't end it: every list
+    back to the last finished import here (`stop` says which message that
+    is) counts, so the admin can forward a whole server's lists, asking
+    Mudae for each in between.
     """
     chunks = []
     async for message in history:
+        if stop is not None and stop(message):
+            break
         forwarded = getattr(message, "message_snapshots", None) or []
         if is_mudae(message.author):
             chunks.append(message_text(message))
         elif forwarded:
             # Newest first, like the history: the whole list is flipped at the end.
             chunks.extend(message_text(s) for s in reversed(forwarded))
-        elif not message.author.bot and chunks:
+        elif not message.author.bot and chunks and not everything:
             break
     return "\n".join(reversed(chunks))
 
@@ -339,13 +384,22 @@ class HaremImport(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    async def read_mudae(self, ctx) -> str:
+    async def read_mudae(self, ctx, everything: bool = False) -> str:
         """Mudae's list as posted (or forwarded) in this channel or thread,
-        walking back from the command."""
+        walking back from the command. With `everything`, every list since
+        the last import Paper finished here."""
         before = discord.Object(id=ctx.message.id) if getattr(ctx.message, "id", None) else None
+        me = getattr(self.bot.user, "id", None)
+
+        def finished_import(message):
+            return (message.author.id == me
+                    and (message.content or "").startswith(DONE_MARK))
+
         try:
             return await collect_mudae(
-                ctx.channel.history(limit=HISTORY_LIMIT, before=before))
+                ctx.channel.history(limit=BULK_HISTORY if everything else HISTORY_LIMIT,
+                                    before=before),
+                everything=everything, stop=finished_import if everything else None)
         except discord.HTTPException:
             return ""
 
@@ -354,19 +408,26 @@ class HaremImport(commands.Cog):
     @commands.has_permissions(manage_guild=True)
     async def haremimport(self, ctx, member: typing.Optional[discord.Member] = None,
                           *, text: str = ""):
-        """Bring someone's Mudae harem over without pinging them. Run
-        `$mmasi- <their user ID>` and Mudae DMs you their list. Forward
+        """Bring Mudae harems over without pinging anyone. Run
+        `$mmasi-o <their user ID>` and Mudae DMs you their list. Forward
         those DMs here (or attach them as a text file), then run this with
-        their user ID, username or @mention. Shows every match before it
-        changes anything."""
+        their user ID, username or @mention - or `all` to import every
+        list forwarded here at once. Shows every match before it changes
+        anything."""
         db = self.bot.db
         gid = ctx.guild.id
+        first, _sep, rest = text.strip().partition(" ")
+        if member is None and first.lower() in BULK_WORDS:
+            text = rest
         source = "your file"
         if ctx.message.attachments:
             raw = [await a.read() for a in ctx.message.attachments[:5]]
             text = "\n".join(r.decode("utf-8-sig", errors="replace") for r in raw)
         elif not text.strip():
-            text, source = await self.read_mudae(ctx), "Mudae's messages here"
+            # Nobody named: every list since the last import, each line
+            # going to the owner Mudae wrote on it.
+            text = await self.read_mudae(ctx, everything=member is None)
+            source = "Mudae's lists here" if member is None else "Mudae's messages here"
         else:
             source = "what you pasted"
 
@@ -374,6 +435,13 @@ class HaremImport(commands.Cog):
         how_to_id = ("To copy a user ID: turn on Developer Mode (User Settings,"
                      " Advanced), then right-click them and pick Copy User ID.")
         word = text.strip()
+        if not entries and member is None and word.startswith("<@&"):
+            await ctx.send(
+                "That's a role - Mudae and Paper both take one person at a time."
+                f" For everyone: pull each list with `{EXPORT_COMMAND} <user ID>`,"
+                f" forward them here, then `{ctx.prefix}haremimport all`.\n{how_to_id}",
+                allowed_mentions=QUIET)
+            return
         if not entries and member is None and word and "\n" not in word and len(word) <= 40:
             # One short word that isn't a list: a name or ID that matched
             # nobody here, which the member lookup handed on as text.
@@ -385,13 +453,15 @@ class HaremImport(commands.Cog):
         if not entries:
             await ctx.send(
                 f"I couldn't find a Mudae harem list in {source}.\n"
-                f"1. Get their list without pinging anyone: `{EXPORT_COMMAND} <their"
-                " user ID>`. Mudae sends it to your DMs (the `s` in"
-                f" `{EXPORT_COMMAND}` means DM).\n"
+                f"1. Get each list without pinging anyone: `{EXPORT_COMMAND} <their"
+                " user ID>` - one person per command, not a role. Mudae sends it to"
+                " your DMs (`s` means DM, `o` writes the owner on every line)."
+                " `$tsv id` lists everyone's IDs.\n"
                 "2. Forward Mudae's DM messages into this channel, then run"
-                f" `{ctx.prefix}haremimport <their user ID>` here. Or copy the whole"
-                " list into a text file and attach it to the command.\n" + how_to_id,
-                allowed_mentions=QUIET)
+                f" `{ctx.prefix}haremimport all` here for everyone at once (or"
+                f" `{ctx.prefix}haremimport <their user ID>` for one person). Or copy"
+                " the lists into a text file and attach it to the command.\n"
+                + how_to_id, allowed_mentions=QUIET)
             return
 
         # Whose harem is whose: the member named, or the owner Mudae printed
@@ -412,7 +482,10 @@ class HaremImport(commands.Cog):
             owned.append((who, entry))
         if not owned:
             await ctx.send(
-                f"Say whose harem this is: `{ctx.prefix}haremimport <their user ID>`."
+                "Mudae's list doesn't say whose it is. Name them:"
+                f" `{ctx.prefix}haremimport <their user ID>`. Or pull lists with"
+                f" `{EXPORT_COMMAND} <user ID>` - the `o` writes the owner on every"
+                f" line, so `{ctx.prefix}haremimport all` can sort everyone's at once."
                 + (f" I couldn't find {', '.join(f'`{n}`' for n in sorted(unowned) if n)}"
                    " here." if any(unowned) else ""),
                 allowed_mentions=QUIET)
@@ -463,9 +536,18 @@ class HaremImport(commands.Cog):
                     if len(plan["missing"]) > 25 else "")
             lines.append(f"❓ **{len(plan['missing']):,}** not in Paper's roster:"
                          f" {shown}{more}")
+        if len(members) > 1:
+            lines.append("\n**Per person**")
+            lines.extend(person_lines(members, plan)[:15])
+            if len(members) > 15:
+                lines.append(f"\u3000...and {len(members) - 15:,} more people")
         if any(unowned):
             lines.append("❓ Not members here: "
-                         + ", ".join(f"`{n}`" for n in sorted(unowned) if n))
+                         + ", ".join(f"`{n}`" for n in sorted(unowned) if n)[:900])
+        if "" in unowned:
+            nameless = sum(1 for e in entries if not e[2])
+            lines.append(f"❓ **{nameless:,}** lines don't say whose they are - pull"
+                         f" lists with `{EXPORT_COMMAND}` so every line names its owner")
         lines.append("\nNobody loses a character they hold here, and running this"
                      " again only adds what's new.")
 
@@ -486,7 +568,8 @@ class HaremImport(commands.Cog):
         added = db.import_marriages(gid, [(who.id, row["id"]) for who, _e, row in chosen])
         skipped = len(chosen) - added
         await ctx.send(
-            f"\U0001f48d Imported **{added:,}** characters into {whose}'s harem."
+            f"{DONE_MARK} **{added:,}** characters into {whose}'s"
+            f" {'harem' if len(members) == 1 else 'harems'}."
             + (f" {skipped:,} were claimed by someone in the meantime." if skipped else ""),
             allowed_mentions=QUIET)
 
