@@ -4391,6 +4391,92 @@ async def main():
           split == ["　**Bob**: 3 to add",
                     "　**Alice**: 1 to add (1 guesses, 1 not in roster)"], str(split))
 
+    # localize: Paper's English swapped for the reader's language on the way out.
+    import json as _json
+    import localize as lz
+    from pathlib import Path as _Path
+    lz_dir = _Path(tempfile.mkdtemp())
+    (lz_dir / "strings").mkdir()
+    (lz_dir / "catalog.json").write_text(_json.dumps(
+        ["Nothing yet.", "Claimed **{0}**!", "roll a girl", "{0} into {1}.", "harems",
+         "{0} has {1} karuda", "Claim", "Broken {0}", "Roll a girl from an anime.",
+         "Use {{braces}} for {0}", "{0} day{1} old"]), "utf-8")
+    (lz_dir / "strings" / "xx.json").write_text(_json.dumps({
+        "Nothing yet.": "Nada todavía.", "Claimed **{0}**!": "¡Reclamaste a **{0}**!",
+        "roll a girl": "tira una chica", "{0} into {1}.": "{0} en {1}.",
+        "harems": "harenes", "{0} has {1} karuda": "{0} tiene {1} karuda",
+        "Claim": "Reclamar", "Broken {0}": "Roto",
+        "Roll a girl from an anime.": "Tira una chica de un anime.",
+        "Use {{braces}} for {0}": "Usa {{llaves}} para {0}",
+        "{0} day{1} old": "{0} día{1} de antigüedad"}), "utf-8")
+    lz.CATALOG, lz.STRINGS = lz_dir / "catalog.json", lz_dir / "strings"
+    lz._templates.cache_clear(); lz._table.cache_clear(); lz._text.cache_clear()
+    T = lambda s: lz.text(s, "xx")  # noqa: E731
+    check("localize: a known line", T("Nothing yet.") == "Nada todavía.")
+    check("localize: an f-string line keeps its value",
+          T("Claimed **Rem**!") == "¡Reclamaste a **Rem**!", T("Claimed **Rem**!"))
+    check("localize: emoji in front of a known line stay",
+          T("✅ Claimed **Rem**!") == "✅ ¡Reclamaste a **Rem**!")
+    check("localize: pieces glued to code are found",
+          T("`$w` roll a girl") == "`$w` tira una chica", T("`$w` roll a girl"))
+    check("localize: a value that is itself a known line is translated",
+          T("3 into harems.") == "3 en harenes.", T("3 into harems."))
+    check("localize: a translation that lost its {field} is not used",
+          T("Broken thing") == "Broken thing")
+    check("localize: literal braces survive",
+          T("Use {braces} for Rem") == "Usa {llaves} para Rem", T("Use {braces} for Rem"))
+    check("localize: an English plural ending the code adds is dropped",
+          T("3 days old") == "3 día de antigüedad", T("3 days old"))
+    check("localize: multi-line text goes line by line, code blocks untouched",
+          T("Nothing yet.\n```Nothing yet.```\nunknown line")
+          == "Nada todavía.\n```Nothing yet.```\nunknown line")
+    check("localize: a wrapped help paragraph is found reflowed",
+          T("Roll a girl\nfrom an anime.") == "Tira una chica de un anime.")
+    check("localize: Paper's import marker is never translated",
+          T(hi.DONE_MARK + " **3** characters into harems.").startswith(hi.DONE_MARK))
+    check("localize: English and unknown languages are left alone",
+          lz.text("Nothing yet.", "en") == "Nothing yet."
+          and lz.text("Nothing yet.", "zz") == "Nothing yet.")
+    original = discord.Embed(title="Claim", description="Nothing yet.")
+    original.add_field(name="Claim", value="Bob has 5 karuda")
+    copy = lz.embed(original, "xx")
+    check("localize: an embed is translated as a copy",
+          copy.title == "Reclamar" and copy.fields[0].value == "Bob tiene 5 karuda"
+          and original.title == "Claim" and original.fields[0].value == "Bob has 5 karuda",
+          str(copy.to_dict()))
+    lz_view = discord.ui.View()
+    lz_view.add_item(discord.ui.Button(label="Claim"))
+    lz_undo = lz._swap_components(lz_view, "xx")
+    swapped = lz_view.children[0].label
+    lz_undo()
+    check("localize: button labels swap for the send and swap back after",
+          swapped == "Reclamar" and lz_view.children[0].label == "Claim")
+    check("localize: Discord app languages map onto ours",
+          [lz.from_locale(x) for x in ("es-ES", "pt-BR", "zh-TW", "zh-CN", "da", "fr")]
+          == ["es", "pt", "zh-tw", "zh", None, "fr"])
+    async def lz_fake_send(self, content=None, **kwargs):
+        return SimpleNamespace(id=1, content=content, kwargs=kwargs)
+    lz_token = lz.current.set("xx")
+    lz_sent = await lz._wrap_send(lz_fake_send)(
+        object(), "Nothing yet.", embed=discord.Embed(title="Claim"), view=lz_view)
+    lz.current.reset(lz_token)
+    check("localize: a send goes out translated, view restored after",
+          lz_sent.content == "Nada todavía." and lz_sent.kwargs["embed"].title == "Reclamar"
+          and lz_view.children[0].label == "Claim", str(lz_sent))
+    lz.patch()
+    check("localize: every way Paper speaks is routed through it",
+          all("localize" in getattr(f, "__qualname__", "") + getattr(f, "__module__", "")
+              for f in (discord.abc.Messageable.send, discord.InteractionResponse.send_message,
+                        discord.InteractionResponse.edit_message, discord.Webhook.send,
+                        discord.Message.edit, discord.Interaction.edit_original_response)))
+    real_catalog = _json.loads((_Path(PROJECT) / "locales" / "catalog.json").read_text("utf-8"))
+    check("localize: the catalog has Paper's lines in it", len(real_catalog) > 1000)
+    for lz_file in sorted((_Path(PROJECT) / "locales" / "strings").glob("*.json")):
+        data = _json.loads(lz_file.read_text("utf-8"))
+        broken = [k for k, v in data.items() if lz._fields(k) != lz._fields(v)]
+        check(f"localize: {lz_file.stem}.json keeps every {{field}}", not broken,
+              f"{len(broken)} broken, e.g. {broken[:2]}")
+
     await b.close()
 
 

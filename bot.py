@@ -12,6 +12,7 @@ from discord.ext import commands
 
 import backup
 import config
+import localize
 from cogs import chatlogs
 from converters import NoSuchRole
 import views
@@ -171,6 +172,8 @@ class GachaBot(commands.Bot):
         # Shard icons prefer custom emoji uploaded to the server.
         utils.use_emoji_from(self)
         self.add_check(self.check_allowed)
+        # Before the cogs, so the slash commands sync with their translations.
+        await localize.install(self)
 
         self.boot_id, last = self.db.start_boot()
         if last is not None and not last["finished_at"]:

@@ -29,6 +29,7 @@ from discord.ext import commands
 from discord.ext.commands.view import StringView
 
 import config
+import localize
 from cogs import help as help_cog
 
 log = logging.getLogger("gacha.slash")
@@ -412,7 +413,8 @@ def build_tree(bot) -> list:
 
 def checksum(tree) -> int:
     payload = [c.to_dict(tree) for c in tree.get_commands()]
-    return zlib.crc32(json.dumps(payload, sort_keys=True).encode())
+    # The translations ride along at sync time, so a changed one re-syncs too.
+    return zlib.crc32(json.dumps(payload, sort_keys=True).encode() + localize.version())
 
 
 class Slash(commands.Cog):

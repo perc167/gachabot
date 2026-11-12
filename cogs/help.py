@@ -16,6 +16,7 @@ import discord
 from discord.ext import commands
 
 import config
+import localize
 
 # (icon, section, [(command, what it does), ...])
 #
@@ -790,7 +791,11 @@ class Help(commands.Cog):
             await self._one_command(ctx, command.strip().lstrip(prefix), prefix)
             return
 
-        messages = batches(help_pages(prefix))
+        # Translated before batching: other languages run longer than
+        # English, and a batch packed by English length can top Discord's
+        # 6,000 characters a message once translated.
+        code = localize.for_context(ctx)
+        messages = batches([localize.embed(e, code) for e in help_pages(prefix)])
         from cogs.profile import links_view
         last = len(messages) - 1
         try:
