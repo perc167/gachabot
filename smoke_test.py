@@ -4400,7 +4400,8 @@ async def main():
     (lz_dir / "catalog.json").write_text(_json.dumps(
         ["Nothing yet.", "Claimed **{0}**!", "roll a girl", "{0} into {1}.", "harems",
          "{0} has {1} karuda", "Claim", "Broken {0}", "Roll a girl from an anime.",
-         "Use {{braces}} for {0}", "{0} day{1} old"]), "utf-8")
+         "Use {{braces}} for {0}", "{0} day{1} old", "{0} voice", "Voice",
+         "your own voice rooms"]), "utf-8")
     (lz_dir / "strings" / "xx.json").write_text(_json.dumps({
         "Nothing yet.": "Nada todavía.", "Claimed **{0}**!": "¡Reclamaste a **{0}**!",
         "roll a girl": "tira una chica", "{0} into {1}.": "{0} en {1}.",
@@ -4408,7 +4409,8 @@ async def main():
         "Claim": "Reclamar", "Broken {0}": "Roto",
         "Roll a girl from an anime.": "Tira una chica de un anime.",
         "Use {{braces}} for {0}": "Usa {{llaves}} para {0}",
-        "{0} day{1} old": "{0} día{1} de antigüedad"}), "utf-8")
+        "{0} day{1} old": "{0} día{1} de antigüedad", "{0} voice": "{0} de voz",
+        "Voice": "Voz", "your own voice rooms": "tus propias salas de voz"}), "utf-8")
     lz.CATALOG, lz.STRINGS = lz_dir / "catalog.json", lz_dir / "strings"
     lz._templates.cache_clear(); lz._table.cache_clear(); lz._text.cache_clear()
     T = lambda s: lz.text(s, "xx")  # noqa: E731
@@ -4427,6 +4429,10 @@ async def main():
           T("Use {braces} for Rem") == "Usa {llaves} para Rem", T("Use {braces} for Rem"))
     check("localize: an English plural ending the code adds is dropped",
           T("3 days old") == "3 día de antigüedad", T("3 days old"))
+    lz_help = "\U0001f50a **Voice** — your own voice rooms  ·  `$help voice`"
+    check("localize: a one-word template doesn't swallow a glued help line",
+          T(lz_help) == "\U0001f50a **Voz** — tus propias salas de voz  ·  `$help voice`",
+          T(lz_help))
     check("localize: multi-line text goes line by line, code blocks untouched",
           T("Nothing yet.\n```Nothing yet.```\nunknown line")
           == "Nada todavía.\n```Nothing yet.```\nunknown line")

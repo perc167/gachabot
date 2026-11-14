@@ -96,7 +96,7 @@ def _fields(template: str) -> set:
 
 class Template:
     """One catalog line with fields, as a regex that pulls the values out."""
-    __slots__ = ("english", "regex", "weight")
+    __slots__ = ("english", "regex", "weight", "loose")
 
     def __init__(self, english: str):
         self.english = english
@@ -112,6 +112,9 @@ class Template:
         self.regex = re.compile("".join(pattern), re.S)
         # More fixed text = more specific: "{0} claimed {1}!" beats "{0}!".
         self.weight = len(FIELD.sub("", english))
+        # One fixed word ("{0} voice", "{0} characters") says too little to
+        # be trusted with a value that is itself several words of prose.
+        self.loose = len(re.findall(r"[^\W\d_]{2,}", FIELD.sub(" ", english))) < 2
 
 
 @lru_cache(maxsize=1)
@@ -201,6 +204,9 @@ def _template(text: str, table, depth: int):
         if not match:
             continue
         values = {k[1:]: v for k, v in match.groupdict().items()}
+        if template.loose and any(len(re.findall(r"[^\W\d_]{2,}", v)) >= 2
+                                  for v in values.values()):
+            continue
         for k, v in values.items():
             # English grammar the code fills in itself - the "s" of
             # "day{1}", the "is" of "There {0} only..." - means nothing in
