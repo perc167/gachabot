@@ -204,7 +204,7 @@ class Bulk(commands.Cog):
         kept = db.starwish_count(gid, ctx.author.id)
         await ctx.send(f"Cleared **{len(rows)}** wishes."
                        + (f" Your {kept} starwish{'es' if kept != 1 else ''} stayed;"
-                          f" `{ctx.prefix}starwish remove <name>` drops one." if kept else ""))
+                          f" `{ctx.prefix}wr <name>` drops one." if kept else ""))
 
     @commands.command(name="series", aliases=["sr", "mudanime", "anime", "sl"])
     @commands.guild_only()

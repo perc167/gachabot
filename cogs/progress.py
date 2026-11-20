@@ -1,12 +1,13 @@
 """Badges and the karuda tower.
 
 Two long-term karuda sinks. Badges are seven materials of four levels each,
-climbed one level at a time; the tower is a ladder of floors. Both feed the
-same perks table, so a player sees one combined effect rather than having to
-add things up themselves.
+bought Mudae style: `$iron` buys the next level, `$iron 3` buys three; the
+tower is a ladder of floors. Both feed the same perks table, so a player
+sees one combined effect rather than having to add things up themselves.
 
-A badge level replaces the one below it rather than stacking on it, so the
-number shown beside a badge is what it is worth, not what it adds.
+Badge levels stack like Mudae's, so the line beside a badge you own shows
+everything it adds so far, and the next-level price shows what that level
+adds on top.
 """
 import discord
 from discord.ext import commands
@@ -56,7 +57,7 @@ class Progress(commands.Cog):
 
             head = f"{mark} **{badge.name} {level}**"
             if level >= perks.LEVELS:
-                lines.append(f"{head} · **maxed** · {badge.describe(level)}")
+                lines.append(f"{head} · **maxed** · {badge.describe_total(level)}")
                 continue
 
             price = perks.badge_price(db, gid, member.id, badge, level + 1)
@@ -68,7 +69,7 @@ class Progress(commands.Cog):
 
         top = perks.LEVELS * len(perks.BADGES)
         lines += ["", f"**Karuda tower:** {ctx.prefix}tower",
-                  f"**Buy a level:** {ctx.prefix}buybadge <name>"
+                  f"**Buy:** {ctx.prefix}iron, or {ctx.prefix}iron 3 for three levels"
                   if mine else f"**Badges:** {owned_levels}/{top} levels"]
 
         embed = discord.Embed(
@@ -81,21 +82,32 @@ class Progress(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(name="buybadge", aliases=["bb", "upgradebadge"])
+    @commands.command(name="buybadge",
+                      aliases=["bb", "upgradebadge", *perks.BADGES_BY_KEY])
     @commands.guild_only()
-    async def buybadge(self, ctx, *, name: str):
-        """Climb a badge one level. `$buybadge gold`"""
+    async def buybadge(self, ctx, *, name: str = ""):
+        """Buy badge levels, Mudae style. `$iron` buys the next level,
+        `$iron 3` buys three at once; `$buybadge gold 2` works too."""
         db = self.bot.db
         gid = ctx.guild.id
-        wanted = name.strip().lower()
+        words = name.split()
+        count = 1
+        if words and words[-1].isdigit():
+            count = int(words.pop())
+        invoked = (ctx.invoked_with or "").lower()
+        wanted = invoked if invoked in perks.BADGES_BY_KEY else " ".join(words).lower()
         badge = next(
             (b for b in perks.BADGES
              if b.key == wanted or b.name.lower() == wanted),
             None,
         )
         if not badge:
-            names = ", ".join(b.name for b in perks.BADGES)
-            await ctx.send(f"No badge called `{name}`. There is: {names}.")
+            names = ", ".join(f"`{ctx.prefix}{b.key}`" for b in perks.BADGES)
+            await ctx.send(f"No badge called `{wanted or name}`. There is: {names}."
+                           f" Add a number to buy several levels: `{ctx.prefix}iron 3`.")
+            return
+        if count < 1:
+            await ctx.send(f"Buy at least one level: `{ctx.prefix}{badge.key} 1`.")
             return
 
         levels = db.badge_levels(gid, ctx.author.id)
@@ -114,30 +126,36 @@ class Progress(commands.Cog):
             )
             return
 
-        price = perks.badge_price(db, gid, ctx.author.id, badge, level + 1)
+        # Asking for more than is left buys up to IV, as Mudae does.
+        target = min(perks.LEVELS, level + count)
+        price = sum(perks.badge_price(db, gid, ctx.author.id, badge, n)
+                    for n in range(level + 1, target + 1))
         balance = db.get_player(gid, ctx.author.id)["karuda"]
+        span = (f"{badge.name} {perks.ROMAN[level]}" if target == level + 1
+                else f"{badge.name} {perks.ROMAN[level]}-{perks.ROMAN[target - 1]}")
         if balance < price:
-            await ctx.send(
-                f"{mark} **{badge.name} {perks.ROMAN[level]}** costs"
-                f" {price:,}; you have {balance:,}."
-            )
+            await ctx.send(f"{mark} **{span}** costs {price:,}; you have {balance:,}.")
             return
 
         db.add_karuda(gid, ctx.author.id, -price)
-        db.raise_badge(gid, ctx.author.id, badge.key, level + 1)
+        db.raise_badge(gid, ctx.author.id, badge.key, target)
         earned = perks.effective(db, gid, ctx.author.id)
 
+        gained = [f"**{perks.ROMAN[n - 1]}** {badge.describe(n)}"
+                  for n in range(level + 1, target + 1)]
+        reached = (f"\n\n\U0001f31f You just reached **{badge.name.upper()} IV**!"
+                   if target == perks.LEVELS else "")
         embed = discord.Embed(
-            title=f"{self._badge_icon(badge, level + 1)}  "
-                  f"{badge.name} {perks.ROMAN[level]}",
-            description=f"{badge.describe(level + 1)}"
-                        f"\n\nYour perks: _{perks.describe(earned)}_",
+            title=f"{self._badge_icon(badge, target)}  "
+                  f"{badge.name} {perks.ROMAN[target - 1]}",
+            description="\n".join(gained) + reached
+                        + f"\n\nYour perks: _{perks.describe(earned)}_",
             colour=config.CARD_COLOUR,
         )
-        nxt = badge.price(level + 2)
+        nxt = perks.badge_price(db, gid, ctx.author.id, badge, target + 1)
         embed.set_footer(
             text=f"-{price:,} karuda"
-                 + (f" · {perks.ROMAN[level + 1]} costs {nxt:,}" if nxt else
+                 + (f" · {perks.ROMAN[target]} costs {nxt:,}" if nxt else
                     " · maxed")
         )
         await ctx.send(embed=embed)
@@ -309,7 +327,8 @@ class Progress(commands.Cog):
             inline=True,
         )
         marks = " ".join(
-            perks.BADGES_BY_KEY[key][1] for key in owned if key in perks.BADGES_BY_KEY
+            self._badge_icon(perks.BADGES_BY_KEY[key], level)
+            for key, level in owned.items() if key in perks.BADGES_BY_KEY
         )
         embed.add_field(
             name="From",

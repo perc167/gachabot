@@ -11,14 +11,16 @@ often as a new one, not ten times.
 
 import premium
 
-# Badges are seven materials of four levels each, climbed one level at a
-# time. A level replaces the one below it rather than stacking on it, so
-# Gold III is 9% and not 3+6+9 - which is what the numbers below say, and
-# what keeps a maxed player about half again as strong as a new one rather
-# than ten times.
+# Badges are seven materials of four levels each, built the way Mudae builds
+# its kakera badges: every level adds to the ones below it (Gold III is
+# 3+3+3%), a level costs the badge's base times the level (I = 1x, IV = 4x,
+# so a badge costs ten times its base to max), and level IV gives a bigger
+# step, sometimes with a bonus on top, like Mudae's IV titles. `$iron 3`
+# buys three levels at once, as `$bronze 3` does in Mudae.
 #
-# Order is the order they are worth buying in, and the price of a level is
-# the base times the level, so a material costs ten times its base to max.
+# Bases follow Mudae's ladder (1000/2000/3000/5000/7000/9000), except that
+# Diamond - the discount, Mudae's Ruby IV - is cheap enough to be worth
+# buying early, which is the "cheapest route" Mudae players take.
 LEVELS = 4
 ROMAN = ("I", "II", "III", "IV")
 
@@ -27,30 +29,42 @@ class Badge:
     """One material: its levels, its price, and the perk it grants."""
 
     __slots__ = ("key", "name", "fallback", "base", "perk", "amounts",
-                 "blurb", "unlock")
+                 "blurb", "unlock", "bonus", "bonus_text")
 
     def __init__(self, key, name, fallback, base, perk, amounts, blurb,
-                 unlock=0):
+                 unlock=0, bonus=None, bonus_text=""):
         self.key = key
         self.name = name
         self.fallback = fallback      # emoji used until the PNG is uploaded
         self.base = base
         self.perk = perk
-        self.amounts = amounts        # what each level grants, I to IV
+        self.amounts = amounts        # what each level adds, I to IV
         self.blurb = blurb
         # 0 is on the shelf from the start. 1, 2 and 3 need the three
         # starters at that level first, so the later materials are something
         # to work towards rather than a wall of prices on day one.
         self.unlock = unlock
+        self.bonus = bonus or {}      # extra perks that come with level IV
+        self.bonus_text = bonus_text
 
     def amount(self, level: int) -> int:
+        """What this one level adds."""
         return self.amounts[max(1, min(level, LEVELS)) - 1]
 
+    def total_at(self, level: int) -> int:
+        """What every level up to this one adds up to."""
+        return sum(self.amounts[:max(0, min(level, LEVELS))])
+
     def perk_at(self, level: int) -> dict:
-        return {self.perk: self.amount(level)} if level else {}
+        if not level:
+            return {}
+        perk = {self.perk: self.total_at(level)}
+        if level >= LEVELS:
+            perk.update(self.bonus)
+        return perk
 
     def price(self, level: int):
-        """What the next level costs, or None past the top."""
+        """What this level costs, or None past the top."""
         if 1 <= level <= LEVELS:
             return self.base * level
         return None
@@ -58,29 +72,44 @@ class Badge:
     def total(self) -> int:
         return sum(self.base * n for n in range(1, LEVELS + 1))
 
-    def describe(self, level: int) -> str:
-        amount = self.amount(level)
+    def _text(self, amount: int) -> str:
         # "+1 rolls" reads like a typo, so the blurbs carry a {s} the count
         # fills in. Blurbs without one are unaffected.
         return f"+{amount}{self.blurb.format(s='' if amount == 1 else 's')}"
 
+    def describe(self, level: int) -> str:
+        """What buying this level adds."""
+        text = self._text(self.amount(level))
+        if level >= LEVELS and self.bonus_text:
+            text += f", and {self.bonus_text}"
+        return text
+
+    def describe_total(self, level: int) -> str:
+        """What a player at this level has from the badge, all told."""
+        text = self._text(self.total_at(level))
+        if level >= LEVELS and self.bonus_text:
+            text += f", and {self.bonus_text}"
+        return text
+
 
 BADGES = [
-    Badge("paper", "Paper", "\U0001f4c4", 800, "wish_slots",
-          (1, 2, 3, 5), " wishlist slot{s}"),
-    Badge("iron", "Iron", "\u2699\ufe0f", 1200, "rolls",
-          (1, 2, 3, 4), " roll{s} per window"),
-    Badge("gold", "Gold", "\U0001f947", 1800, "grab_percent",
-          (3, 6, 9, 12), "% from every karuda grab"),
-    Badge("emerald", "Emerald", "\U0001f49a", 2600, "daily_percent",
-          (5, 10, 18, 25), "% on your daily drops", unlock=1),
-    Badge("opal", "Opal", "\U0001f52e", 3600, "claim_percent",
-          (5, 10, 15, 20), "% off the claim wait", unlock=2),
-    Badge("amethyst", "Amethyst", "\U0001f49c", 5000, "wish_chance",
-          (4, 8, 12, 18), "% chance a roll is someone you wished for",
+    Badge("paper", "Paper", "📄", 1000, "wish_slots",
+          (1, 1, 1, 1), " wishlist slot{s}",
+          bonus={"wish_claim_karuda": 500},
+          bonus_text="+500 karuda whenever you claim one of your own wishes"),
+    Badge("iron", "Iron", "⚙️", 2000, "rolls",
+          (1, 1, 1, 2), " roll{s} per window"),
+    Badge("gold", "Gold", "🥇", 3000, "grab_percent",
+          (3, 3, 3, 6), "% from every karuda grab"),
+    Badge("emerald", "Emerald", "💚", 5000, "daily_percent",
+          (5, 5, 5, 10), "% on your daily drops", unlock=1),
+    Badge("opal", "Opal", "🔮", 7000, "claim_percent",
+          (5, 5, 5, 5), "% off the claim wait", unlock=2),
+    Badge("amethyst", "Amethyst", "💜", 9000, "wish_chance",
+          (4, 4, 4, 6), "% chance a roll is someone you wished for",
           unlock=3),
-    Badge("diamond", "Diamond", "\U0001f48e", 7000, "badge_discount",
-          (5, 10, 15, 25), "% off every other badge"),
+    Badge("diamond", "Diamond", "💎", 4000, "badge_discount",
+          (5, 5, 5, 10), "% off every other badge"),
 ]
 
 BADGES_BY_KEY = {badge.key: badge for badge in BADGES}
@@ -204,6 +233,8 @@ EMPTY = {
     # the price of every other badge. Both arrived with the levelled badges.
     "wish_chance": 0,
     "badge_discount": 0,
+    # Paper IV: karuda for claiming one of your own wishes (Mudae's Bronze IV).
+    "wish_claim_karuda": 0,
     # From the tower's chosen floors.
     "star_boost": 0,
     "key_on_wish": 0,
@@ -232,6 +263,8 @@ def describe(perks: dict) -> str:
         parts.append(f"+{perks['karuda_percent']}% karuda")
     if perks.get("wish_chance"):
         parts.append(f"+{perks['wish_chance']}% wish rolls")
+    if perks.get("wish_claim_karuda"):
+        parts.append(f"+{perks['wish_claim_karuda']} karuda per wish claimed")
     if perks.get("badge_discount"):
         parts.append(f"-{perks['badge_discount']}% badge prices")
     if perks.get("star_boost"):

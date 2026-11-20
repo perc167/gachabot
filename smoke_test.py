@@ -1617,22 +1617,31 @@ async def main():
     pool = sorted(db.search_characters("", limit=100000),
                   key=lambda r: r["like_rank"] or 99999)
     check("everyone starts with 8 wish slots", wishes.capacity(db, WG, BOB) == 8)
-    check("starwishes cost 2, then 4, then 6",
-          [wishes.next_star_cost(n) for n in range(3)] == [2, 4, 6]
-          and [wishes.star_cost(n) for n in range(4)] == [0, 2, 6, 12])
+    check("1st starwish is just its own slot, then +2, +4 sacrificed (Mudae)",
+          [wishes.next_star_cost(n) for n in range(3)] == [1, 3, 5]
+          and [wishes.star_cost(n) for n in range(4)] == [0, 1, 4, 9])
     for row in pool[10:13]:
         db.add_wish(WG, BOB, row["id"])
     check("a starwish folds a plain wish into it",
           db.add_starwish(WG, BOB, pool[10]["id"]) and db.wish_count(WG, BOB) == 2
           and db.starwish_count(WG, BOB) == 1)
     check("a starwish needs no wish first", db.add_starwish(WG, BOB, pool[20]["id"]))
-    check("slots used: 2 wishes + starwishes costing 2 and 4",
-          wishes.used(db, WG, BOB) == 8 and wishes.room(db, WG, BOB) == 0)
+    check("slots used: 2 wishes + starwishes costing 1 and 3",
+          wishes.used(db, WG, BOB) == 6 and wishes.room(db, WG, BOB) == 2)
     check("starwishers are pinged like wishers", db.wishers_of(WG, pool[20]["id"]) == [BOB])
     db.claim(WG, pool[11]["id"], ALICE)
     got = {row["id"]: starred for row, starred in db.wish_candidates(WG, BOB)}
     check("only unclaimed wishes tilt rolls, starwishes marked",
           got == {pool[10]["id"]: 1, pool[12]["id"]: 0, pool[20]["id"]: 1}, str(got))
+    # Mudae's $swr: the star comes off, the wish stays; $swrall does them all.
+    check("$swr unstars and keeps the wish",
+          db.unstar(WG, BOB, pool[20]["id"]) == 1 and db.starwish_count(WG, BOB) == 1
+          and any(r["id"] == pool[20]["id"] for r in db.wishes_of(WG, BOB)))
+    check("$swrall unstars the rest", db.unstar(WG, BOB) == 1
+          and db.starwish_count(WG, BOB) == 0
+          and any(r["id"] == pool[10]["id"] for r in db.wishes_of(WG, BOB)))
+    db.add_starwish(WG, BOB, pool[10]["id"])
+    db.add_starwish(WG, BOB, pool[20]["id"])
     check("8 wishes land about 1 roll in 250, and never more than 1 in 4",
           abs(wishes.chance(8) - 1 / 250) < 1e-9 and wishes.chance(10 ** 6) == wishes.MOST_OFTEN)
 
@@ -3509,9 +3518,16 @@ async def main():
           not db.raise_badge(GUILD, CLIMBER, "iron", 2))
     check("badge perk applies at its level",
           perksmod.effective(db, GUILD, CLIMBER)["rolls"] == 2)
-    check("a level replaces the one below, it does not stack",
+    check("levels stack like Mudae's, IV the biggest step",
           db.raise_badge(GUILD, CLIMBER, "iron", 3)
-          and perksmod.effective(db, GUILD, CLIMBER)["rolls"] == 3)
+          and perksmod.effective(db, GUILD, CLIMBER)["rolls"] == 3
+          and perksmod.BADGES_BY_KEY["iron"].perk_at(4) == {"rolls": 5})
+    paper = perksmod.BADGES_BY_KEY["paper"]
+    check("Paper IV adds karuda for claiming your own wish",
+          paper.perk_at(4).get("wish_claim_karuda") == 500
+          and "wish_claim_karuda" not in paper.perk_at(3))
+    check("Mudae prices: a level costs base x level",
+          [paper.price(n) for n in range(1, 5)] == [1000, 2000, 3000, 4000])
     db.raise_badge(GUILD, CLIMBER, "iron", 2)  # no going back down
     check("a badge never goes down", db.badge_level(GUILD, CLIMBER, "iron") == 3)
     check("badges are per server", db.badge_levels(999, CLIMBER) == {})

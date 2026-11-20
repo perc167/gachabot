@@ -4288,6 +4288,21 @@ class Database:
         self.conn.commit()
         return cur.rowcount > 0
 
+    def unstar(self, guild_id: int, user_id: int, character_id: int = None) -> int:
+        """Mudae's $swr: take the star off but keep them wished. None does
+        every starwish ($swrall). Returns how many lost their star."""
+        where, args = "guild_id = ? AND user_id = ?", [guild_id, user_id]
+        if character_id is not None:
+            where += " AND character_id = ?"
+            args.append(character_id)
+        with self.conn:
+            self.conn.execute(
+                f"INSERT OR IGNORE INTO wishes (guild_id, user_id, character_id)"
+                f" SELECT guild_id, user_id, character_id FROM starwishes WHERE {where}",
+                args)
+            cur = self.conn.execute(f"DELETE FROM starwishes WHERE {where}", args)
+        return cur.rowcount
+
     def wish_candidates(self, guild_id: int, user_id: int, gender: str = None,
                         kind: str = None) -> list:
         """This player's unclaimed wishes and starwishes that this roll could

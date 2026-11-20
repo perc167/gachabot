@@ -138,10 +138,11 @@ class Personalise(commands.Cog):
     @commands.command(name="starwish", aliases=["star", "sw", "firstwish"])
     @commands.guild_only()
     async def starwish(self, ctx, *, name: str = None):
-        """A wish that rolls five times as often as a normal one, for wish
-        slots: the first costs 2, the next 4, the next 6. `$starwish <name>`
-        stars someone, `$starwish` shows yours, `$starwish remove <name>`
-        gives the slots back."""
+        """A wish with a star: it rolls five times as often. Your first
+        starwish only uses its own wish slot; each one after sacrifices 2,
+        then 4, then 6 more, as in Mudae. `$sw <name>` stars someone, `$sw`
+        shows yours, `$swr <name>` takes a star off (the wish stays) and
+        `$wr <name>` removes the wish entirely."""
         db = self.bot.db
         gid, uid = ctx.guild.id, ctx.author.id
         starred = db.starwishes_of(gid, uid)
@@ -155,27 +156,16 @@ class Personalise(commands.Cog):
                 + f"\n\nA starwish rolls **{wishes.STAR_WEIGHT}x** as often as a normal"
                   f" wish. Your next one costs **{next_cost}** wish slots; you have"
                   f" **{max(0, wishes.room(db, gid, uid))}** free."
-                  f"\n`{ctx.prefix}starwish <name>` to add one,"
-                  f" `{ctx.prefix}starwish remove <name>` to give one up.",
+                  f"\n`{ctx.prefix}sw <name>` to add one,"
+                  f" `{ctx.prefix}swr <name>` to take a star off (they stay wished),"
+                  f" `{ctx.prefix}swrall` for every star,"
+                  f" `{ctx.prefix}wr <name>` to drop the wish too.",
                 colour=config.CARD_COLOUR))
             return
 
         words = name.strip().split(maxsplit=1)
         if words[0].lower() in ("remove", "unstar", "drop", "delete"):
-            if len(words) < 2 or not starred:
-                await ctx.send(f"Say who: `{ctx.prefix}starwish remove <name>`."
-                               if starred else "You have no starwishes.")
-                return
-            query = words[1].lower()
-            rows = [r for r in starred if query in r["name"].lower()]
-            character = await choose_character(ctx, rows, "Which one?", config.CARD_COLOUR) \
-                if rows else None
-            if not character:
-                await ctx.send(f"`{words[1]}` isn't one of your starwishes.")
-                return
-            db.remove_starwish(gid, uid, character["id"])
-            await ctx.send(f"**{character['name']}** isn't a starwish any more, and"
-                           f" the slots are yours again.")
+            await self._unstar(ctx, words[1] if len(words) > 1 else "")
             return
 
         matches = db.find_by_name_or_alias(gid, uid, name)
@@ -205,7 +195,7 @@ class Personalise(commands.Cog):
         left = free - cost
         view = Confirm({uid})
         view.message = await ctx.send(
-            f"\u2b50 Starwish **{character['name']}**? This sacrifices **{cost}** of your"
+            f"\u2b50 Starwish **{character['name']}**? This uses **{cost}** of your"
             f" wish slots" + (" (their wish is folded in)" if was_wished else "")
             + f", leaving you **{left}** free. They'll roll {wishes.STAR_WEIGHT}x as often"
               " as a normal wish.", view=view)
@@ -215,6 +205,46 @@ class Personalise(commands.Cog):
             return
         db.add_starwish(gid, uid, character["id"])
         await ctx.send(f"\u2b50 **{character['name']}** is a starwish now.")
+
+    async def _unstar(self, ctx, query: str):
+        """Mudae's $swr: the star comes off, the wish stays."""
+        db = self.bot.db
+        gid, uid = ctx.guild.id, ctx.author.id
+        starred = db.starwishes_of(gid, uid)
+        if not starred:
+            await ctx.send("You have no starwishes.")
+            return
+        if not query:
+            await ctx.send(f"Say who: `{ctx.prefix}swr <name>`, or `{ctx.prefix}swrall`"
+                           " for all of them.")
+            return
+        # Either order of a name works: "Nanashi Mumei" finds Mumei Nanashi.
+        parts = query.lower().split()
+        rows = [r for r in starred if all(p in r["name"].lower() for p in parts)]
+        character = await choose_character(ctx, rows, "Which one?", config.CARD_COLOUR) \
+            if rows else None
+        if not character:
+            await ctx.send(f"`{query}` isn't one of your starwishes.")
+            return
+        db.unstar(gid, uid, character["id"])
+        await ctx.send(f"**{character['name']}** isn't a starwish any more, but stays on"
+                       f" your wishlist. `{ctx.prefix}wr {character['name']}` removes the"
+                       " wish too.")
+
+    @commands.command(name="starwishremove", aliases=["swr", "unstar"])
+    @commands.guild_only()
+    async def starwishremove(self, ctx, *, name: str = ""):
+        """Take the star off a starwish; they stay on your wishlist. `$swr <name>`"""
+        await self._unstar(ctx, name.strip())
+
+    @commands.command(name="starwishremoveall", aliases=["swrall"])
+    @commands.guild_only()
+    async def starwishremoveall(self, ctx):
+        """Take the star off every starwish; they all stay on your wishlist."""
+        gone = self.bot.db.unstar(ctx.guild.id, ctx.author.id)
+        await ctx.send(f"Took the star off **{gone}** starwish{'es' if gone != 1 else ''};"
+                       " they're still on your wishlist." if gone
+                       else "You have no starwishes.")
 
     @commands.command(name="wishprotect", aliases=["wp"])
     @commands.guild_only()

@@ -2,10 +2,11 @@
 
 Slots
     Everyone has the server's wish_limit (8 by default), plus slots bought in
-    the shop, from badges and from Premium. A wish uses one. Starwishes cost
-    more each time, like Mudae's: the first uses 2 slots, the second 4 more,
-    the third 6 more (star_cost). A starwish doesn't need the character
-    wished first; if they were, the plain wish is folded into it.
+    the shop, from badges and from Premium. A wish uses one. Starwishes work
+    like Mudae's: a starwish is a wish with a star, so the first uses just
+    its own slot, and each one after sacrifices more - the second 2 extra
+    slots, the third 4, the fourth 6 (star_cost). $swr takes the star off
+    and leaves the wish; $wr removes the wish, star and all.
 
 Rolls
     Each roll first has a chance of landing on one of your own unclaimed
@@ -29,13 +30,15 @@ MOST_OFTEN = 0.25        # never more than one roll in four, however many
 
 
 def star_cost(count: int) -> int:
-    """Slots used by this many starwishes: 2, then 4 more, then 6 more..."""
-    return count * (count + 1)
+    """Slots used by this many starwishes, their own wish slots included:
+    1 each, plus the 2, 4, 6... sacrificed for every one after the first."""
+    return count * count
 
 
 def next_star_cost(count: int) -> int:
-    """Slots the next starwish would take, with `count` already."""
-    return 2 * (count + 1)
+    """Slots the next starwish would take, with `count` already: its own
+    wish slot plus 2 per starwish already held."""
+    return 2 * count + 1
 
 
 def capacity(db, guild_id: int, user_id: int) -> int:

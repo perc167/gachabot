@@ -80,7 +80,7 @@ GUILD_SETTINGS = {
         35, 0, 100,
         "How strongly rolls favour well-known characters (0 = flat pool)",
     ),
-    "wish_limit": (8, 1, 200, "Wish slots each person has (a starwish uses 2, then 4, then 6)"),
+    "wish_limit": (8, 1, 200, "Wish slots each person has (1st starwish free, then +2, +4, +6)"),
     "custom_limit": (50, 0, 2000, "Custom characters a server may add"),
     "dk_snipe": (1, 0, 1, "Let others take the shard you leave behind (0/1)"),
     "dk_protect_seconds": (

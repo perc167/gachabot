@@ -60,8 +60,14 @@ class Wishlist(commands.Cog):
         """`$unwish` — pick from your wishlist, or name someone directly."""
         db = self.bot.db
         gid = ctx.guild.id
+        # Starwishes are wishes with a star, as in Mudae, so $wr finds them too.
+        listed = [*db.starwishes_of(gid, ctx.author.id), *db.wishes_of(gid, ctx.author.id)]
         if name:
-            matches = db.find_characters_by_name(name, guild_id=gid)
+            # Your own list first, either order of a name: "Nanashi Mumei"
+            # finds the Mumei Nanashi you wished for, not a namesake.
+            parts = name.lower().split()
+            matches = [r for r in listed if all(p in r["name"].lower() for p in parts)] \
+                or db.find_characters_by_name(name, guild_id=gid)
             character = await choose_character(
                 ctx, matches, "Which one?", config.CARD_COLOUR
             )
@@ -69,7 +75,7 @@ class Wishlist(commands.Cog):
                 await ctx.send(f"No character matching `{name}`.")
                 return
         else:
-            rows = db.wishes_of(ctx.guild.id, ctx.author.id)
+            rows = listed
             if not rows:
                 await ctx.send("Your wishlist is empty.")
                 return
@@ -84,8 +90,10 @@ class Wishlist(commands.Cog):
             character = view.chosen
             if not character:
                 return
-        if db.remove_wish(ctx.guild.id, ctx.author.id, character["id"]):
-            await ctx.send(f"Removed **{character['name']}** from your wishlist.")
+        starred = db.remove_starwish(gid, ctx.author.id, character["id"])
+        if db.remove_wish(gid, ctx.author.id, character["id"]) or starred:
+            star = "⭐ " if starred else ""
+            await ctx.send(f"Removed {star}**{character['name']}** from your wishlist.")
         else:
             await ctx.send(f"**{character['name']}** is not on your wishlist.")
 
@@ -123,7 +131,7 @@ class Wishlist(commands.Cog):
             )
             embed.set_footer(
                 text=f"Page {page_no}/{len(pages)} • {wishes.used(db, gid, member.id)}/{limit}"
-                     f" slots used • \u2b50 starwishes use 2, then 4, then 6"
+                     f" slots used • \u2b50 1st starwish free, then +2, +4, +6 slots"
             )
             embeds.append(embed)
 

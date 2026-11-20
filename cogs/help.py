@@ -86,7 +86,7 @@ CATEGORIES = [
     ]),
     ("\U0001f3c5", "Badges & tower", [
         ("badges", "seven materials, four levels each"),
-        ("buybadge", "climb one a level"),
+        ("buybadge", "$iron 3 buys three levels"),
         ("kt", "the karuda tower"),
         ("build", "build a floor"),
         ("destroy", "refund your tower"),
@@ -196,6 +196,8 @@ CATEGORIES = [
     ]),
     ("🌟", "Wish settings", [
         ("starwish", "5x wish, costs slots"),
+        ("starwishremove", "unstar, keep the wish"),
+        ("starwishremoveall", "unstar them all"),
         ("wishdm", "pings by DM"),
         ("wishsort", "how it sorts"),
         ("wishprotect", "how long it holds"),

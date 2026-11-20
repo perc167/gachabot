@@ -94,6 +94,10 @@ class ClaimView(discord.ui.View):
         if chance and random.random() * 100 < chance:
             got, held = perks.earn_keys(db, self.guild_id, user.id, 1)
             key_note = f" \U0001f511 +{got} key{'s' if got > 1 else ''} (you hold {held})"
+        # Paper IV, like Mudae's Bronze IV: karuda for landing your own wish.
+        if earned["wish_claim_karuda"] and user.id in self.wishers:
+            db.add_karuda(self.guild_id, user.id, earned["wish_claim_karuda"])
+            key_note += f" +{earned['wish_claim_karuda']:,} karuda for a wish"
 
         # Wishes are consumed once granted, for everyone who wanted them.
         for wisher in self.wishers:
