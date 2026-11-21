@@ -693,6 +693,11 @@ def character_card(db, guild_id: int, character, *, random_art: bool = False,
     the embed points at. Choosing it twice would let a random-art roll attach
     a different picture than the one it displays.
     """
+    if image_url is None and not random_art:
+        # The picture whoever claimed them here picked with $c, Mudae style:
+        # it changes their claim on this server and nowhere else.
+        pinned = db.note_of(guild_id, character["id"]) if guild_id else None
+        image_url = pinned["note_image"] if pinned and pinned["note_image"] else None
     if image_url is None:
         image_url = (db.random_image(character["id"]) if random_art
                      else character["image_url"])

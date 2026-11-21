@@ -271,11 +271,13 @@ class Aliases(commands.Cog):
 
     @commands.command(name="changeimg", aliases=["setmainimg", "c"])
     @commands.guild_only()
-    @commands.has_permissions(manage_guild=True)
     async def changeimg(self, ctx, *, args: str = None):
         """`$changeimg <character> | <number>` — pick which picture leads.
 
-        Mudae's `$c Rem$2` works too."""
+        As in Mudae, whoever claimed them picks the picture for their claim on
+        this server, no permission needed. Someone with Manage Server can
+        change an unclaimed character's main picture, which is shared by
+        every server. Mudae's `$c Rem$2` works too."""
         if args and "|" not in args and "$" in args:
             args = "|".join(args.rsplit("$", 1))
         if not args or "|" not in args:
@@ -294,7 +296,21 @@ class Aliases(commands.Cog):
         if not 1 <= index <= len(urls):
             await ctx.send(f"They have {len(urls)} pictures, so 1 to {len(urls)}.")
             return
-        self.bot.db.update_character(character["id"], image_url=urls[index - 1])
+        db = self.bot.db
+        owner = db.owner_of(ctx.guild.id, character["id"])
+        if owner == ctx.author.id:
+            db.set_note_image(ctx.guild.id, character["id"], ctx.author.id, urls[index - 1])
+            embed, art = utils.character_card(db, ctx.guild.id, character)
+            await ctx.send(f"Picture {index} leads for your **{character['name']}**"
+                           " on this server.", embed=embed, **art)
+            return
+        if not ctx.author.guild_permissions.manage_guild:
+            await ctx.send(f"Only whoever claimed **{character['name']}** here can change"
+                           " their picture." if owner else
+                           f"Claim **{character['name']}** first; then `{ctx.prefix}c"
+                           f" {character['name']} | {index}` sets their picture here.")
+            return
+        db.update_character(character["id"], image_url=urls[index - 1])
         embed, art = utils.character_card(
             self.bot.db, ctx.guild.id, self.bot.db.get_character(character["id"])
         )
