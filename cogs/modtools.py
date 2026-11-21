@@ -948,8 +948,8 @@ class ModTools(commands.Cog):
 
     @commands.group(name="lockdown", aliases=["lock"], invoke_without_command=True)
     @commands.guild_only()
-    @commands.has_permissions(manage_channels=True)
-    @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
+    @commands.bot_has_permissions(manage_roles=True)
     async def lockdown(self, ctx, channel: Optional[discord.TextChannel] = None,
                        *, reason: str = ""):
         """Stop everyone typing in a channel. This one, if you don't name one."""
@@ -959,21 +959,21 @@ class ModTools(commands.Cog):
         await ctx.send(f"{channel.mention} is locked.")
 
     @lockdown.command(name="all")
-    @commands.has_permissions(manage_channels=True)
-    @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
+    @commands.bot_has_permissions(manage_roles=True)
     async def lockdown_all(self, ctx, *, reason: str = ""):
         """Lock every channel except the ignored ones. For raids."""
         await self.lock_many(ctx, True, reason)
 
     @lockdown.group(name="ignore", invoke_without_command=True)
-    @commands.has_permissions(manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
     async def lockdown_ignore(self, ctx, channel: discord.TextChannel):
         """Leave a channel alone during $lockdown all."""
         self.db.ignore_lockdown(ctx.guild.id, channel.id)
         await ctx.send(f"{channel.mention} will stay open during a full lockdown.")
 
     @lockdown_ignore.command(name="list")
-    @commands.has_permissions(manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
     async def lockdown_ignore_list(self, ctx):
         """Channels a full lockdown leaves alone."""
         ids = self.db.lockdown_ignored(ctx.guild.id)
@@ -983,7 +983,7 @@ class ModTools(commands.Cog):
             colour=self.colour(ctx.guild.id)))
 
     @lockdown_ignore.command(name="remove")
-    @commands.has_permissions(manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
     async def lockdown_ignore_remove(self, ctx, channel: discord.TextChannel):
         """Include a channel in full lockdowns again."""
         gone = self.db.unignore_lockdown(ctx.guild.id, channel.id)
@@ -1001,8 +1001,8 @@ class ModTools(commands.Cog):
     @commands.group(name="unlockdown", aliases=["unlock"],
                     invoke_without_command=True)
     @commands.guild_only()
-    @commands.has_permissions(manage_channels=True)
-    @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
+    @commands.bot_has_permissions(manage_roles=True)
     async def unlockdown(self, ctx, channel: Optional[discord.TextChannel] = None,
                          *, reason: str = ""):
         """Let everyone type in a channel again."""
@@ -1012,8 +1012,8 @@ class ModTools(commands.Cog):
         await ctx.send(f"{channel.mention} is unlocked.")
 
     @unlockdown.command(name="all")
-    @commands.has_permissions(manage_channels=True)
-    @commands.bot_has_permissions(manage_roles=True, manage_channels=True)
+    @commands.has_permissions(manage_roles=True)
+    @commands.bot_has_permissions(manage_roles=True)
     async def unlockdown_all(self, ctx, *, reason: str = ""):
         """Unlock every channel a full lockdown locked."""
         await self.lock_many(ctx, False, reason)

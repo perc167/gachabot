@@ -65,6 +65,14 @@ Stripe's customer and subscription IDs and the plan's status, and never sees
 card details.</li>
 </ul>
 
+<h2>The server list on this website</h2>
+<p>Servers are <strong>not</strong> listed on this website unless they opt in.
+A server appears only after someone with Manage Server runs
+<code>$sitelist on</code> in it, and <code>$sitelist off</code> takes it off
+again at any time. A listed server shows just its name, icon and member count,
+nothing about its members. The totals on the home page (servers and users) are
+plain counts and name no one.</p>
+
 <h2>What Paper keeps only briefly</h2>
 <ul>
 <li><strong>Recent messages</strong> are held in memory, never in the

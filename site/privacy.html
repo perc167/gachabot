@@ -514,6 +514,14 @@ Stripe's customer and subscription IDs and the plan's status, and never sees
 card details.</li>
 </ul>
 
+<h2>The server list on this website</h2>
+<p>Servers are <strong>not</strong> listed on this website unless they opt in.
+A server appears only after someone with Manage Server runs
+<code>$sitelist on</code> in it, and <code>$sitelist off</code> takes it off
+again at any time. A listed server shows just its name, icon and member count,
+nothing about its members. The totals on the home page (servers and users) are
+plain counts and name no one.</p>
+
 <h2>What Paper keeps only briefly</h2>
 <ul>
 <li><strong>Recent messages</strong> are held in memory, never in the
@@ -662,7 +670,10 @@ Office of the Australian Information Commissioner at
   if (!section || !window.fetch) return;
   fetch("https://gachabot-production-fbd6.up.railway.app/api/servers").then(function(r){ return r.ok ? r.json() : null; })
     .then(function(data){
-      if (!data || !data.list || !data.list.length) return;
+      if (!data || !data.servers) return;
+      // The totals always show; the scrolling list only holds servers that
+      // asked to be on it ($sitelist on), so it may be empty.
+      section.hidden = false;
       document.getElementById("srv-users").textContent = data.users.toLocaleString("en");
       document.getElementById("srv-count").textContent = data.servers.toLocaleString("en");
       if (data.servers === 1) document.getElementById("srv-word").textContent = "community";
@@ -684,9 +695,9 @@ Office of the Australian Information Commissioner at
         text.append(name, count); el.append(pic, text);
         return el;
       }
-      data.list.forEach(function(s){ track.appendChild(item(s)); });
-      section.hidden = false;
       var marquee = track.parentNode;
+      if (!data.list || !data.list.length) { marquee.hidden = true; return; }
+      data.list.forEach(function(s){ track.appendChild(item(s)); });
       // Only scroll when there's more than fits; a copy of the list follows
       // the first so the loop has no seam.
       if (track.scrollWidth > marquee.clientWidth) {
