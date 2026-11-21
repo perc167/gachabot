@@ -3527,7 +3527,7 @@ async def main():
           paper.perk_at(4).get("wish_claim_karuda") == 500
           and "wish_claim_karuda" not in paper.perk_at(3))
     check("Mudae prices: a level costs base x level",
-          [paper.price(n) for n in range(1, 5)] == [1000, 2000, 3000, 4000])
+          [paper.price(n) for n in range(1, 5)] == [800, 1600, 2400, 3200])
     db.raise_badge(GUILD, CLIMBER, "iron", 2)  # no going back down
     check("a badge never goes down", db.badge_level(GUILD, CLIMBER, "iron") == 3)
     check("badges are per server", db.badge_levels(999, CLIMBER) == {})

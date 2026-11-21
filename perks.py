@@ -18,7 +18,10 @@ import premium
 # step, sometimes with a bonus on top, like Mudae's IV titles. `$iron 3`
 # buys three levels at once, as `$bronze 3` does in Mudae.
 #
-# Bases follow Mudae's ladder (1000/2000/3000/5000/7000/9000), except that
+# Prices are scaled to Paper's economy, not Mudae's: a $dk is a few hundred
+# karuda where Mudae hands out thousands of kakera, so the full set is about
+# 213k (Mudae's ladder came to 310k and was months of play). Each badge's
+# strength rises with its price, so the locked ones are worth the climb.
 # Diamond - the discount, Mudae's Ruby IV - is cheap enough to be worth
 # buying early, which is the "cheapest route" Mudae players take.
 LEVELS = 4
@@ -93,22 +96,30 @@ class Badge:
 
 
 BADGES = [
-    Badge("paper", "Paper", "📄", 1000, "wish_slots",
-          (1, 1, 1, 1), " wishlist slot{s}",
+    # Full set: 8k + 30k + 20k + 30k + 40k + 55k + 30k = 213k.
+    Badge("paper", "Paper", "📄", 800, "wish_slots",
+          (1, 1, 1, 2), " wishlist slot{s}",
           bonus={"wish_claim_karuda": 500},
           bonus_text="+500 karuda whenever you claim one of your own wishes"),
-    Badge("iron", "Iron", "⚙️", 2000, "rolls",
+    # Rolls are the strongest perk (+5 is half again a 10-roll window), so
+    # Iron is the dearest starter.
+    Badge("iron", "Iron", "⚙️", 3000, "rolls",
           (1, 1, 1, 2), " roll{s} per window"),
-    Badge("gold", "Gold", "🥇", 3000, "grab_percent",
-          (3, 3, 3, 6), "% from every karuda grab"),
-    Badge("emerald", "Emerald", "💚", 5000, "daily_percent",
-          (5, 5, 5, 10), "% on your daily drops", unlock=1),
-    Badge("opal", "Opal", "🔮", 7000, "claim_percent",
-          (5, 5, 5, 5), "% off the claim wait", unlock=2),
-    Badge("amethyst", "Amethyst", "💜", 9000, "wish_chance",
-          (4, 4, 4, 6), "% chance a roll is someone you wished for",
-          unlock=3),
-    Badge("diamond", "Diamond", "💎", 4000, "badge_discount",
+    Badge("gold", "Gold", "🥇", 2000, "grab_percent",
+          (4, 4, 4, 8), "% from every karuda grab",
+          bonus={"grab_cooldown": 20},
+          bonus_text="karuda grabs come back 20% sooner"),
+    Badge("emerald", "Emerald", "💚", 3000, "daily_percent",
+          (10, 10, 10, 20), "% on your daily drops", unlock=1,
+          bonus={"daily_offers": 1},
+          bonus_text="+1 shard to choose from in $dk"),
+    Badge("opal", "Opal", "🔮", 4000, "claim_percent",
+          (5, 5, 5, 10), "% off the claim wait", unlock=2),
+    Badge("amethyst", "Amethyst", "💜", 5500, "wish_chance",
+          (4, 4, 4, 8), "% chance a roll is someone you wished for",
+          unlock=3, bonus={"star_boost": 50},
+          bonus_text="starwishes roll 50% more often"),
+    Badge("diamond", "Diamond", "💎", 3000, "badge_discount",
           (5, 5, 5, 10), "% off every other badge"),
 ]
 
