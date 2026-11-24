@@ -460,16 +460,10 @@ class Rolling(commands.Cog):
             await ctx.send(f"**{ctx.author.display_name}**, next {ctx.prefix}daily"
                            f" reset in **{fmt_duration(wait)}**.")
             return
-        if result == "reset":
-            left, _ = cooldowns.rolls_left(gid, uid)
-            await ctx.send(f"✅ **{ctx.author.display_name}**, your rolls are"
-                           f" reset: **{left}** rolls to go.")
-            return
         stock = self.bot.db.get_player(gid, uid)["roll_resets"]
         await ctx.send(
-            f"✅ **{ctx.author.display_name}**, your rolls are already full,"
-            f" so the reset went in the bank ({stock} in stock)."
-            f" `{ctx.prefix}us` uses it once you've rolled.")
+            f"✅ **{ctx.author.display_name}**, +1 rolls reset in the bank"
+            f" (**{stock}** in stock). `{ctx.prefix}us` uses one whenever you want.")
 
     @commands.command(name="us", aliases=["userolls", "rollreset", "rollsreset"])
     @commands.guild_only()

@@ -4194,9 +4194,10 @@ async def main():
     check("an empty bank says so", dcd.use_reset(GUILD, ALICE) == "none")
     ddb.update_player(GUILD, ALICE, rolls_daily_at=0)
     dcd.spend_roll(GUILD, ALICE)
-    check("$daily after rolling resets them at once",
-          dcd.take_daily(GUILD, ALICE) == "reset"
-          and dcd.rolls_left(GUILD, ALICE)[0] == full)
+    check("$daily after rolling still banks, Mudae style",
+          dcd.take_daily(GUILD, ALICE) == "banked"
+          and dcd.rolls_left(GUILD, ALICE)[0] == full - 1
+          and ddb.get_player(GUILD, ALICE)["roll_resets"] == 1)
 
     check("$rt is locked without Opal IV or Premium",
           not dcd.rt_unlocked(GUILD, BOB))

@@ -37,7 +37,7 @@ CATEGORIES = [
         ("tu", "every timer you have"),
         ("mu", "when you can claim"),
         ("ru", "rolls left"),
-        ("daily", "free rolls reset, every 20h"),
+        ("daily", "bank a rolls reset, every 20h"),
         ("us", "use a banked rolls reset"),
         ("rt", "free claim reset (Opal IV / Plus)"),
         ("limroul", "how deep the rolls go"),

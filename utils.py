@@ -439,16 +439,16 @@ class Cooldowns:
         return remaining <= 0, max(0, remaining)
 
     def take_daily(self, guild_id: int, user_id: int) -> str:
-        """$daily. Returns "reset", "banked", or "" when it isn't ready."""
+        """$daily. Returns "banked", or "" when it isn't ready.
+
+        As in Mudae, the reset always goes into stock and $us spends it when
+        you choose. Spending it on the spot wasted it whenever your rolls were
+        about to refill anyway."""
         if not self.daily_ready(guild_id, user_id)[0]:
             return ""
-        self.rolls_left(guild_id, user_id)  # settle the window first
         player = self.db.get_player(guild_id, user_id)
         self.db.update_player(guild_id, user_id,
                               rolls_daily_at=now() + self.DAILY_ROLLS)
-        if player["rolls_used"] > 0:
-            self.db.update_player(guild_id, user_id, rolls_used=0)
-            return "reset"
         self.db.update_player(guild_id, user_id,
                               roll_resets=player["roll_resets"] + 1)
         return "banked"
