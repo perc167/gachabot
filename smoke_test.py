@@ -1686,6 +1686,20 @@ async def main():
         check(f"harem order '{order}'", isinstance(rows, list) and len(rows) == 1)
     check("note set", db.set_note(GUILD, second["id"], BOB, "best girl"))
     check("note stored", db.harem(GUILD, BOB)[0]["note"] == "best girl")
+    # $c: the claimer's pick leads the card and the $im album, on this server only.
+    import utils as card_utils
+    db.add_image(second["id"], "https://example.com/c1.png")
+    db.add_image(second["id"], "https://example.com/c2.png")
+    album = db.images_for(second["id"])
+    pick = album[-1]
+    db.set_note_image(GUILD, second["id"], BOB, pick)
+    _embeds, pages = card_utils.character_pages(db, GUILD, db.get_character(second["id"]))
+    check("$c pick opens the $im album", pages[0] == pick and sorted(pages) == sorted(album),
+          str(pages))
+    check("$c pick is what the card shows",
+          card_utils.character_card(db, GUILD, second)[0].image.url == pick
+          and card_utils.pinned_image(db, GUILD + 1, second["id"]) is None)
+    db.set_note_image(GUILD, second["id"], BOB, None)
     check("harem leaderboard", db.top_harems(GUILD)[0]["user_id"] == BOB)
     check("karuda leaderboard", db.top_karuda(GUILD)[0]["user_id"] == ALICE)
 

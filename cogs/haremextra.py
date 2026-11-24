@@ -24,7 +24,8 @@ def cards(db, guild_id: int, rows, member, order: str, note: str = None):
         footer = f"{position}/{total} · {member.display_name} · by {order}"
         if note:
             footer = f"{note} · {footer}"
-        image = db.random_image(row["id"]) or row["image_url"]
+        image = (utils.pinned_image(db, guild_id, row["id"]) or db.random_image(row["id"])
+                     or row["image_url"])
         embeds.append(utils.character_embed(db, guild_id, row,
                                             image_url=image, footer=footer))
         art.append(image)

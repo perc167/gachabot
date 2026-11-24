@@ -121,7 +121,8 @@ class Harem(commands.Cog):
                       f" • {total_karuda:,} karuda total • by {order}")
             if note:
                 footer = f"“{note}” • {footer}"
-            image = db.random_image(row["id"]) or row["image_url"]
+            image = (utils.pinned_image(db, gid, row["id"]) or db.random_image(row["id"])
+                     or row["image_url"])
             card = utils.character_embed(db, gid, row, image_url=image,
                                          footer=footer[:2048])
             colour = harem_colour(db, gid, member.id)

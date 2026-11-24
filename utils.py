@@ -568,6 +568,8 @@ def character_embed(
     embed.description = f"> {character['series']}"
 
     if image_url is None:
+        image_url = pinned_image(db, guild_id, character["id"])
+    if image_url is None:
         image_url = (
             db.random_image(character["id"]) if random_art else character["image_url"]
         )
@@ -680,6 +682,14 @@ def iter_roster(path: str):
             yield json.loads(line)
 
 
+def pinned_image(db, guild_id, character_id):
+    """The picture whoever claimed them here chose with $c (or $noteimg).
+    Mudae style: it is what everyone on this server sees for that claim, and
+    no other server is touched. None when nobody pinned one."""
+    row = db.note_of(guild_id, character_id) if guild_id else None
+    return row["note_image"] if row and row["note_image"] else None
+
+
 def character_card(db, guild_id: int, character, *, random_art: bool = False,
                    image_url: str = None, **kwargs):
     """The card, plus whatever has to be attached alongside it.
@@ -693,11 +703,8 @@ def character_card(db, guild_id: int, character, *, random_art: bool = False,
     the embed points at. Choosing it twice would let a random-art roll attach
     a different picture than the one it displays.
     """
-    if image_url is None and not random_art:
-        # The picture whoever claimed them here picked with $c, Mudae style:
-        # it changes their claim on this server and nowhere else.
-        pinned = db.note_of(guild_id, character["id"]) if guild_id else None
-        image_url = pinned["note_image"] if pinned and pinned["note_image"] else None
+    if image_url is None:
+        image_url = pinned_image(db, guild_id, character["id"])
     if image_url is None:
         image_url = (db.random_image(character["id"]) if random_art
                      else character["image_url"])
@@ -718,12 +725,24 @@ def character_pages(db, guild_id: int, character, *, footer: str = None,
     urls = db.images_for(character["id"]) or []
     if not urls:
         urls = [character["image_url"]] if character["image_url"] else [""]
+    # Open on the lead picture - the $c pick for this server, else the main
+    # one - keeping each picture's own number, so `$c name | 3` still means
+    # "Image 3" after the album has been turned round.
+    lead = pinned_image(db, guild_id, character["id"]) or character["image_url"]
+    numbered = list(enumerate(urls, 1))
+    if lead in urls:
+        at = urls.index(lead)
+        numbered = numbered[at:] + numbered[:at]
+    elif lead and lead != urls[0]:
+        numbered = [(0, lead)] + numbered   # a $noteimg link outside the album
+    urls = [url for _n, url in numbered]
 
+    album = sum(1 for n, _url in numbered if n)
     embeds = []
-    for index, url in enumerate(urls, 1):
+    for index, url in numbered:
         tail = footer or ""
         if len(urls) > 1:
-            page = f"Image {index}/{len(urls)}"
+            page = f"Image {index}/{album}" if index else "Pinned image"
             tail = f"{page} • {tail}" if tail else page
         embeds.append(
             character_embed(db, guild_id, character, image_url=url,
